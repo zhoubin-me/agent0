@@ -35,7 +35,9 @@ class Actor:
         self.action_dim = self.train_envs.action_space.n
         self.state_shape = self.train_envs.observation_space.shape
         self.network = NatureCNN(self.state_shape[-1], self.action_dim).to(self.device)
+        self.min_epsilon = self.min_epsilons[self.rank]
         self.epsilon_schedule = LinearSchedule(1.0, self.min_epsilon, int(1e6))
+
         self.R = np.zeros(self.num_envs)
         self.Rs = []
 
@@ -48,7 +50,8 @@ class Actor:
             qs = self.network(inp)
             actions_greedy = qs.argmax(dim=-1).tolist()
             actions_random = np.random.randint(0, self.action_dim, self.num_envs)
-            epsilon = self.epsilon_schedule(4)
+            # epsilon = self.epsilon_schedule(4)
+            epsilon = self.min_epsilon
         actions = [act_greedy if rnd > epsilon else act_random
                    for rnd, act_greedy, act_random in zip(np.random.rand(4), actions_greedy, actions_random)]
         return actions
@@ -68,7 +71,7 @@ class Actor:
                     self.Rs.append(self.R[n])
                     self.R[n] = 0
             self.obs = obs_next
-        # print(np.mean(Rs), np.meant())
+        print(self.rank, self.min_epsilon, np.mean(self.Rs), np.std(self.Rs), np.max(self.Rs))
         return data
 
     def set_network(self, network):
@@ -76,7 +79,7 @@ class Actor:
 
 
 @ray.remote(num_gpus=0.5)
-class Agent:
+class Learner:
     def __init__(self, **kwargs):
         for k, v in kwargs.items():
             setattr(self, k, v)
@@ -199,7 +202,7 @@ class Sampler:
 
 
 
-class Trainer:
+class Agent:
     def __init__(self, **kwargs):
         for k, v in kwargs.items():
             setattr(self, k, v)
@@ -217,7 +220,7 @@ class Trainer:
             batch_size=128,
             discount=0.99,
             target_update_freq=100,
-            min_epsilon = 0.01,
+            min_epsilons=[0.99, 0.8, 0.2, 0.01],
         )
 
     def setup(self):
@@ -226,9 +229,9 @@ class Trainer:
             for k, v in kwargs.items():
                 setattr(self, k, v)
 
-        self.agent = Agent.remote(**kwargs)
+        self.learner = Learner.remote(**kwargs)
         self.sampler = Sampler.remote(**kwargs)
-        self.actors = [Actor.remote(**kwargs) for _ in range(self.num_actors)]
+        self.actors = [Actor.remote(**kwargs.update(rank=n)) for n in range(self.num_actors)]
 
 
     def warmup(self):
@@ -248,11 +251,11 @@ class Trainer:
         for step in range(1000):
             sampler_ops = [self.sampler.add_entries.remote(a.step.remote(self.actor_steps)) for a in self.actors]
 
-            agent_train_op = self.agent.train.remote(self.sampler.sample.remote())
-            actor_sync_op = [a.set_network.remote(self.agent.get_latest_network.remote()) for a in self.actors]
+            learner_train_op = self.learner.train.remote(self.sampler.sample.remote())
+            actor_sync_op = [a.set_network.remote(self.learner.get_latest_network.remote()) for a in self.actors]
             sampler_count_op = self.sampler.get_count.remote()
             # agent_test_op = self.agent.test.remote()
-            loss, count, *_ = ray.get([agent_train_op, sampler_count_op] + sampler_ops + actor_sync_op)
+            loss, count, *_ = ray.get([learner_train_op, sampler_count_op] + sampler_ops + actor_sync_op)
             print(step, loss, count)
         toc = time.time()
         print(ray.get(self.sampler.get_count.remote()) / (toc - tic))
