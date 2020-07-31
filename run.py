@@ -1,13 +1,15 @@
+import os
+os.environ['CUDA_VISIBLE_DEVICES'] = '8,9'
+
 import ray
 import neptune
 from src.agents.dqn_agent import Agent
 
 if __name__ == '__main__':
 
-    ray.init(num_cpus=10, num_gpus=2)
-    neptune.init('zhoubinxyz/agentzero')
+    ray.init(num_cpus=32, num_gpus=2)
     agent = Agent()
-    agent.run()
+    agent.benchmark()
 
 
 

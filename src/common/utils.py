@@ -1,4 +1,20 @@
 
+from prefetch_generator import BackgroundGenerator
+from torch.utils.data import Dataset, DataLoader
+
+class ReplayDataset(Dataset):
+    def __init__(self, data):
+        self.data = data
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        return self.data[idx]
+
+class DataLoaderX(DataLoader):
+    def __iter__(self):
+        return BackgroundGenerator(super().__iter__())
 
 class LinearSchedule:
     def __init__(self, start, end=None, steps=None):
