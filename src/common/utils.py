@@ -14,7 +14,7 @@ class ReplayDataset(Dataset):
 
 class DataLoaderX(DataLoader):
     def __iter__(self):
-        return BackgroundGenerator(super().__iter__())
+        return BackgroundGenerator(super().__iter__(), max_prefetch=3)
 
 class LinearSchedule:
     def __init__(self, start, end=None, steps=None):
