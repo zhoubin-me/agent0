@@ -2,6 +2,7 @@ import ray
 import copy
 import time
 import numpy as np
+import neptune
 
 import torch
 import torch.nn as nn
@@ -62,6 +63,7 @@ class Actor:
 
     def step(self, steps):
         data = []
+        self.Rs = []
         for step in range(steps):
             actions, epsilon = self.get_actions()
             obs_next, rewards, dones, infos = self.train_envs.step(actions)
@@ -72,9 +74,10 @@ class Actor:
                     self.Rs.append(self.R[n])
                     self.R[n] = 0
             self.obs = obs_next
-        # if len(self.Rs) > 0:
-        # print(self.rank, epsilon, np.mean(self.Rs[-100:]), np.std(self.Rs[-100:]), np.max(self.Rs[-100:]))
         return data
+
+    def get_Rs(self):
+        return self.Rs
 
     def set_network(self, network):
         self.network = copy.deepcopy(network)
@@ -139,7 +142,6 @@ class Learner:
         self.network_target = copy.deepcopy(self.network)
         self.optimizer = torch.optim.Adam(self.network.parameters(), self.adam_lr, eps=self.adam_eps)
         self.update_steps = 0
-        self.Ls = []
 
 
     def train(self, data):
@@ -165,12 +167,12 @@ class Learner:
         self.optimizer.step()
 
         self.update_steps += 1
-        self.Ls.append(loss.item())
 
         if self.update_steps % self.target_update_freq == 0:
             self.network_target.load_state_dict(self.network.state_dict())
 
-        return np.mean(self.Ls[-100:])
+        return loss.item()
+
 
     def get_latest_network(self):
         return self.network
@@ -198,12 +200,6 @@ class Learner:
         return torch.from_numpy(np.array(obs)).unsqueeze(0).float().permute(0, 3, 1, 2).to(self.device) / 255.0
 
 
-
-
-
-
-
-
 class Agent:
     def __init__(self, **kwargs):
         for k, v in kwargs.items():
@@ -211,7 +207,8 @@ class Agent:
 
         self.setup()
 
-    def default_params(self):
+    @staticmethod
+    def default_params():
         return dict(
             env_id='Breakout',
             num_envs=4,
@@ -220,7 +217,7 @@ class Agent:
             adam_lr=1e-4,
             replay_size=int(1e6),
             num_actors=4,
-            actor_steps=4,
+            actor_steps=16,
             batch_size=32,
             discount=0.99,
             target_update_freq=10000,
@@ -237,13 +234,13 @@ class Agent:
             for k, v in kwargs.items():
                 setattr(self, k, v)
 
+        neptune.create_experiment(name=self.env_id, params=vars(self))
         actors_total_steps = self.actor_steps * self.num_actors * self.num_envs
 
         kwargs.update(
                 target_update_freq=self.target_update_freq // actors_total_steps,
                 exploration_steps=self.exploration_steps // (self.num_envs * self.num_actors),
-                batch_size=self.batch_size * self.num_actors * self.num_envs,
-        )
+                batch_size=(self.batch_size * self.num_actors * self.num_envs * self.actor_steps) // 4)
 
         self.start_update_steps = self.start_update_steps // (actors_total_steps)
         self.epoch_steps = self.total_steps // (self.epoches * actors_total_steps)
@@ -251,6 +248,8 @@ class Agent:
         self.learner = Learner.remote(**kwargs)
         self.sampler = Sampler.remote(**kwargs)
         self.actors = [Actor.remote(rank=n, **kwargs) for n in range(self.num_actors)]
+
+
 
 
     def warmup(self):
@@ -270,14 +269,25 @@ class Agent:
             learner_train_op = self.learner.train.remote(self.sampler.sample.remote())
             actor_sync_op = [a.set_network.remote(self.learner.get_latest_network.remote()) for a in self.actors]
             sampler_count_op = self.sampler.get_count.remote()
-            # agent_test_op = self.agent.test.remote()
             loss, count, *_ = ray.get([learner_train_op, sampler_count_op] + sampler_ops + actor_sync_op)
+
+
+            neptune.send_metric('loss', loss)
+            Rs = ray.get([a.get_Rs.remote() for a in self.actors])
+            for rank, R in enumerate(Rs):
+                for r in R:
+                    neptune.send_metric(f'{rank}_ep_reward', r)
+
+
         toc = time.time()
-        print(ray.get(self.sampler.get_count.remote()) / (toc - tic))
+        epoch_time = toc - tic
+        epoch_speed = (self.total_steps / self.epoches) / epoch_time
+        neptune.send_metric("epoch_speed", epoch_speed)
+        neptune.send_metric("epoch_time", epoch_time)
 
     def run(self):
         self.warmup()
         for epoch in range(self.epoches):
-            print("Epoch ", epoch)
+            print(f"Epoch ------- {epoch} -------------")
             self.train()
 
