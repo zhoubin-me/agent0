@@ -36,8 +36,9 @@ class Actor:
         self.state_shape = self.train_envs.observation_space.shape
         self.network = NatureCNN(self.state_shape[-1], self.action_dim).to(self.device)
         self.min_epsilon = self.min_epsilons[self.rank]
-        self.epsilon_schedule = LinearSchedule(1.0, self.min_epsilon, int(1e6))
+        self.epsilon_schedule = LinearSchedule(1.0, self.min_epsilon, self.exploration_steps)
 
+        self.steps = 0
         self.R = np.zeros(self.num_envs)
         self.Rs = []
 
@@ -48,21 +49,21 @@ class Actor:
         with torch.no_grad():
             inp = self.get_inp(self.obs)
             qs = self.network(inp)
-            actions_greedy = qs.argmax(dim=-1).tolist()
+            epsilon = self.epsilon_schedule()
             actions_random = np.random.randint(0, self.action_dim, self.num_envs)
-            # epsilon = self.epsilon_schedule(4)
-            epsilon = self.min_epsilon
+            actions_greedy = qs.argmax(dim=-1).tolist()
         actions = [act_greedy if rnd > epsilon else act_random
                    for rnd, act_greedy, act_random in zip(np.random.rand(4), actions_greedy, actions_random)]
-        return actions
+        return actions, epsilon
 
     def get_random_actions(self):
         return np.random.randint(0, self.train_envs.action_space.n, self.num_envs)
 
+
     def step(self, steps):
         data = []
         for step in range(steps):
-            actions = self.get_actions()
+            actions, epsilon = self.get_actions()
             obs_next, rewards, dones, infos = self.train_envs.step(actions)
             self.R += np.array(rewards)
             for n, entry in enumerate(zip(self.obs, actions, rewards, dones, obs_next)):
@@ -71,12 +72,55 @@ class Actor:
                     self.Rs.append(self.R[n])
                     self.R[n] = 0
             self.obs = obs_next
-        print(self.rank, self.min_epsilon, np.mean(self.Rs), np.std(self.Rs), np.max(self.Rs))
+        # if len(self.Rs) > 0:
+        # print(self.rank, epsilon, np.mean(self.Rs[-100:]), np.std(self.Rs[-100:]), np.max(self.Rs[-100:]))
         return data
 
     def set_network(self, network):
         self.network = copy.deepcopy(network)
 
+@ray.remote(num_gpus=0.1)
+class Sampler:
+    def __init__(self, **kwargs):
+        for k, v in kwargs.items():
+            setattr(self, k, v)
+
+        self.device = torch.device(f'cuda:{self.gpu_id}' if self.gpu_id >= 0 else 'cpu')
+        self.buffer = ReplayBuffer(self.replay_size)
+        self.stream = torch.cuda.Stream()
+        self.data = None
+        self.count = 0
+
+    def preload(self):
+        try:
+            data = self.buffer.sample(self.batch_size)
+            self.data = map(lambda x: torch.from_numpy(x), data)
+        except:
+            print("Cannot preload")
+            return
+
+        with torch.cuda.stream(self.stream):
+            self.data = list(x.to(self.device, non_blocking=True) for x in self.data)
+
+    def sample(self):
+        torch.cuda.current_stream().wait_stream(self.stream)
+        data = self.data
+        self.preload()
+        return data
+
+    def add(self, entry):
+        self.buffer.add(entry)
+        self.count += 1
+
+    def add_entries(self, entries):
+        for entry in entries:
+            self.add(entry)
+
+        if self.data is None and self.count > self.batch_size:
+            self.preload()
+
+    def get_count(self):
+        return self.count
 
 @ray.remote(num_gpus=0.5)
 class Learner:
@@ -93,7 +137,7 @@ class Learner:
         self.test_env = make_env(self.env_id)
         self.network = NatureCNN(4, self.test_env.action_space.n).to(self.device)
         self.network_target = copy.deepcopy(self.network)
-        self.optimizer = torch.optim.Adam(self.network.parameters(), self.lr)
+        self.optimizer = torch.optim.Adam(self.network.parameters(), self.adam_lr, eps=self.adam_eps)
         self.update_steps = 0
         self.Ls = []
 
@@ -156,48 +200,6 @@ class Learner:
 
 
 
-@ray.remote(num_gpus=0.1)
-class Sampler:
-    def __init__(self, **kwargs):
-        for k, v in kwargs.items():
-            setattr(self, k, v)
-
-        self.device = torch.device(f'cuda:{self.gpu_id}' if self.gpu_id >= 0 else 'cpu')
-        self.buffer = ReplayBuffer(self.replay_size)
-        self.stream = torch.cuda.Stream()
-        self.data = None
-        self.count = 0
-
-    def preload(self):
-        try:
-            data = self.buffer.sample(self.batch_size)
-            self.data = map(lambda x: torch.from_numpy(x), data)
-        except:
-            print("Cannot preload")
-            return
-
-        with torch.cuda.stream(self.stream):
-            self.data = list(x.to(self.device, non_blocking=True) for x in self.data)
-
-    def sample(self):
-        torch.cuda.current_stream().wait_stream(self.stream)
-        data = self.data
-        self.preload()
-        return data
-
-    def add(self, entry):
-        self.buffer.add(entry)
-        self.count += 1
-
-    def add_entries(self, entries):
-        for entry in entries:
-            self.add(entry)
-
-        if self.data is None and self.count > self.batch_size:
-            self.preload()
-
-    def get_count(self):
-        return self.count
 
 
 
@@ -206,6 +208,7 @@ class Agent:
     def __init__(self, **kwargs):
         for k, v in kwargs.items():
             setattr(self, k, v)
+
         self.setup()
 
     def default_params(self):
@@ -213,14 +216,19 @@ class Agent:
             env_id='Breakout',
             num_envs=4,
             gpu_id=0,
-            lr=1e-4,
+            adam_eps=0.00015,
+            adam_lr=1e-4,
             replay_size=int(1e6),
             num_actors=4,
-            actor_steps=32,
-            batch_size=128,
+            actor_steps=4,
+            batch_size=32,
             discount=0.99,
-            target_update_freq=100,
-            min_epsilons=[0.99, 0.8, 0.2, 0.01],
+            target_update_freq=10000,
+            start_update_steps=20000,
+            exploration_steps=int(1e6),
+            total_steps=int(1e7),
+            epoches=100,
+            min_epsilons=[0.01, 0.02, 0.05, 0.1],
         )
 
     def setup(self):
@@ -229,40 +237,47 @@ class Agent:
             for k, v in kwargs.items():
                 setattr(self, k, v)
 
+        actors_total_steps = self.actor_steps * self.num_actors * self.num_envs
+
+        kwargs.update(
+                target_update_freq=self.target_update_freq // actors_total_steps,
+                exploration_steps=self.exploration_steps // (self.num_envs * self.num_actors),
+                batch_size=self.batch_size * self.num_actors * self.num_envs,
+        )
+
+        self.start_update_steps = self.start_update_steps // (actors_total_steps)
+        self.epoch_steps = self.total_steps // (self.epoches * actors_total_steps)
+
         self.learner = Learner.remote(**kwargs)
         self.sampler = Sampler.remote(**kwargs)
-        self.actors = [Actor.remote(**kwargs.update(rank=n)) for n in range(self.num_actors)]
+        self.actors = [Actor.remote(rank=n, **kwargs) for n in range(self.num_actors)]
 
 
     def warmup(self):
         tic = time.time()
         # Filling Sampler
-        for step in range(10):
+        for step in range(self.start_update_steps):
             sampler_ops = [self.sampler.add_entries.remote(a.step.remote(self.actor_steps)) for a in self.actors]
             ray.get(sampler_ops)
-            print(ray.get(self.sampler.get_count.remote()))
-
         toc = time.time()
-        print("Warmming up:", ray.get(self.sampler.get_count.remote()) / (toc - tic))
+        print("Warmming up speed:", ray.get(self.sampler.get_count.remote()) / (toc - tic))
 
     def train(self):
         # Start Training
         tic = time.time()
-        for step in range(1000):
+        for step in range(self.epoch_steps):
             sampler_ops = [self.sampler.add_entries.remote(a.step.remote(self.actor_steps)) for a in self.actors]
-
             learner_train_op = self.learner.train.remote(self.sampler.sample.remote())
             actor_sync_op = [a.set_network.remote(self.learner.get_latest_network.remote()) for a in self.actors]
             sampler_count_op = self.sampler.get_count.remote()
             # agent_test_op = self.agent.test.remote()
             loss, count, *_ = ray.get([learner_train_op, sampler_count_op] + sampler_ops + actor_sync_op)
-            print(step, loss, count)
         toc = time.time()
         print(ray.get(self.sampler.get_count.remote()) / (toc - tic))
 
     def run(self):
         self.warmup()
-        for epoch in range(10):
+        for epoch in range(self.epoches):
             print("Epoch ", epoch)
             self.train()
 
