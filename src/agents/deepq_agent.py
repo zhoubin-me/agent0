@@ -2,13 +2,14 @@ import ray
 import time
 import numpy as np
 from collections import deque
+import neptune
 from tqdm import tqdm
+from functools import reduce
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision as tv
-from functools import reduce
 
 from src.common.vec_env import ShmemVecEnv, VecEnvWrapper, DummyVecEnv
 from src.common.utils import LinearSchedule, DataLoader, DataPrefetcher, ReplayDataset, DataLoaderX
@@ -124,6 +125,9 @@ class Agent:
                 if not hasattr(self, k):
                     setattr(self, k, v)
 
+        neptune.init('zhoubinxyz/agentzero')
+        neptune.create_experiment(name=self.env_id, params=vars(self))
+
         def make_env(env_id):
             env = make_atari(f'{env_id}NoFrameskip-v4')
             env = wrap_deepmind(env, episode_life=False, clip_rewards=False, frame_stack=True, scale=False)
@@ -151,6 +155,8 @@ class Agent:
 
         self.actors = [Actor.remote(rank=rank, **kwargs) for rank in range(self.num_actors)]
         self.replay = deque(maxlen=self.replay_size)
+
+        self.obs = self.env.reset()
         self.Rs = []
         self.Qs = []
         self.Ls = []
@@ -195,17 +201,40 @@ class Agent:
                 self.model_target.load_state_dict(self.model.state_dict())
         return Ls
 
+    def test(self):
+        Rs = []
+        R, E = 0, 0
+
+        for e in tqdm(range(150)):
+            while True:
+                obs = torch.from_numpy(np.array(self.obs)).to(self.device).float().div(255.0)
+                action = model(obs).argmax(dim=-1).item()
+                obs_next, reward, done, info = self.env.step(action)
+                self.obs = obs_next
+                R += reward
+                if done:
+                    Rs.append(R)
+                    R = 0
+                    E += 1
+                    self.obs = self.env.reset()
+                    break
+
+        return Rs
+
+
+
     def run(self):
 
         frames_per_epoch = self.total_steps // self.epoches
         steps_per_actor = int(frames_per_epoch / self.num_envs / self.num_actors)
         steps_per_epoch_update = int(frames_per_epoch * self.update_per_data / self.batch_size)
         self.target_sync_freq = int(self.target_update_freq / (self.batch_size / self.base_batch_size))
+        self.steps_per_actor = steps_per_actor
 
         for epoch in range(self.epoches):
             ticc = time.time()
             tic = time.time()
-            datas = ray.get([a.step_epoch.remote(steps_per_actor) for a in self.actors])
+            datas = ray.get([a.step_epoch.remote(steps_per_actor) for a in self.actors]
             Rs, Qs = [], []
             for replay, rs, qs in datas:
                 self.replay.extend(replay)
@@ -215,7 +244,7 @@ class Agent:
                 self.Rs += rs
             toc = time.time()
             print(f"Epoch {epoch}: Data Collection Time: {toc - tic}, Speed {frames_per_epoch / (toc - tic)}")
-            print(f"Epoch {epoch}: EP Reward mean/std/max", np.mean(Rs), np.std(Rs), np.max(Rs))
+            print(f"Epoch {epoch}: EP Training Reward mean/std/max", np.mean(Rs), np.std(Rs), np.max(Rs))
             print(f"Epoch {epoch}: Qmax mean/std/max", np.mean(Qs), np.std(Qs), np.max(Qs))
 
 
@@ -231,9 +260,31 @@ class Agent:
             toc = time.time()
             print(f"Epoch {epoch}: Model Sync Time: {toc - tic}")
 
+            tic = time.time()
+            RsTest = self.test()
+            toc = time.time()
+            print(f"Epoch {epoch}: Model Test Time: {toc - tic}")
+            print(f"Epoch {epoch}: EP Test Reward mean/std/max", np.mean(RsTest), np.std(RsTest), np.max(RsTest))
+
+            for l in Ls:
+                neptune.send_metric('loss', l)
+
+            for r in Rs:
+                neptune.send_metric('EP Training Reward', r)
+
+            for r in RsTest
+                neptune.send_metric('EP Test Reward', r)
+
+            for q in Qs:
+                neptune.send_metric('EP Qmax', q)
+
+            neptune.send_metric('Epoch Time', toc - ticc)
+
             print("=" * 50)
-            print(f"Total Epoch Time : {toc - tic}")
+            print(f"Total Epoch Time : {toc - ticc}")
             print("=" * 50)
+
+
 
 
 
