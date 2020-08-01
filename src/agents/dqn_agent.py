@@ -6,14 +6,13 @@ import neptune
 from tqdm import tqdm
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 
 
 from baselines.common.atari_wrappers import make_atari, wrap_deepmind
-from baselines.common.vec_env import ShmemVecEnv, DummyVecEnv
-from src.common.replay_buffer import ReplayBuffer, PrioritizedReplayBuffer
-from src.common.model import NatureCNN
+from baselines.common.vec_env import ShmemVecEnv
+from src.common.replay_buffer import ReplayBuffer
+from src.agents.model import NatureCNN
 from src.common.utils import LinearSchedule, DataLoaderX, ReplayDataset
 
 
