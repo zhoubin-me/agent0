@@ -13,7 +13,7 @@ def init(m, gain=1.0):
 
 
 class NatureCNN(nn.Module):
-    def __init__(self, in_channels, action_dim):
+    def __init__(self, in_channels, action_dim, dueling=True):
         super(NatureCNN, self).__init__()
 
         self.convs = nn.Sequential(
@@ -22,16 +22,23 @@ class NatureCNN(nn.Module):
             nn.Conv2d(64, 64, 3, stride=1), nn.ReLU(), nn.Flatten(),
             nn.Linear(64 * 7 * 7, 512), nn.ReLU())
 
-        self.v = nn.Linear(512, 1)
-        self.p = nn.Linear(512, action_dim)
 
         self.convs.apply(lambda m: init(m, nn.init.calculate_gain('relu')))
+        self.p = nn.Linear(512, action_dim)
         self.p.apply(lambda m: init(m, 0.01))
-        self.v.apply(lambda m: init(m, 1.0))
+
+        if dueling:
+            self.v = nn.Linear(512, 1)
+            self.v.apply(lambda m: init(m, 1.0))
+        else:
+            self.v = None
 
     def forward(self, x):
         features = self.convs(x)
-        v = self.v(features)
         adv = self.p(features)
-        q = v.expand_as(adv) + (adv - adv.mean(dim=-1, keepdim=True).expand_as(adv))
+        if self.v is not None:
+            v = self.v(features)
+            q = v.expand_as(adv) + (adv - adv.mean(dim=-1, keepdim=True).expand_as(adv))
+        else:
+            q = adv
         return q
