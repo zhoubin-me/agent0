@@ -21,7 +21,7 @@ def default_hyperparams():
         env_id='Breakout',
         num_actors=32,
         num_envs=8,
-        num_data_workers=12,
+        num_data_workers=20,
         gpu_id=0,
         adam_eps=0.00015,
         adam_lr=1e-4,
@@ -183,7 +183,7 @@ class Agent:
                 q_target = rewards + self.discount * (1 - terminals) * q_next
 
             q = self.model(states).gather(1, actions.unsqueeze(-1)).squeeze(-1)
-            loss = F.smooth_l1_loss(q, q_target)
+            loss = F.mse_loss(q, q_target)
 
             self.optimizer.zero_grad()
             loss.backward()
@@ -232,7 +232,7 @@ class Agent:
             print(f"Epoch {epoch}: Model Sync Time: {toc - tic}")
 
             print("=" * 50)
-            print(f"Total Epoch Time : {ticc - toc}")
+            print(f"Total Epoch Time : {toc - tic}")
             print("=" * 50)
 
 
