@@ -207,8 +207,8 @@ class Agent:
 
         for e in tqdm(range(150)):
             while True:
-                obs = torch.from_numpy(np.array(self.obs)).to(self.device).float().div(255.0)
-                action = model(obs).argmax(dim=-1).item()
+                obs = torch.from_numpy(np.array(self.obs)).to(self.device).float().div(255.0).unsqueeze(0)
+                action = self.model(obs).argmax(dim=-1).item()
                 obs_next, reward, done, info = self.env.step(action)
                 self.obs = obs_next
                 R += reward
@@ -234,7 +234,7 @@ class Agent:
         for epoch in range(self.epoches):
             ticc = time.time()
             tic = time.time()
-            datas = ray.get([a.step_epoch.remote(steps_per_actor) for a in self.actors]
+            datas = ray.get([a.step_epoch.remote(steps_per_actor) for a in self.actors])
             Rs, Qs = [], []
             for replay, rs, qs in datas:
                 self.replay.extend(replay)
@@ -260,20 +260,19 @@ class Agent:
             toc = time.time()
             print(f"Epoch {epoch}: Model Sync Time: {toc - tic}")
 
-            tic = time.time()
-            RsTest = self.test()
-            toc = time.time()
-            print(f"Epoch {epoch}: Model Test Time: {toc - tic}")
-            print(f"Epoch {epoch}: EP Test Reward mean/std/max", np.mean(RsTest), np.std(RsTest), np.max(RsTest))
+            # tic = time.time()
+            # RsTest = self.test()
+            # toc = time.time()
+            # print(f"Epoch {epoch}: Model Test Time: {toc - tic}")
+            # print(f"Epoch {epoch}: EP Test Reward mean/std/max", np.mean(RsTest), np.std(RsTest), np.max(RsTest))
+            # for r in RsTest:
+            #     neptune.send_metric('EP Test Reward', r)
 
             for l in Ls:
                 neptune.send_metric('loss', l)
 
             for r in Rs:
                 neptune.send_metric('EP Training Reward', r)
-
-            for r in RsTest
-                neptune.send_metric('EP Test Reward', r)
 
             for q in Qs:
                 neptune.send_metric('EP Qmax', q)
