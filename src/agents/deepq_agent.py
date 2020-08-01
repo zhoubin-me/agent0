@@ -107,9 +107,10 @@ class Actor:
                     Rs.append(self.R[idx])
                     self.R[idx] = 0
         toc = time.time()
-        print(f"Rank {self.rank}: Data Collection Time: {toc - tic}, Speed {len(replay) / (toc - tic)}")
-        print(f"Rank {self.rank}: EP Reward mean/std/max", np.mean(Rs), np.std(Rs), np.max(Rs))
-        print(f"Rank {self.rank}: Qmax mean/std/max", np.mean(Qs), np.std(Qs), np.max(Qs))
+        print(f"Rank {self.rank:2d}: Data Collection Time:\t {toc - tic:6.2f}, Speed {len(replay) / (toc - tic):6.1f}")
+        print(f"Rank {self.rank:2d}: EP Reward mean/std/max:\t {np.mean(Rs):8.3f}, {np.std(Rs):8.3f}, {np.max(Rs):8.3f}")
+        print(f"Rank {self.rank:2d}: Qmax mean/std/max:\t {np.mean(Qs):8.3f}, {np.std(Qs):8.3f}, {np.max(Qs):8.3f}")
+        print(f"Rank {self.rank:2d}: Current Epsilon", epsilon)
         return replay, Rs, Qs
 
 class Agent:
@@ -243,22 +244,22 @@ class Agent:
                 self.Qs += qs
                 self.Rs += rs
             toc = time.time()
-            print(f"Epoch {epoch}: Data Collection Time: {toc - tic}, Speed {frames_per_epoch / (toc - tic)}")
-            print(f"Epoch {epoch}: EP Training Reward mean/std/max", np.mean(Rs), np.std(Rs), np.max(Rs))
-            print(f"Epoch {epoch}: Qmax mean/std/max", np.mean(Qs), np.std(Qs), np.max(Qs))
 
+            print(f"Eopch {epoch:2d}: Data Collection Time: {toc - tic:6.2f}, Speed {frames_per_epoch / (toc - tic):6.1f}")
+            print(f"Epoch {epoch:2d}: EP Reward mean/std/max {np.mean(Rs):8.3f}, {np.std(Rs):8.3f}, {np.max(Rs):8.3f}")
+            print(f"Epoch {epoch:2d}: Qmax mean/std/max {np.mean(Qs):8.3f}, {np.std(Qs):8.3f}, {np.max(Qs):8.3f}")
 
             tic = time.time()
             Ls = self.train_epoch(steps_per_epoch_update)
             toc = time.time()
-            print(f"Epoch {epoch}: Model Training Time: {toc - tic}, Speed {steps_per_epoch_update / (toc - tic)}")
-            print(f"Epoch {epoch}: EP Loss mean/std/max", np.mean(Ls), np.std(Ls), np.max(Ls))
+            print(f"Epoch {epoch:2d}: Model Training Time: {toc - tic:6.2f}, Speed {steps_per_epoch_update / (toc - tic):6.1f}")
+            print(f"Epoch {epoch:2d}: Epoch Loss mean/std/max {np.mean(Ls):8.5f}, {np.std(Ls):8.5f}, {np.max(Ls):8.5f}")
             self.Ls += Ls
 
             tic = time.time()
             ray.get([a.load_model.remote(self.model) for a in self.actors])
             toc = time.time()
-            print(f"Epoch {epoch}: Model Sync Time: {toc - tic}")
+            print(f"Epoch {epoch:2d}: Model Sync Time: {toc - tic:6.2f}")
 
             # tic = time.time()
             # RsTest = self.test()
