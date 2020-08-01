@@ -25,7 +25,7 @@ def default_hyperparams():
         adam_eps=0.00015,
         adam_lr=1e-4,
         replay_size=int(1e6),
-        batch_size=2048,
+        batch_size=1024,
         update_per_data=8,
         base_batch_size=32,
         discount=0.99,
@@ -157,16 +157,16 @@ class Agent:
     def train_epoch(self, steps):
 
         dataset = ReplayDataset(self.replay)
-        dataloader = DataLoaderX(dataset, batch_size=self.batch_size, shuffle=True, num_workers=4)
+        dataloader = DataLoaderX(dataset, batch_size=self.batch_size, shuffle=True, num_workers=12)
         prefetcher = DataPrefetcher(dataloader, self.device)
 
 
         Ls = []
-        data = prefetcher.next()
         for _ in tqdm(range(steps)):
-            if data is None:
-                prefetcher = DataPrefetcher(dataloader, self.device)
+            try:
                 data = prefetcher.next()
+            except:
+                raise StandardError("No data left")
 
             states, actions, rewards, next_states, terminals = data
             states = states.float().to(memory_format=self.memory_format).div(255.0)
@@ -192,7 +192,6 @@ class Agent:
             Ls.append(loss.item())
             if self.update_count % self.target_sync_freq == 0:
                 self.model_target.load_state_dict(self.model.state_dict())
-            data = prefetcher.next()
         return Ls
 
     def run(self):

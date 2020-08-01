@@ -5,8 +5,9 @@ from torch.utils.data import Dataset, DataLoader
 
 
 class DataPrefetcher:
-    def __init__(self, loader, device):
-        self.loader = iter(loader)
+    def __init__(self, dataloader, device):
+        self.dataloader = dataloader
+        self.loader = iter(self.dataloader)
         self.stream = torch.cuda.Stream()
         self.device = device
         self.preload()
@@ -15,8 +16,8 @@ class DataPrefetcher:
         try:
             self.next_data = next(self.loader)
         except StopIteration:
-            self.next_data = None
-            return
+            self.loader = iter(self.dataloader)
+            self.next_data = next(self.loader)
 
         with torch.cuda.stream(self.stream):
             self.next_data = (x.to(self.device, non_blocking=True) for x in self.next_data)
