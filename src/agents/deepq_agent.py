@@ -21,11 +21,12 @@ def default_hyperparams():
         env_id='Breakout',
         num_actors=32,
         num_envs=8,
+        num_data_workers=12,
         gpu_id=0,
         adam_eps=0.00015,
         adam_lr=1e-4,
         replay_size=int(1e6),
-        batch_size=1024,
+        batch_size=2048,
         update_per_data=8,
         base_batch_size=32,
         discount=0.99,
@@ -157,7 +158,7 @@ class Agent:
     def train_epoch(self, steps):
 
         dataset = ReplayDataset(self.replay)
-        dataloader = DataLoaderX(dataset, batch_size=self.batch_size, shuffle=True, num_workers=12)
+        dataloader = DataLoaderX(dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_data_workers)
         prefetcher = DataPrefetcher(dataloader, self.device)
 
 
@@ -202,6 +203,7 @@ class Agent:
         self.target_sync_freq = int(self.target_update_freq / (self.batch_size / self.base_batch_size))
 
         for epoch in range(self.epoches):
+            ticc = time.time()
             tic = time.time()
             datas = ray.get([a.step_epoch.remote(steps_per_actor) for a in self.actors])
             Rs, Qs = [], []
@@ -212,17 +214,26 @@ class Agent:
                 self.Qs += qs
                 self.Rs += rs
             toc = time.time()
-            print(f"epoch {epoch}: Data Collection Time: {toc - tic}, Speed {frames_per_epoch / (toc - tic)}")
-            print(f"epoch {epoch}: EP Reward mean/std/max", np.mean(Rs), np.std(Rs), np.max(Rs))
-            print(f"epoch {epoch}: Qmax mean/std/max", np.mean(Qs), np.std(Qs), np.max(Qs))
+            print(f"Epoch {epoch}: Data Collection Time: {toc - tic}, Speed {frames_per_epoch / (toc - tic)}")
+            print(f"Epoch {epoch}: EP Reward mean/std/max", np.mean(Rs), np.std(Rs), np.max(Rs))
+            print(f"Epoch {epoch}: Qmax mean/std/max", np.mean(Qs), np.std(Qs), np.max(Qs))
 
 
             tic = time.time()
             Ls = self.train_epoch(steps_per_epoch_update)
             toc = time.time()
-            print(f"epoch {epoch}: Model Training Time: {toc - tic}, Speed {steps_per_epoch_update / (toc - tic)}")
-            print(f"epoch {epoch}: EP Loss mean/std/max", np.mean(Ls), np.std(Ls), np.max(Ls))
+            print(f"Epoch {epoch}: Model Training Time: {toc - tic}, Speed {steps_per_epoch_update / (toc - tic)}")
+            print(f"Epoch {epoch}: EP Loss mean/std/max", np.mean(Ls), np.std(Ls), np.max(Ls))
             self.Ls += Ls
+
+            tic = time.time()
+            ray.get([a.load_model.remote(self.model) for a in self.actors])
+            toc = time.time()
+            print(f"Epoch {epoch}: Model Sync Time: {toc - tic}")
+
+            print("=" * 50)
+            print(f"Total Epoch Time : {ticc - toc}")
+            print("=" * 50)
 
 
 
