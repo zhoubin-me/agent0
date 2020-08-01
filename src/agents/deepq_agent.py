@@ -11,7 +11,7 @@ import torchvision as tv
 from functools import reduce
 
 from src.common.vec_env import ShmemVecEnv, VecEnvWrapper, DummyVecEnv
-from src.common.utils import LinearSchedule, DataLoaderX, DataPrefetcher, ReplayDataset
+from src.common.utils import LinearSchedule, DataLoader, DataPrefetcher, ReplayDataset, DataLoaderX
 from src.common.atari_wrappers import make_atari, wrap_deepmind
 from src.agents.model import NatureCNN
 
@@ -19,9 +19,9 @@ from src.agents.model import NatureCNN
 def default_hyperparams():
     params = dict(
         env_id='Breakout',
-        num_actors=32,
-        num_envs=8,
-        num_data_workers=20,
+        num_actors=16,
+        num_envs=16,
+        num_data_workers=8,
         gpu_id=0,
         adam_eps=0.00015,
         adam_lr=1e-4,
