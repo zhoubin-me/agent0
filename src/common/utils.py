@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 from prefetch_generator import BackgroundGenerator
 from torch.utils.data import Dataset, DataLoader
 
@@ -15,6 +16,7 @@ class DataPrefetcher:
             self.next_data = next(self.loader)
         except StopIteration:
             self.next_data = None
+            return
 
         with torch.cuda.stream(self.stream):
             self.next_data = (x.to(self.device, non_blocking=True) for x in self.next_data)
@@ -33,11 +35,13 @@ class ReplayDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        return self.data[idx]
+        S, A, R, NS, T = map(lambda x: np.array(x), self.data[idx])
+        return S, A, R, NS, T
 
 class DataLoaderX(DataLoader):
     def __iter__(self):
         return BackgroundGenerator(super().__iter__(), max_prefetch=3)
+
 
 class LinearSchedule:
     def __init__(self, start, end=None, steps=None):

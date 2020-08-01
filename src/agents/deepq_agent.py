@@ -19,13 +19,13 @@ from src.agents.model import NatureCNN
 def default_hyperparams():
     params = dict(
         env_id='Breakout',
-        num_envs=16,
+        num_actors=32,
+        num_envs=8,
         gpu_id=0,
         adam_eps=0.00015,
         adam_lr=1e-4,
         replay_size=int(1e6),
-        num_actors=32,
-        batch_size=1024,
+        batch_size=2048,
         update_per_data=8,
         base_batch_size=32,
         discount=0.99,
@@ -40,6 +40,8 @@ def default_hyperparams():
     params.update(
         min_epsilons=np.random.choice([0.01, 0.02, 0.05, 0.1], size=params['num_actors'], p=[0.7, 0.1, 0.1, 0.1])
     )
+
+    return params
 
 def make_env(game, episode_life=True, clip_rewards=True):
     env = make_atari(f'{game}NoFrameskip-v4')
@@ -83,7 +85,7 @@ class Actor:
         epsilon = self.epsilon_schedule()
         Rs, Qs = [], []
         tic = time.time()
-        for _ in tqdm(range(steps)):
+        for _ in range(steps):
             action_random = np.random.randint(0, self.action_dim, self.num_envs)
             st = torch.from_numpy(np.array(self.obs)).float().div(255.0).to(self.device, memory_format=self.memory_format)
             qs = self.model(st)
@@ -132,6 +134,7 @@ class Agent:
 
 
         self.device = torch.device('cuda:0')
+        self.memory_format = torch.channels_last
         self.model = NatureCNN(self.state_shape[0], self.action_dim).to(self.device, memory_format=self.memory_format)
         self.model_target = NatureCNN(self.state_shape[0], self.action_dim).to(self.device, memory_format=self.memory_format)
 
@@ -145,29 +148,29 @@ class Agent:
         self.memory_format = torch.channels_last
         self.update_count = 0
 
-        self.actors = [Actor.remote(**kwargs) for _ in range(self.num_actors)]
+        self.actors = [Actor.remote(rank=rank, **kwargs) for rank in range(self.num_actors)]
         self.replay = deque(maxlen=self.replay_size)
         self.Rs = []
         self.Qs = []
         self.Ls = []
 
-    def train_epoch(self, steps, replay):
+    def train_epoch(self, steps):
 
-        dataset = ReplayDataset(replay)
-        dataloader = DataLoaderX(dataset, batch_size=self.batch_size, shuffle=True, num_workers=12)
+        dataset = ReplayDataset(self.replay)
+        dataloader = DataLoaderX(dataset, batch_size=self.batch_size, shuffle=True, num_workers=4)
         prefetcher = DataPrefetcher(dataloader, self.device)
 
+
         Ls = []
+        data = prefetcher.next()
         for _ in tqdm(range(steps)):
-            try:
-                data = prefetcher.next()
-            except:
+            if data is None:
                 prefetcher = DataPrefetcher(dataloader, self.device)
                 data = prefetcher.next()
 
             states, actions, rewards, next_states, terminals = data
-            states = states.float().to(memory_format=self.memory_format) / 255.0
-            next_states = next_states.float().to(memory_format=self.memory_format) / 255.0
+            states = states.float().to(memory_format=self.memory_format).div(255.0)
+            next_states = next_states.float().to(memory_format=self.memory_format).div(255.0)
             actions = actions.long()
             terminals = terminals.float()
             rewards = rewards.float()
@@ -188,7 +191,8 @@ class Agent:
             self.update_count += 1
             Ls.append(loss.item())
             if self.update_count % self.target_sync_freq == 0:
-                self.model_target.module.load_state_dict(self.model.module.state_dict())
+                self.model_target.load_state_dict(self.model.state_dict())
+            data = prefetcher.next()
         return Ls
 
     def run(self):
@@ -201,21 +205,25 @@ class Agent:
         for epoch in range(self.epoches):
             tic = time.time()
             datas = ray.get([a.step_epoch.remote(steps_per_actor) for a in self.actors])
-            for replay, Qs, Rs in datas:
+            Rs, Qs = [], []
+            for replay, rs, qs in datas:
                 self.replay.extend(replay)
-                self.Qs += Qs
-                self.Rs += Rs
+                Rs += rs
+                Qs += qs
+                self.Qs += qs
+                self.Rs += rs
             toc = time.time()
-
-            print(f"epoch {epoch}: Data Collection Time: {toc - tic}, Speed {len(frames_per_epoch) / (toc - tic)}")
+            print(f"epoch {epoch}: Data Collection Time: {toc - tic}, Speed {frames_per_epoch / (toc - tic)}")
             print(f"epoch {epoch}: EP Reward mean/std/max", np.mean(Rs), np.std(Rs), np.max(Rs))
             print(f"epoch {epoch}: Qmax mean/std/max", np.mean(Qs), np.std(Qs), np.max(Qs))
+
 
             tic = time.time()
             Ls = self.train_epoch(steps_per_epoch_update)
             toc = time.time()
             print(f"epoch {epoch}: Model Training Time: {toc - tic}, Speed {steps_per_epoch_update / (toc - tic)}")
             print(f"epoch {epoch}: EP Loss mean/std/max", np.mean(Ls), np.std(Ls), np.max(Ls))
+            self.Ls += Ls
 
 
 
