@@ -23,9 +23,9 @@ def default_hyperparams():
         num_actors=16,
         num_envs=16,
         num_data_workers=8,
+        num_test_envs=8,
         gpu_id=0,
-        adam_eps=0.00015,
-        adam_lr=1e-4,
+        adam_lr=1e-3,
         replay_size=int(1e6),
         batch_size=512,
         update_per_data=8,
@@ -131,12 +131,12 @@ class Agent:
 
         def make_env(env_id):
             env = make_atari(f'{env_id}NoFrameskip-v4')
-            env = wrap_deepmind(env, episode_life=True, clip_rewards=True, frame_stack=True, scale=False)
+            env = wrap_deepmind(env, episode_life=True, clip_rewards=False, frame_stack=True, scale=False)
             return env
 
-        self.env = make_env(self.env_id)
-        self.action_dim = self.env.action_space.n
-        self.state_shape = self.env.observation_space.shape
+        self.envs = ShmemVecEnv([lambda: make_env(self.env_id) for _ in range(self.num_test_envs)])
+        self.action_dim = self.envs.action_space.n
+        self.state_shape = self.envs.observation_space.shape
 
 
         self.device = torch.device('cuda:0')
@@ -157,11 +157,12 @@ class Agent:
         self.actors = [Actor.remote(rank=rank, **kwargs) for rank in range(self.num_actors)]
         self.replay = deque(maxlen=self.replay_size)
 
-        self.obs = self.env.reset()
+        self.obs = self.envs.reset()
         self.Rs = []
         self.Qs = []
         self.Ls = []
         self.RTest = []
+        self.R = np.zeros(self.num_test_envs)
 
     def train_epoch(self, steps):
 
@@ -206,21 +207,20 @@ class Agent:
 
     def test(self):
         Rs = []
-        R, E = 0, 0
-        for e in tqdm(range(150)):
-            while True:
-                obs = torch.from_numpy(np.array(self.obs)).to(self.device).float().div(255.0).unsqueeze(0)
-                action = self.model(obs).argmax(dim=-1).item()
-                obs_next, reward, done, info = self.env.step(action)
-                self.obs = obs_next
-                R += reward
-                if done:
-                    Rs.append(R)
-                    R = 0
+        E = 0
+        while True:
+            obs = torch.from_numpy(np.array(self.obs)).to(self.device).float().div(255.0)
+            action = self.model(obs).argmax(dim=-1).tolist()
+            obs_next, reward, done, info = self.envs.step(action)
+            self.obs = obs_next
+            self.R += np.array(reward)
+            for idx, d in enumerate(done):
+                if d:
+                    Rs.append(self.R[idx])
+                    self.R[idx] = 0
                     E += 1
-                    self.obs = self.env.reset()
-                    break
-        return Rs
+            if E > 300:
+                return Rs
 
 
 
@@ -270,44 +270,7 @@ class Agent:
             print(f"Epoch {epoch:3d}: EP Test Reward mean/std/max {np.mean(RTest):8.3f}, {np.std(RTest):8.3f}, {np.max(RTest):8.3f}")
             self.RTest += RTest
 
-            """
-
-            tic = time.time()
-            for r in RsTest:
-                neptune.send_metric('EP Test Reward', r)
-
-            for l in Ls:
-                neptune.send_metric('loss', l)
-
-            for r in Rs:
-                neptune.send_metric('EP Training Reward', r)
-
-            for q in Qs:
-                neptune.send_metric('EP Training Qmax', q)
-
-            neptune.send_metric('Epoch Time', toc - ticc)
-            toc = time.time()
-            print(f"Epoch {epoch:3d}: Neptune Time: {toc - tic}")
-
-
-            """
-            with open(f'ckpt/{self.env_id}.log', 'w') as f:
-                for r in self.RTest:
-                    f.write(f"RTest {r}\t")
-                f.write('\n')
-
-                for l in self.Ls:
-                    f.write(f"Loss {l}\t")
-                f.write('\n')
-
-                for q in self.Qs:
-                    f.write(f"QmaxTrain {q}\t")
-                f.write('\n')
-
-                for r in self.Rs:
-                    f.write(f"RTrain {r}\t")
-                f.write('\n')
-
+            torch.save({'model': self.model.state_dict(), 'Ls': self.Ls, 'Rs': self.Rs, 'Qs': self.Qs, 'RTs': self.RTest}, f'ckpt/deepq_e{epoch}.pth')
 
             print("=" * 50)
             print(f"Total Epoch Time : {toc - ticc}")
