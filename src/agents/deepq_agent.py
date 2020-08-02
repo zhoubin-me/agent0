@@ -73,7 +73,7 @@ class Actor:
         self.model = NatureCNN(self.state_shape[0], self.action_dim).to(self.device, memory_format=self.memory_format)
 
         self.min_epsilon = self.min_epsilons[self.rank]
-        self.epsilon_schedule = LinearSchedule(1.0, self.min_epsilon, self.epoches)
+        self.epsilon_schedule = LinearSchedule(1.0, self.min_epsilon, int(self.epoches * self.exploration_ratio))
 
         self.steps = 0
         self.R = np.zeros(self.num_envs)
@@ -219,7 +219,6 @@ class Agent:
                     E += 1
                     self.obs = self.env.reset()
                     break
-
         return Rs
 
 
@@ -264,11 +263,11 @@ class Agent:
             print(f"Epoch {epoch:3d}: Model Sync Time: {toc - tic:6.2f}")
 
             tic = time.time()
-            RsTest = self.test()
+            RTest = self.test()
             toc = time.time()
             print(f"Epoch {epoch:3d}: Model Test Time: {toc - tic}")
-            print(f"Epoch {epoch:3d}: EP Test Reward mean/std/max {np.mean(RsTest):8.3f}, {np.std(RsTest):8.3f}, {np.max(RsTest):8.3f}")
-            self.RTest += RsTest
+            print(f"Epoch {epoch:3d}: EP Test Reward mean/std/max {np.mean(RTest):8.3f}, {np.std(RTest):8.3f}, {np.max(RTest):8.3f}")
+            self.RTest += RTest
 
             """
 
@@ -291,33 +290,25 @@ class Agent:
 
 
             """
-            with open('ckpt/{self.env_id}.log', 'w') as f:
+            with open(f'ckpt/{self.env_id}.log', 'w') as f:
                 for r in self.RTest:
-                    f.write(f"RTest {r}")
+                    f.write(f"RTest {r}\t")
+                f.write('\n')
 
                 for l in self.Ls:
-                    f.write(f"Loss {l}")
+                    f.write(f"Loss {l}\t")
+                f.write('\n')
 
                 for q in self.Qs:
-                    f.write(f"QmaxTrain {q}")
+                    f.write(f"QmaxTrain {q}\t")
+                f.write('\n')
 
                 for r in self.Rs:
-                    f.write(f"RTrain {r}")
+                    f.write(f"RTrain {r}\t")
+                f.write('\n')
 
 
             print("=" * 50)
             print(f"Total Epoch Time : {toc - ticc}")
             print("=" * 50)
-
-
-
-
-
-
-
-
-
-
-
-
 
