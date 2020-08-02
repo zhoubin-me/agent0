@@ -27,13 +27,13 @@ def default_hyperparams():
         adam_eps=0.00015,
         adam_lr=1e-4,
         replay_size=int(1e6),
-        batch_size=2048,
+        batch_size=512,
         update_per_data=8,
         base_batch_size=32,
         discount=0.99,
         target_update_freq=10000,
         start_update_steps=20000,
-        exploration_fract=0.1,
+        exploration_ratio=0.1,
         total_steps=int(1e7),
         epoches=100,
         random_seed=1234,
@@ -191,7 +191,8 @@ class Agent:
                 q_target = rewards + self.discount * (1 - terminals) * q_next
 
             q = self.model(states).gather(1, actions.unsqueeze(-1)).squeeze(-1)
-            loss = F.mse_loss(q, q_target)
+            # loss = F.mse_loss(q, q_target)
+            loss= F.smooth_l1_loss(q, target)
 
             self.optimizer.zero_grad()
             loss.backward()
