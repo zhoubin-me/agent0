@@ -192,7 +192,7 @@ class Agent:
 
             q = self.model(states).gather(1, actions.unsqueeze(-1)).squeeze(-1)
             # loss = F.mse_loss(q, q_target)
-            loss= F.smooth_l1_loss(q, target)
+            loss= F.smooth_l1_loss(q, q_target)
 
             self.optimizer.zero_grad()
             loss.backward()
