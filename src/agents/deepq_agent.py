@@ -107,9 +107,9 @@ class Actor:
                     Rs.append(self.R[idx])
                     self.R[idx] = 0
         toc = time.time()
-        print(f"Rank {self.rank:2d}: Data Collection Time:\t {toc - tic:6.2f}, Speed {len(replay) / (toc - tic):6.1f}")
-        print(f"Rank {self.rank:2d}: EP Reward mean/std/max:\t {np.mean(Rs):8.3f}, {np.std(Rs):8.3f}, {np.max(Rs):8.3f}")
-        print(f"Rank {self.rank:2d}: Qmax mean/std/max:\t {np.mean(Qs):8.3f}, {np.std(Qs):8.3f}, {np.max(Qs):8.3f}")
+        print(f"Rank {self.rank:2d}: Data Collection Time:\t\t {toc - tic:6.2f}, Speed {len(replay) / (toc - tic):6.1f}")
+        print(f"Rank {self.rank:2d}: EP Reward mean/std/max:\t\t {np.mean(Rs):8.3f}, {np.std(Rs):8.3f}, {np.max(Rs):8.3f}")
+        print(f"Rank {self.rank:2d}: Qmax mean/std/max:\t\t {np.mean(Qs):8.3f}, {np.std(Qs):8.3f}, {np.max(Qs):8.3f}")
         print(f"Rank {self.rank:2d}: Current Epsilon", epsilon)
         return replay, Rs, Qs
 
@@ -131,7 +131,7 @@ class Agent:
 
         def make_env(env_id):
             env = make_atari(f'{env_id}NoFrameskip-v4')
-            env = wrap_deepmind(env, episode_life=False, clip_rewards=False, frame_stack=True, scale=False)
+            env = wrap_deepmind(env, episode_life=True, clip_rewards=True, frame_stack=True, scale=False)
             return env
 
         self.env = make_env(self.env_id)
@@ -205,7 +205,6 @@ class Agent:
     def test(self):
         Rs = []
         R, E = 0, 0
-
         for e in tqdm(range(150)):
             while True:
                 obs = torch.from_numpy(np.array(self.obs)).to(self.device).float().div(255.0).unsqueeze(0)
@@ -233,7 +232,9 @@ class Agent:
         self.steps_per_actor = steps_per_actor
 
         for epoch in range(self.epoches):
-            ticc = time.time()
+            tic = time.time()
+
+
             tic = time.time()
             datas = ray.get([a.step_epoch.remote(steps_per_actor) for a in self.actors])
             Rs, Qs = [], []
@@ -245,9 +246,9 @@ class Agent:
                 self.Rs += rs
             toc = time.time()
 
-            print(f"Eopch {epoch:2d}: Data Collection Time: {toc - tic:6.2f}, Speed {frames_per_epoch / (toc - tic):6.1f}")
-            print(f"Epoch {epoch:2d}: EP Reward mean/std/max {np.mean(Rs):8.3f}, {np.std(Rs):8.3f}, {np.max(Rs):8.3f}")
-            print(f"Epoch {epoch:2d}: Qmax mean/std/max {np.mean(Qs):8.3f}, {np.std(Qs):8.3f}, {np.max(Qs):8.3f}")
+            print(f"Eopch {epoch:2d}: Data Collection Time:\t\t{toc - tic:6.2f}, Speed {frames_per_epoch / (toc - tic):6.1f}")
+            print(f"Epoch {epoch:2d}: EP Reward mean/std/max:\t\t {np.mean(Rs):8.3f}, {np.std(Rs):8.3f}, {np.max(Rs):8.3f}")
+            print(f"Epoch {epoch:2d}: Qmax mean/std/max:\t\t {np.mean(Qs):8.3f}, {np.std(Qs):8.3f}, {np.max(Qs):8.3f}")
 
             tic = time.time()
             Ls = self.train_epoch(steps_per_epoch_update)
@@ -261,13 +262,14 @@ class Agent:
             toc = time.time()
             print(f"Epoch {epoch:2d}: Model Sync Time: {toc - tic:6.2f}")
 
-            # tic = time.time()
-            # RsTest = self.test()
-            # toc = time.time()
-            # print(f"Epoch {epoch}: Model Test Time: {toc - tic}")
-            # print(f"Epoch {epoch}: EP Test Reward mean/std/max", np.mean(RsTest), np.std(RsTest), np.max(RsTest))
-            # for r in RsTest:
-            #     neptune.send_metric('EP Test Reward', r)
+            tic = time.time()
+            RsTest = self.test()
+            toc = time.time()
+            print(f"Epoch {epoch:3d}: Model Test Time: {toc - tic}")
+            print(f"Epoch {epoch:3d}: EP Test Reward mean/std/max {np.mean(RsTest):8.3f}, {np.std(RsTest):8.3f}, {np.max(RsTest):8.3f}")
+
+            for r in RsTest:
+                neptune.send_metric('EP Test Reward', r)
 
             for l in Ls:
                 neptune.send_metric('loss', l)
