@@ -126,8 +126,8 @@ class Agent:
                 if not hasattr(self, k):
                     setattr(self, k, v)
 
-        neptune.init('zhoubinxyz/agentzero')
-        neptune.create_experiment(name=self.env_id, params=vars(self))
+        # neptune.init('zhoubinxyz/agentzero')
+        # neptune.create_experiment(name=self.env_id, params=vars(self))
 
         def make_env(env_id):
             env = make_atari(f'{env_id}NoFrameskip-v4')
