@@ -69,7 +69,8 @@ class Actor:
         self.state_shape = self.envs.observation_space.shape
 
         self.memory_format = torch.channels_last
-        self.device = torch.device(f'cuda:{self.gpu_id}' if self.gpu_id >= 0 else 'cpu')
+        # self.device = torch.device(f'cuda:{self.gpu_id}' if self.gpu_id >= 0 else 'cpu')
+        self.device = torch.device('cpu')
         self.model = NatureCNN(self.state_shape[0], self.action_dim).to(self.device, memory_format=self.memory_format)
 
         self.min_epsilon = self.min_epsilons[self.rank]
@@ -80,7 +81,7 @@ class Actor:
         self.obs = self.envs.reset()
 
     def load_model(self, model):
-        self.model.load_state_dict(model.state_dict())
+        self.model.load_state_dict(model.cpu().state_dict())
 
     def step_epoch(self, steps):
         replay = deque(maxlen=self.replay_size)
@@ -169,7 +170,7 @@ class Agent:
         dataset = ReplayDataset(self.replay)
         dataloader = DataLoaderX(dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_data_workers)
         prefetcher = DataPrefetcher(dataloader, self.device)
-
+        self.model.cuda()
 
         Ls = []
         for _ in tqdm(range(steps)):
