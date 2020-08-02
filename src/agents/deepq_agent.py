@@ -93,7 +93,7 @@ class Actor:
             qs = self.model(st)
             qs_max, qs_argmax = qs.max(dim=-1)
             action_greedy = qs_argmax.tolist()
-            Qs += qs_max.tolist()
+            Qs.append(qs_max.mean().item())
             action = [act_grd if p > epsilon else act_rnd for p, act_rnd, act_grd in
                       zip(np.random.rand(self.num_envs), action_random, action_greedy)]
 
@@ -161,6 +161,7 @@ class Agent:
         self.Rs = []
         self.Qs = []
         self.Ls = []
+        self.RTest = []
 
     def train_epoch(self, steps):
 
@@ -232,7 +233,7 @@ class Agent:
         self.steps_per_actor = steps_per_actor
 
         for epoch in range(self.epoches):
-            tic = time.time()
+            ticc = time.time()
 
 
             tic = time.time()
@@ -246,28 +247,32 @@ class Agent:
                 self.Rs += rs
             toc = time.time()
 
-            print(f"Eopch {epoch:2d}: Data Collection Time:\t\t{toc - tic:6.2f}, Speed {frames_per_epoch / (toc - tic):6.1f}")
-            print(f"Epoch {epoch:2d}: EP Reward mean/std/max:\t\t {np.mean(Rs):8.3f}, {np.std(Rs):8.3f}, {np.max(Rs):8.3f}")
-            print(f"Epoch {epoch:2d}: Qmax mean/std/max:\t\t {np.mean(Qs):8.3f}, {np.std(Qs):8.3f}, {np.max(Qs):8.3f}")
+            print(f"Eopch {epoch:3d}: Data Collection Time:\t\t{toc - tic:6.2f}, Speed {frames_per_epoch / (toc - tic):6.1f}")
+            print(f"Epoch {epoch:3d}: EP Reward mean/std/max:\t\t {np.mean(Rs):8.3f}, {np.std(Rs):8.3f}, {np.max(Rs):8.3f}")
+            print(f"Epoch {epoch:3d}: Qmax mean/std/max:\t\t {np.mean(Qs):8.3f}, {np.std(Qs):8.3f}, {np.max(Qs):8.3f}")
 
             tic = time.time()
             Ls = self.train_epoch(steps_per_epoch_update)
             toc = time.time()
-            print(f"Epoch {epoch:2d}: Model Training Time: {toc - tic:6.2f}, Speed {steps_per_epoch_update / (toc - tic):6.1f}")
-            print(f"Epoch {epoch:2d}: Epoch Loss mean/std/max {np.mean(Ls):8.5f}, {np.std(Ls):8.5f}, {np.max(Ls):8.5f}")
+            print(f"Epoch {epoch:3d}: Model Training Time: {toc - tic:6.2f}, Speed {steps_per_epoch_update / (toc - tic):6.1f}")
+            print(f"Epoch {epoch:3d}: Epoch Loss mean/std/max {np.mean(Ls):8.5f}, {np.std(Ls):8.5f}, {np.max(Ls):8.5f}")
             self.Ls += Ls
 
             tic = time.time()
             ray.get([a.load_model.remote(self.model) for a in self.actors])
             toc = time.time()
-            print(f"Epoch {epoch:2d}: Model Sync Time: {toc - tic:6.2f}")
+            print(f"Epoch {epoch:3d}: Model Sync Time: {toc - tic:6.2f}")
 
             tic = time.time()
             RsTest = self.test()
             toc = time.time()
             print(f"Epoch {epoch:3d}: Model Test Time: {toc - tic}")
             print(f"Epoch {epoch:3d}: EP Test Reward mean/std/max {np.mean(RsTest):8.3f}, {np.std(RsTest):8.3f}, {np.max(RsTest):8.3f}")
+            self.RTest += RsTest
 
+            """
+
+            tic = time.time()
             for r in RsTest:
                 neptune.send_metric('EP Test Reward', r)
 
@@ -278,13 +283,35 @@ class Agent:
                 neptune.send_metric('EP Training Reward', r)
 
             for q in Qs:
-                neptune.send_metric('EP Qmax', q)
+                neptune.send_metric('EP Training Qmax', q)
 
             neptune.send_metric('Epoch Time', toc - ticc)
+            toc = time.time()
+            print(f"Epoch {epoch:3d}: Neptune Time: {toc - tic}")
+
+
+            """
+            with open('ckpt/{self.env_id}.log', 'w') as f:
+                for r in self.RTest:
+                    f.write(f"RTest {r}")
+
+                for l in self.Ls:
+                    f.write(f"Loss {l}")
+
+                for q in self.Qs:
+                    f.write(f"QmaxTrain {q}")
+
+                for r in self.Rs:
+                    f.write(f"RTrain {r}")
+
 
             print("=" * 50)
             print(f"Total Epoch Time : {toc - ticc}")
             print("=" * 50)
+
+
+
+
 
 
 
