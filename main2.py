@@ -102,8 +102,11 @@ class Actor:
         self.rank = rank
 
     def sample(self, epsilon, state_dict, target_state_dict):
-        self.model.load_state_dict(state_dict)
-        self.model_target.load_state_dict(state_dict)
+
+        with torch.no_grad():
+            self.model.load_state_dict(state_dict)
+            self.model_target.load_state_dict(target_state_dict)
+
         steps = steps_per_epoch // (num_env * num_actors)
         Rs, Qs = [], []
         tic = time.time()
@@ -147,7 +150,7 @@ class Actor:
 
         toc = time.time()
         # print(f"Rank {self.rank}, Data Collection Time: {toc - tic}, Speed {steps_per_epoch / (toc - tic)}")
-        return local_replay, Rs, Qs, self.rank, len(local_replay) / (toc - tic), self.model.parameters()
+        return local_replay, Rs, Qs, self.rank, len(local_replay) / (toc - tic), self.model.load_state_dict()
 
 # In[ ]:
 class Agent:
@@ -206,9 +209,9 @@ class Agent:
         return loss.detach()
 
 
-    def update_model(self, target_params):
-        for param, target_param in zip(self.model.parameters(), target_params):
-            param.data.copy_(self.tau * target_param.data + (1 - self.tau) * param.data)
+    def update_model(self, model_dict):
+        for (_, v1), (_, v2) in zip(self.model.state_dict().items(), model_dict.items()):
+            v1.copy_(self.tau * v2.data + (1 - self.tau) * v1.data)
 # In[ ]:
 
 
@@ -247,14 +250,14 @@ def train(game):
 
         done_id, sample_ops = ray.wait(sample_ops)
         data = ray.get(done_id)
-        local_replay, Rs, Qs, rank, duration, params = data[0]
+        local_replay, Rs, Qs, rank, duration, model_dict = data[0]
 
         if rank < num_actors:
             # Actor
             if len(Rs) > 0:
                 Rn = len(Rs)
                 if np.mean(Rs) > np.mean(RRs[-8 * Rn:]):
-                    agent.update_model(params)
+                    agent.update_model(model_dict)
 
             agent.append_data(local_replay)
             steps += len(local_replay)
