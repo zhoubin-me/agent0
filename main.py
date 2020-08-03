@@ -127,12 +127,7 @@ class Actor:
         # print(f"Rank {self.rank}, Data Collection Time: {toc - tic}, Speed {steps_per_epoch / (toc - tic)}")
         return local_replay, Rs, Qs, self.rank, len(local_replay) / (toc - tic)
 
-
-
-
 # In[ ]:
-
-
 class Agent:
     def __init__(self, game):
         test_env = make_env(game)
@@ -273,7 +268,7 @@ def train(game):
                 formated_print("Training Time     ", Ttime[-10:])
                 formated_print("Iteration Time    ", Etime[-10:])
                 formated_print("Iteration FPS     ", Efps[-10:])
-                formated_print("Actor Sampling FPS", Sfps[-10:])
+                formated_print("Actor FPS         ", Sfps[-10:])
 
                 print("=" * 100)
                 print(" " * 100)
