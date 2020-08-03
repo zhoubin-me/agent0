@@ -203,7 +203,7 @@ def train(game):
     agent = Agent(game)
     sample_ops = [a.sample.remote(1.0, agent.model.state_dict()) for a in actors]
 
-    TRRs, RRs, QQs, LLs, Sfps, Tfps, Etime, Ttime = [], [], [], [], [], [], [], []
+    TRRs, RRs, QQs, LLs, Sfps, Tfps, Efps, Etime, Ttime = [], [], [], [], [], [], [], [], []
     for local_replay, Rs, Qs, rank, fps in ray.get(sample_ops):
         if rank < num_actors:
             agent.append_data(local_replay)
@@ -269,10 +269,10 @@ def train(game):
                 formated_print("EP Qmax           ", QQs[-1000:])
                 formated_print("EP Test Reward    ", TRRs[-1000:])
                 formated_print("Samping FPS       ", Sfps[-10:])
-                formated_print("Training FPS      ", Tfps[-10:])
+                formated_print("Training Speed    ", Tfps[-10:])
                 formated_print("Training Time     ", Ttime[-10:])
-                formated_print("Epoch Time        ", Etime[-10:])
-                formated_print("Epoch FPS         ", [steps_per_epoch / x for x in Etime[-10:]])
+                formated_print("Iteration Time    ", Etime[-10:])
+                formated_print("Iteration FPS     ", Efps[-10:])
 
 
                 print("=" * 100)
@@ -301,7 +301,7 @@ def train(game):
 
         ttoc = time.time()
         Etime.append(ttoc - ttic)
-
+        Efps.append(len(local_replay) / (ttoc - ttic))
 
 # In[ ]:
 
