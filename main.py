@@ -290,7 +290,27 @@ def train(game):
             epoch += 1
             if epoch == 10:
                 sample_ops.append(tester.sample.remote(0.01, agent.model.state_dict()))
+
+
             if epoch > epoches:
+                sample_ops = [a.sample.remote(0.01, agent.model.state_dict()) for a in actors] * 10
+                TRs_final = []
+                for local_replay, Rs, Qs, rank, fps in ray.get(sample_ops):
+                    TRs_final += Rs
+                    torch.save({
+                        'model': agent.model.state_dict(),
+                        'optim': agent.optimizer.state_dict(),
+                        'epoch': epoch,
+                        'epsilon': epsilon,
+                        'steps': steps,
+                        'Rs': RRs,
+                        'TRs': TRRs,
+                        'Qs': QQs,
+                        'Ls': LLs,
+                        'time': toc - tic,
+                        'FinalTestReward': TRs_final
+                    }, f'ckpt/{game}_final.pth')
+
                 ray.shutdown()
                 return
 
