@@ -203,7 +203,7 @@ def train(game):
     agent = Agent(game)
     sample_ops = [a.sample.remote(1.0, agent.model.state_dict()) for a in actors]
 
-    TRRs, RRs, QQs, LLs, Sfps, Tfps = [], [], [], [], [], []
+    TRRs, RRs, QQs, LLs, Sfps, Tfps, Etime, Ttime = [], [], [], [], [], [], [], []
     for local_replay, Rs, Qs, rank, fps in ray.get(sample_ops):
         if rank < num_actors:
             agent.append_data(local_replay)
@@ -220,6 +220,8 @@ def train(game):
     epoch = 0
     tic = time.time()
     while True:
+        ttic = time.time()
+
         done_id, sample_ops = ray.wait(sample_ops)
         data = ray.get(done_id)
         local_replay, Rs, Qs, rank, duration = data[0]
@@ -247,7 +249,10 @@ def train(game):
             loss = agent.train_step()
             LLs.append(loss)
         tocc = time.time()
-        Tfps.append(len(local_replay) / (tocc - ticc))
+        Tfps.append((batch_size * agent_train_freq) / (tocc - ticc))
+        Ttime.append(tocc - ticc)
+        Etime.append(tocc - ttic)
+
 
 
         # Logging and saving
@@ -263,6 +268,9 @@ def train(game):
                 formated_print("EP Test Reward    ", TRRs[-1000:])
                 formated_print("Samping FPS       ", Sfps[-10:])
                 formated_print("Training FPS      ", Tfps[-10:])
+                formated_print("Epoch Time        ", Etime[-10:])
+                formated_print("Training Time     ", Ttime[-10:])
+
                 print("=" * 100)
                 print(" " * 100)
 
