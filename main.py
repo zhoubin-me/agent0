@@ -262,18 +262,18 @@ def train(game):
             if epoch % 10 == 0:
                 toc = time.time()
                 print("=" * 100)
-                print(f"Epoch: {epoch:5d}\t Steps: {steps:10d}\t Average Speed: {steps / (toc - tic):8.2f}\t Epsilon: {epsilon}")
+                speed = steps / (toc - tic)
+                print(f"Epoch: {epoch:4d}\t Steps: {steps:8d}\t AvgSpeed: {speed:8.2f}\t RemMin: {(total_steps - steps) / speed / 3600.0:5.1f} Epsilon: {epsilon:6.4}")
                 print('-' * 100)
                 formated_print("EP Training Reward", RRs[-1000:])
                 formated_print("EP Loss           ", LLs[-1000:])
                 formated_print("EP Qmax           ", QQs[-1000:])
                 formated_print("EP Test Reward    ", TRRs[-1000:])
-                formated_print("Samping FPS       ", Sfps[-10:])
                 formated_print("Training Speed    ", Tfps[-10:])
                 formated_print("Training Time     ", Ttime[-10:])
                 formated_print("Iteration Time    ", Etime[-10:])
+                formated_print("Samping FPS       ", Sfps[-10:])
                 formated_print("Iteration FPS     ", Efps[-10:])
-
 
                 print("=" * 100)
                 print(" " * 100)
