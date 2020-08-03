@@ -150,7 +150,7 @@ class Actor:
 
         toc = time.time()
         # print(f"Rank {self.rank}, Data Collection Time: {toc - tic}, Speed {steps_per_epoch / (toc - tic)}")
-        return local_replay, Rs, Qs, self.rank, len(local_replay) / (toc - tic), self.model.load_state_dict()
+        return local_replay, Rs, Qs, self.rank, len(local_replay) / (toc - tic), self.model.state_dict()
 
 # In[ ]:
 class Agent:
@@ -331,15 +331,16 @@ def train(game):
                 }, f'ckpt/{game}2_e{epoch:04d}.pth')
 
             epoch += 1
+
             if epoch == 10:
-                sample_ops.append(tester.sample.remote(0.01, agent.model.state_dict()))
+                sample_ops.append(tester.sample.remote(0.01, agent.model.state_dict(), agent.model_target.state_dict()))
 
 
             if epoch > epoches:
                 print("Final Testing")
-                sample_ops = [a.sample.remote(0.01, agent.model.state_dict()) for a in actors] * 10
+                sample_ops = [a.sample.remote(0.01, agent.model.state_dict(), agent.model_target.state_dict()) for a in actors] * 10
                 TRs_final = []
-                for local_replay, Rs, Qs, rank, fps in ray.get(sample_ops):
+                for local_replay, Rs, Qs, rank, fps, _ in ray.get(sample_ops):
                     TRs_final += Rs
 
                 torch.save({
