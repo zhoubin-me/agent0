@@ -41,7 +41,7 @@ from src.agents.model import NatureCNN
 # In[2]:
 
 
-num_env = 16
+num_env = 8
 num_actors = 8
 total_steps = int(1e7)
 epoches = 1000
@@ -52,7 +52,7 @@ batch_size = 512
 lr = 1e-3
 agent_train_freq = 20
 target_net_update_freq = 250
-exploration_ratio = 0.2
+exploration_ratio = 0.1
 steps_per_epoch = total_steps // epoches
 
 
@@ -258,7 +258,8 @@ def train(game):
                 toc = time.time()
                 print("=" * 100)
                 speed = steps / (toc - tic)
-                print(f"Epoch:{epoch:4d}\t Steps:{steps:8d}\t AvgSpeed:{speed:8.2f}FPS\t Remain:{(total_steps - steps) / speed / 3600.0:5.1f}hrs\t Epsilon:{epsilon:6.4}")
+                print(f"Epoch:{epoch:4d}\t Steps:{steps:8d}\t  AvgSpeed:{speed:8.2f}\t
+                        Remain:{(total_steps - steps) / speed / 60:5.1f}\t Epsilon:{epsilon:6.4}")
                 print('-' * 100)
                 formated_print("Training Reward   ", RRs[-1000:])
                 formated_print("Loss              ", LLs[-1000:])
