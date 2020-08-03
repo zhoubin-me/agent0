@@ -125,7 +125,7 @@ class Actor:
                     self.R[idx] = 0
         toc = time.time()
         # print(f"Rank {self.rank}, Data Collection Time: {toc - tic}, Speed {steps_per_epoch / (toc - tic)}")
-        return local_replay, Rs, Qs, self.rank, toc - tic
+        return local_replay, Rs, Qs, self.rank, len(local_replay) / (toc - tic)
 
 
 
@@ -204,12 +204,12 @@ def train(game):
     sample_ops = [a.sample.remote(1.0, agent.model.state_dict()) for a in actors]
 
     TRRs, RRs, QQs, LLs, Sfps, Tfps = [], [], [], [], [], []
-    for local_replay, Rs, Qs, rank, duration in ray.get(sample_ops):
+    for local_replay, Rs, Qs, rank, fps in ray.get(sample_ops):
         if rank < num_actors:
             agent.append_data(local_replay)
             RRs += Rs
             QQs += Qs
-            Sfps += [len(local_replay) / duration]
+            Sfps += [fps]
         else:
             TRRs += Rs
 
@@ -247,7 +247,7 @@ def train(game):
             loss = agent.train_step()
             LLs.append(loss)
         tocc = time.time()
-        Tfps.append(len(replay_size) / (toc - tic))
+        Tfps.append(len(local_replay) / (tocc - ticc))
 
 
         # Logging and saving
@@ -261,8 +261,8 @@ def train(game):
                 formated_print("EP Loss           ", torch.stack(LLs).tolist()[-1000:])
                 formated_print("EP Qmax           ", QQs[-1000:])
                 formated_print("EP Test Reward    ", TRRs[-1000:])
-                formated_print("Samping FPS       ", Sfps[-1000:])
-                formated_print("Training FPS      ", Tfps[-1000:])
+                formated_print("Samping FPS       ", Sfps[-10:])
+                formated_print("Training FPS      ", Tfps[-10:])
                 print("=" * 100)
                 print(" " * 100)
 
