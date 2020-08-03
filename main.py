@@ -270,8 +270,10 @@ def train(game):
                 formated_print("EP Test Reward    ", TRRs[-1000:])
                 formated_print("Samping FPS       ", Sfps[-10:])
                 formated_print("Training FPS      ", Tfps[-10:])
-                formated_print("Epoch Time        ", Etime[-10:])
                 formated_print("Training Time     ", Ttime[-10:])
+                formated_print("Epoch Time        ", Etime[-10:])
+                formated_print("Epoch FPS         ", [steps_per_epoch / x for x in Etime[-10:]])
+
 
                 print("=" * 100)
                 print(" " * 100)
