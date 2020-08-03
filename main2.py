@@ -325,7 +325,7 @@ def train(game):
                     'Qs': QQs,
                     'Ls': LLs,
                     'time': toc - tic,
-                }, f'ckpt/{game}_e{epoch:04d}.pth')
+                }, f'ckpt/{game}2_e{epoch:04d}.pth')
 
             epoch += 1
             if epoch == 10:
@@ -351,7 +351,7 @@ def train(game):
                     'Ls': LLs,
                     'time': toc - tic,
                     'FinalTestReward': TRs_final
-                }, f'ckpt/{game}_final.pth')
+                }, f'ckpt/{game}2_final.pth')
 
                 ray.shutdown()
                 return

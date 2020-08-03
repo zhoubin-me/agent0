@@ -34,8 +34,9 @@ class ReplayDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        S, A, R, NS, T = map(lambda x: np.array(x), self.data[idx])
-        return S, A, R, NS, T
+        # S, A, R, NS, T = map(lambda x: np.array(x), self.data[idx])
+        # return S, A, R, NS, T
+        return self.data[idx]
 
 class DataLoaderX(DataLoader):
     def __iter__(self):
