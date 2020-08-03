@@ -265,7 +265,7 @@ def train(game):
                 print(f"Epoch: {epoch:5d}\t Steps: {steps:10d}\t Average Speed: {steps / (toc - tic):8.2f}\t Epsilon: {epsilon}")
                 print('-' * 100)
                 formated_print("EP Training Reward", RRs[-1000:])
-                formated_print("EP Loss           ", torch.stack(LLs).tolist()[-1000:])
+                formated_print("EP Loss           ", LLs[-1000:])
                 formated_print("EP Qmax           ", QQs[-1000:])
                 formated_print("EP Test Reward    ", TRRs[-1000:])
                 formated_print("Samping FPS       ", Sfps[-10:])
