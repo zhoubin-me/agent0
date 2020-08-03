@@ -69,7 +69,6 @@ class Actor:
         self.state_shape = self.envs.observation_space.shape
 
         self.memory_format = torch.channels_last
-        # self.device = torch.device(f'cuda:{self.gpu_id}' if self.gpu_id >= 0 else 'cpu')
         self.device = torch.device('cpu')
         self.model = NatureCNN(self.state_shape[0], self.action_dim).to(self.device, memory_format=self.memory_format)
 
