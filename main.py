@@ -41,7 +41,7 @@ from src.agents.model import NatureCNN
 # In[2]:
 
 
-num_env = 8
+num_env = 5
 num_actors = 8
 total_steps = int(1e7)
 epoches = 1000
@@ -190,7 +190,7 @@ def formated_print(var_name, xs):
             var_name, np.mean(xs), np.std(xs), np.max(xs), np.min(xs)))
 
 def train(game):
-    ray.init()
+    ray.init(num_cpus=25, num_gpus=2)
     epsilon_schedule = LinearSchedule(1.0, 0.01, int(total_steps * exploration_ratio))
     actors = [Actor.remote(rank, game) for rank in range(num_actors + 1)]
     tester = actors[-1]
@@ -258,7 +258,7 @@ def train(game):
                 toc = time.time()
                 print("=" * 100)
                 speed = steps / (toc - tic)
-                print(f"Epoch:{epoch:4d}\t Steps:{steps:8d}\t  AvgSpeed:{speed:8.2f}\t Remain:{(total_steps - steps) / speed / 60:5.1f}\t Epsilon:{epsilon:6.4}")
+                print(f"Epoch:{epoch:4d}\t Steps:{steps:8d}\t  AvgSpeedFPS:{speed:8.2f}\t EstRemainMin:{(total_steps - steps) / speed / 60:8.2f}\t Epsilon:{epsilon:6.4}")
                 print('-' * 100)
                 formated_print("Training Reward   ", RRs[-1000:])
                 formated_print("Loss              ", LLs[-1000:])
