@@ -260,9 +260,9 @@ def train(game):
                 formated_print("EP Training Reward", RRs[-1000:])
                 formated_print("EP Loss           ", torch.stack(LLs).tolist()[-1000:])
                 formated_print("EP Qmax           ", QQs[-1000:])
-                if len(TRRs) > 0:
-                    formated_print("EP Test Reward    ", TRRs[-1000:])
-
+                formated_print("EP Test Reward    ", TRRs[-1000:])
+                formated_print("Samping FPS       ", Sfps[-1000:])
+                formated_print("Training FPS      ", Tfps[-1000:])
                 print("=" * 100)
                 print(" " * 100)
 
