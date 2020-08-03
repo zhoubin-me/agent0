@@ -245,13 +245,15 @@ def train(game):
 
         # Trainer
         ticc = time.time()
+        Ls = []
         for _ in range(agent_train_freq):
             loss = agent.train_step()
-            LLs.append(loss)
+            Ls.append(loss)
+        Ls = torch.stack(Ls).tolist()
+        LLs += Ls
         tocc = time.time()
         Tfps.append((batch_size * agent_train_freq) / (tocc - ticc))
         Ttime.append(tocc - ticc)
-        Etime.append(tocc - ttic)
 
 
 
@@ -295,6 +297,8 @@ def train(game):
                 ray.shutdown()
                 return
 
+        ttoc = time.time()
+        Etime.append(ttoc - ttic)
 
 
 # In[ ]:
