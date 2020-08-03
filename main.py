@@ -50,7 +50,7 @@ replay_size = int(1e6)
 discount = 0.99
 batch_size = 512
 lr = 1e-3
-
+agent_train_freq = 20
 target_net_update_freq = 250
 exploration_ratio = 0.2
 steps_per_epoch = total_steps // epoches
@@ -125,7 +125,7 @@ class Actor:
                     self.R[idx] = 0
         toc = time.time()
         # print(f"Rank {self.rank}, Data Collection Time: {toc - tic}, Speed {steps_per_epoch / (toc - tic)}")
-        return local_replay, Rs, Qs, self.rank
+        return local_replay, Rs, Qs, self.rank, toc - tic
 
 
 
@@ -203,15 +203,15 @@ def train(game):
     agent = Agent(game)
     sample_ops = [a.sample.remote(1.0, agent.model.state_dict()) for a in actors]
 
-    TRRs, RRs, QQs, LLs = [], [], [], []
-    for local_replay, Rs, Qs, rank in ray.get(sample_ops): # + [test_op]):
+    TRRs, RRs, QQs, LLs, Sfps, Tfps = [], [], [], [], [], []
+    for local_replay, Rs, Qs, rank, duration in ray.get(sample_ops):
         if rank < num_actors:
             agent.append_data(local_replay)
             RRs += Rs
             QQs += Qs
+            Sfps += [len(local_replay) / duration]
         else:
             TRRs += Rs
-
 
     formated_print("Warming up Reward", RRs)
     formated_print("Warming up Qmax", QQs)
@@ -222,13 +222,14 @@ def train(game):
     while True:
         done_id, sample_ops = ray.wait(sample_ops)
         data = ray.get(done_id)
-        local_replay, Rs, Qs, rank = data[0]
+        local_replay, Rs, Qs, rank, duration = data[0]
 
         if rank < num_actors:
             # Actor
             agent.append_data(local_replay)
             steps += len(local_replay)
             epsilon = epsilon_schedule(len(local_replay))
+
             if epsilon == 0.01:
                 epsilon=np.random.choice([0.01, 0.02, 0.05, 0.1], p=[0.7, 0.1, 0.1, 0.1])
 
@@ -241,10 +242,15 @@ def train(game):
             TRRs += Rs
 
         # Trainer
-        for _ in range(16):
+        ticc = time.time()
+        for _ in range(agent_train_freq):
             loss = agent.train_step()
             LLs.append(loss)
+        tocc = time.time()
+        Tfps.append(len(replay_size) / (toc - tic))
 
+
+        # Logging and saving
         if (steps // steps_per_epoch) > epoch:
             if epoch % 10 == 0:
                 toc = time.time()
