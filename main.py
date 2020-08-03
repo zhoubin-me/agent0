@@ -258,8 +258,7 @@ def train(game):
                 toc = time.time()
                 print("=" * 100)
                 speed = steps / (toc - tic)
-                print(f"Epoch:{epoch:4d}\t Steps:{steps:8d}\t  AvgSpeed:{speed:8.2f}\t
-                        Remain:{(total_steps - steps) / speed / 60:5.1f}\t Epsilon:{epsilon:6.4}")
+                print(f"Epoch:{epoch:4d}\t Steps:{steps:8d}\t  AvgSpeed:{speed:8.2f}\t Remain:{(total_steps - steps) / speed / 60:5.1f}\t Epsilon:{epsilon:6.4}")
                 print('-' * 100)
                 formated_print("Training Reward   ", RRs[-1000:])
                 formated_print("Loss              ", LLs[-1000:])
