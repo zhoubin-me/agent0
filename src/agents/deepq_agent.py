@@ -1,4 +1,3 @@
-import json
 import time
 from collections import deque
 
@@ -109,7 +108,6 @@ class Agent:
 
         # neptune.init('zhoubinxyz/agentzero')
         # neptune.create_experiment(name=self.game, params=vars(self))
-        self.vars = json.loads(json.dumps(vars(self)))
         self.envs = make_env(self.game)
         self.action_dim = self.envs.action_space.n
         self.state_shape = self.envs.observation_space.shape
@@ -125,7 +123,8 @@ class Agent:
 
     def get_datafetcher(self):
         dataset = ReplayDataset(self.replay)
-        dataloader = DataLoaderX(dataset, batch_size=self.batch_size, shuffle=True, num_workers=4, pin_memory=True)
+        dataloader = DataLoaderX(dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_data_workers,
+                                 pin_memory=True)
         datafetcher = DataPrefetcher(dataloader, self.device)
         return datafetcher
 
@@ -269,7 +268,7 @@ def run(**kwargs):
                     'Qs': QQs,
                     'Ls': LLs,
                     'time': toc - tic,
-                    'vars': agent.vars,
+                    'params': kwargs,
                 }, f'ckpt/{agent.game}_e{epoch:04d}.pth')
 
 
@@ -287,7 +286,7 @@ def run(**kwargs):
                     'Qs': QQs,
                     'Ls': LLs,
                     'time': toc - tic,
-                    'vars': agent.vars,
+                    'params': kwargs,
                     'FTRs': TRs
                 }, f'ckpt/{agent.game}_final.pth')
                 ray.shutdown()
