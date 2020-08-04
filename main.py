@@ -123,7 +123,6 @@ class Actor:
                     Rs.append(self.R[idx])
                     self.R[idx] = 0
         toc = time.time()
-        # print(f"Rank {self.rank}, Data Collection Time: {toc - tic}, Speed {steps_per_epoch / (toc - tic)}")
         return local_replay, Rs, Qs, self.rank, len(local_replay) / (toc - tic)
 
 # In[ ]:
