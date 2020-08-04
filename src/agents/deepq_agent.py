@@ -5,6 +5,7 @@ import numpy as np
 import ray
 import torch
 import torch.nn.functional as F
+from ray import tune
 
 from src.agents.model import NatureCNN
 from src.common.utils import LinearSchedule, DataPrefetcher, ReplayDataset, DataLoaderX, pprint, make_env
@@ -40,14 +41,6 @@ class Actor:
     def __init__(self, **kwargs):
         for k, v in kwargs.items():
             setattr(self, k, v)
-        self.setup(**kwargs)
-
-    def setup(self, **kwargs):
-        if not hasattr(self, 'game'):
-            kwargs_default = default_hyperparams()
-            for k, v in kwargs_default.items():
-                if not hasattr(self, k):
-                    setattr(self, k, v)
 
         if self.rank == self.num_actors:
             # Testing
@@ -97,14 +90,6 @@ class Agent:
     def __init__(self, **kwargs):
         for k, v in kwargs.items():
             setattr(self, k, v)
-        self.setup(**kwargs)
-
-    def setup(self, **kwargs):
-        if not hasattr(self, 'game'):
-            kwargs_default = default_hyperparams()
-            for k, v in kwargs_default.items():
-                if not hasattr(self, k):
-                    setattr(self, k, v)
 
         # neptune.init('zhoubinxyz/agentzero')
         # neptune.create_experiment(name=self.game, params=vars(self))
@@ -161,7 +146,16 @@ class Agent:
         return loss.detach()
 
 
-def run(**kwargs):
+def run(config=None, **kwargs):
+    if config is not None:
+        kwargs = default_hyperparams()
+        for k, v in config.items():
+            kwargs[k] = v
+    else:
+        args = default_hyperparams()
+        for k, v in args.items():
+            if k not in kwargs:
+                kwargs[k] = v
 
     ray.init(num_gpus=4)
     agent = Agent(**kwargs)
@@ -289,5 +283,7 @@ def run(**kwargs):
                     'params': kwargs,
                     'FTRs': TRs
                 }, f'ckpt/{agent.game}_final.pth')
-                ray.shutdown()
+
+                if config is None:
+                    tune.report(final_test_rewards=np.mean(TRs))
                 return

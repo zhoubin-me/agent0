@@ -15,5 +15,4 @@ def parse_arguments(params):
 if __name__ == '__main__':
     params = default_hyperparams()
     kwargs = parse_arguments(params)
-    agent = run(**kwargs)
-
+    run(**kwargs)
