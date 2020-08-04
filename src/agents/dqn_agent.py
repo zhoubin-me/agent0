@@ -169,7 +169,7 @@ class Agent:
 
 
 def run(total_steps, epoches, num_envs, num_actors, exploration_ratio, num_data_workers,
-        game, lr, batch_size, replay_size, discount, relay_size, agent_train_freq, target_net_update_freq):
+        game, lr, batch_size, replay_size, discount, agent_train_freq, target_net_update_freq, **kwargs):
 
     ray.init()
 
@@ -179,7 +179,7 @@ def run(total_steps, epoches, num_envs, num_actors, exploration_ratio, num_data_
     actors = [Actor.remote(rank, game, num_envs, replay_size) for rank in range(num_actors + 1)]
     tester = actors[-1]
 
-    agent = Agent(game, lr, relay_size, discount, batch_size, num_data_workers, target_net_update_freq)
+    agent = Agent(game, lr, replay_size, discount, batch_size, num_data_workers, target_net_update_freq)
     sample_ops = [a.sample.remote(actor_steps, 1.0, agent.model.state_dict()) for a in actors]
 
     TRRs, RRs, QQs, LLs, Sfps, Tfps, Efps, Etime, Ttime = [], [], [], [], [], [], [], [], []
