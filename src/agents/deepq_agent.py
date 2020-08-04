@@ -185,7 +185,7 @@ def run(**kwargs):
         else:
             TRRs += Rs
     pprint("Warming up Reward", RRs)
-    pprint("Warming up Qmax", QQs)
+    pprint("Warming up Qmax  ", QQs)
 
     actor_fps, training_fps, iteration_fps, iteration_time, training_time = [], [], [], [], []
     epoch, steps = 0, 0
@@ -241,7 +241,7 @@ def run(**kwargs):
                       f"TimePast(min):{(toc - tic) / 60:8.2f}\t "
                       f"EstTimeRem(min):{(agent.total_steps - steps) / speed / 60:8.2f}\n"
                       f"AvgSpeedFPS:{speed:8.2f}\t "
-                      f"Epsilon:{epsilon:6.2}")
+                      f"Epsilon:{epsilon:6.4}")
                 print('-' * 100)
 
                 pprint("Training Reward   ", RRs[-1000:])
