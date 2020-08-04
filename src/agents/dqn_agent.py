@@ -169,7 +169,7 @@ class Agent:
 
 
 def run(total_steps, epoches, num_envs, num_actors, exploration_ratio, num_data_workers,
-        game, lr, batch_size, replay_size, discount, relay_size, agent_train_freq, target_net_update_freq, **kwargs):
+        game, lr, batch_size, replay_size, discount, relay_size, agent_train_freq, target_net_update_freq):
 
     ray.init()
 
