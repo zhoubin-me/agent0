@@ -256,7 +256,6 @@ def run(**kwargs):
                     'time': toc - tic,
                 }, f'ckptx/{agent.game}_e{epoch:04d}.pth')
 
-
             if epoch > agent.epoches:
                 print("Final Testing")
                 TRs = ray.get(tester.sample.remote(actor_steps * 10, 0.01, agent.model.state_dict()))[1]
@@ -273,7 +272,7 @@ def run(**kwargs):
                     'params': kwargs,
                     'time': toc - tic,
                     'FTRs': TRs
-                }, f'ckpt/{agent.env_id}_final.pth')
+                }, f'ckpt/{agent.game}_final.pth')
                 ray.shutdown()
                 return
 

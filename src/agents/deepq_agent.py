@@ -128,7 +128,7 @@ class Agent:
 
     def get_datafetcher(self):
         dataset = ReplayDataset(self.replay)
-        dataloader = DataLoaderX(dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_data_workers, pin_memory=True)
+        dataloader = DataLoaderX(dataset, batch_size=self.batch_size, shuffle=True, num_workers=4, pin_memory=True)
         datafetcher = DataPrefetcher(dataloader, self.device)
         return datafetcher
 
@@ -140,8 +140,8 @@ class Agent:
             data = self.prefetcher.next()
 
         states, actions, rewards, next_states, terminals = data
-        states = states.float().div(255.0)
-        next_states = next_states.float().div(255.0)
+        states = states.float() / 255.0
+        next_states = next_states.float() / 255.0
         actions = actions.long()
         terminals = terminals.float()
         rewards = rewards.float()
@@ -164,16 +164,14 @@ class Agent:
             self.model_target.load_state_dict(self.model.state_dict())
         return loss.detach()
 
-    def load(self):
-        pass
-
 
 def run(**kwargs):
-    ray.init(num_gpus=4)
 
+    ray.init(num_gpus=4)
     agent = Agent(**kwargs)
+
     epsilon_schedule = LinearSchedule(1.0, 0.01, int(agent.total_steps * agent.exploration_ratio))
-    actors = [Actor.remote(rank=rank, **agent.vars) for rank in range(agent.num_actors + 1)]
+    actors = [Actor.remote(rank=rank, **kwargs) for rank in range(agent.num_actors + 1)]
     tester = actors[-1]
 
     steps_per_epoch = agent.total_steps // agent.epoches
