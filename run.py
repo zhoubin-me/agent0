@@ -1,9 +1,8 @@
 import os
 
-import ray
 import neptune
 import argparse
-from src.agents.deepq_agent import Agent, default_hyperparams
+from src.agents.deepq_agent import Agent, default_hyperparams, run
 
 def parse_arguments(params):
     parser = argparse.ArgumentParser()
@@ -15,10 +14,8 @@ def parse_arguments(params):
 if __name__ == '__main__':
     params = default_hyperparams()
     kwargs = parse_arguments(params)
-    ray.init(num_cpus=50, num_gpus=4)
     agent = Agent(**kwargs)
-    # agent.run()
 
-
+    run(agent)
 
 
