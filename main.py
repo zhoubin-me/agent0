@@ -49,8 +49,8 @@ replay_size = int(1e6)
 discount = 0.99
 batch_size = 512
 lr = 1e-3
-agent_train_freq = 10
-target_net_update_freq = 250
+agent_train_freq = 20
+target_net_update_freq = 500
 exploration_ratio = 0.15
 steps_per_epoch = total_steps // epoches
 

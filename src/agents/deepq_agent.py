@@ -22,7 +22,7 @@ def default_hyperparams():
         env_id='Breakout',
 
         num_actors=8,
-        num_envs=8,
+        num_envs=16,
         num_data_workers=4,
 
         adam_lr=1e-3,
@@ -112,9 +112,8 @@ class Agent:
 
         # neptune.init('zhoubinxyz/agentzero')
         # neptune.create_experiment(name=self.env_id, params=vars(self))
-        params = vars(self)
-        print("input args:\n", json.dumps(params, indent=4, separators=(",", ":")))
-        self.vars = params
+        self.vars = json.load(json.dumps(vars(self)))
+        print("input args:\n", json.dumps(self.vars, indent=4, separators=(",", ":")))
 
         self.envs = make_env(self.env_id)
         self.action_dim = self.envs.action_space.n
@@ -275,7 +274,7 @@ def run(agent):
                     'Qs': QQs,
                     'Ls': LLs,
                     'time': toc - tic,
-                    'vars': agent.vars,
+                    # 'vars': agent.vars,
                 }, f'ckpt/{agent.env_id}_e{epoch:04d}.pth')
 
 
@@ -293,7 +292,7 @@ def run(agent):
                     'Qs': QQs,
                     'Ls': LLs,
                     'time': toc - tic,
-                    'FinalTestReward': TRs
+                    'FTRs': TRs
                 }, f'ckpt/{agent.env_id}_final.pth')
                 ray.shutdown()
                 return
