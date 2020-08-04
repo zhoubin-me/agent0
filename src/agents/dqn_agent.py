@@ -62,12 +62,13 @@ def default_hyperparams():
 
 @ray.remote(num_gpus=0.125)
 class Actor:
-    def __init__(self, rank, game, num_envs, replay_size):
+    def __init__(self, rank, game, num_envs, replay_size, num_actors):
 
         self.rank = rank
         self.game = game
         self.num_envs = num_envs
         self.replay_size = replay_size
+        self.num_actors =  num_actors
 
         if self.rank < self.num_actors:
             self.envs = ShmemVecEnv([lambda: make_env(self.game) for _ in range(self.num_envs)], context='fork')
@@ -176,7 +177,8 @@ def run(total_steps, epoches, num_envs, num_actors, exploration_ratio, num_data_
     steps_per_epoch = total_steps // epoches
     actor_steps = steps_per_epoch // (num_envs * num_actors)
     epsilon_schedule = LinearSchedule(1.0, 0.01, int(total_steps * exploration_ratio))
-    actors = [Actor.remote(rank, game, num_envs, replay_size) for rank in range(num_actors + 1)]
+
+    actors = [Actor.remote(rank, game, num_envs, replay_size, num_actors) for rank in range(num_actors + 1)]
     tester = actors[-1]
 
     agent = Agent(game, lr, replay_size, discount, batch_size, num_data_workers, target_net_update_freq)
@@ -274,12 +276,12 @@ def run(total_steps, epoches, num_envs, num_actors, exploration_ratio, num_data_
 
             epoch += 1
             if epoch == 10:
-                sample_ops.append(tester.sample.remote(0.01, agent.model.state_dict()))
+                sample_ops.append(tester.sample.remote(actor_steps, 0.01, agent.model.state_dict()))
 
 
             if epoch > epoches:
                 print("Final Testing")
-                sample_ops = [tester.sample.remote(0.01, agent.model.state_dict()) for _ in range(100)]
+                sample_ops = [tester.sample.remote(actor_steps, 0.01, agent.model.state_dict()) for _ in range(100)]
                 TRs_final = []
                 for local_replay, Rs, Qs, rank, fps in ray.get(sample_ops):
                     TRs_final += Rs
