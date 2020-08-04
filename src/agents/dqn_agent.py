@@ -58,15 +58,16 @@ def default_hyperparams():
         total_steps=int(2e7),
         epoches=1000,
         random_seed=1234)
-
     return params
 
 @ray.remote(num_gpus=0.125)
 class Actor:
-    def __init__(self, **kwargs):
-        print(kwargs)
-        for k, v in kwargs.items():
-            setattr(self, k, v)
+    def __init__(self, rank, game, num_envs, replay_size):
+
+        self.rank = rank
+        self.game = game
+        self.num_envs = num_envs
+        self.replay_size = replay_size
 
         if self.rank < self.num_actors:
             self.envs = ShmemVecEnv([lambda: make_env(self.game) for _ in range(self.num_envs)], context='fork')
@@ -106,10 +107,13 @@ class Actor:
         return local_replay, Rs, Qs, self.rank, len(local_replay) / (toc - tic)
 
 class Agent:
-    def __init__(self, **kwargs):
-        for k, v in kwargs.items():
-            setattr(self, k, v)
-        print(kwargs)
+    def __init__(self, game, lr, relay_size, discount, batch_size):
+        self.game = game
+        self.lr = lr
+        self.replay_size = relay_size
+        self.discount = discount
+        self.batch_size = batch_size
+
         test_env = make_env(self.game)
         self.state_shape, self.action_dim = test_env.observation_space.shape, test_env.action_space.n
         self.model = NatureCNN(self.state_shape[0], self.action_dim).cuda()
@@ -162,18 +166,17 @@ class Agent:
 
 
 
-def run(game, total_steps, exploration_ratio, num_actors, agent_train_freq, batch_size, epoches, **kwargs):
-    params = locals()
-    print(params)
+def run(total_steps, epoches, num_envs, num_actors, exploration_ratio, game, lr, batch_size, replay_size, discount, relay_size, agent_train_freq):
     ray.init()
 
     steps_per_epoch = total_steps // epoches
+    actor_steps = steps_per_epoch // (num_envs * num_actors)
     epsilon_schedule = LinearSchedule(1.0, 0.01, int(total_steps * exploration_ratio))
-    actors = [Actor.remote(rank=rank, **params) for rank in range(num_actors + 1)]
+    actors = [Actor.remote(rank, game, num_envs, replay_size) for rank in range(num_actors + 1)]
     tester = actors[-1]
 
-    agent = Agent(**params)
-    sample_ops = [a.sample.remote(1.0, agent.model.state_dict()) for a in actors]
+    agent = Agent(game, lr, relay_size, discount, batch_size)
+    sample_ops = [a.sample.remote(actor_steps, 1.0, agent.model.state_dict()) for a in actors]
 
     TRRs, RRs, QQs, LLs, Sfps, Tfps, Efps, Etime, Ttime = [], [], [], [], [], [], [], [], []
     for local_replay, Rs, Qs, rank, fps in ray.get(sample_ops):
@@ -207,12 +210,12 @@ def run(game, total_steps, exploration_ratio, num_actors, agent_train_freq, batc
             if epsilon == 0.01:
                 epsilon=np.random.choice([0.01, 0.02, 0.05, 0.1], p=[0.7, 0.1, 0.1, 0.1])
 
-            sample_ops.append(actors[rank].sample.remote(epsilon, agent.model.state_dict()))
+            sample_ops.append(actors[rank].sample.remote(actor_steps, epsilon, agent.model.state_dict()))
             RRs += Rs
             QQs += Qs
         else:
             # Tester
-            sample_ops.append(tester.sample.remote(0.01, agent.model.state_dict()))
+            sample_ops.append(tester.sample.remote(actor_steps, 0.01, agent.model.state_dict()))
             TRRs += Rs
 
         # Trainer
