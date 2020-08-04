@@ -14,7 +14,7 @@ from src.common.vec_env import ShmemVecEnv
 
 def default_hyperparams():
     params = dict(
-        env_id='Breakout',
+        game='Breakout',
 
         num_actors=8,
         num_envs=16,
@@ -44,7 +44,7 @@ class Actor:
         self.setup(**kwargs)
 
     def setup(self, **kwargs):
-        if not hasattr(self, 'env_id'):
+        if not hasattr(self, 'game'):
             kwargs_default = default_hyperparams()
             for k, v in kwargs_default.items():
                 if not hasattr(self, k):
@@ -52,10 +52,12 @@ class Actor:
 
         if self.rank == self.num_actors:
             # Testing
-            self.envs = ShmemVecEnv([lambda: make_env(self.env_id, False, False) for _ in range(self.num_envs)], context='fork')
+            self.envs = ShmemVecEnv([lambda: make_env(self.game, False, False) for _ in range(self.num_envs)],
+                                    context='fork')
         else:
             # Training
-            self.envs = ShmemVecEnv([lambda: make_env(self.env_id, True, True) for _ in range(self.num_envs)], context='fork')
+            self.envs = ShmemVecEnv([lambda: make_env(self.game, True, True) for _ in range(self.num_envs)],
+                                    context='fork')
         self.action_dim = self.envs.action_space.n
         self.state_shape = self.envs.observation_space.shape
 
@@ -99,16 +101,16 @@ class Agent:
         self.setup(**kwargs)
 
     def setup(self, **kwargs):
-        if not hasattr(self, 'env_id'):
+        if not hasattr(self, 'game'):
             kwargs_default = default_hyperparams()
             for k, v in kwargs_default.items():
                 if not hasattr(self, k):
                     setattr(self, k, v)
 
         # neptune.init('zhoubinxyz/agentzero')
-        # neptune.create_experiment(name=self.env_id, params=vars(self))
+        # neptune.create_experiment(name=self.game, params=vars(self))
         self.vars = json.loads(json.dumps(vars(self)))
-        self.envs = make_env(self.env_id)
+        self.envs = make_env(self.game)
         self.action_dim = self.envs.action_space.n
         self.state_shape = self.envs.observation_space.shape
 
@@ -268,12 +270,12 @@ def run(**kwargs):
                     'Ls': LLs,
                     'time': toc - tic,
                     'vars': agent.vars,
-                }, f'ckpt/{agent.env_id}_e{epoch:04d}.pth')
+                }, f'ckpt/{agent.game}_e{epoch:04d}.pth')
 
 
             if epoch > agent.epoches:
                 print("Final Testing")
-                TRs = [x[1] for x in ray.get(tester.sample.remote(actor_steps * 10, 0.01, agent.model.state_dict()))]
+                TRs = ray.get(tester.sample.remote(actor_steps * 100, 0.01, agent.model.state_dict()))[1]
                 torch.save({
                     'model': agent.model.state_dict(),
                     'optim': agent.optimizer.state_dict(),
@@ -287,6 +289,6 @@ def run(**kwargs):
                     'time': toc - tic,
                     'vars': agent.vars,
                     'FTRs': TRs
-                }, f'ckpt/{agent.env_id}_final.pth')
+                }, f'ckpt/{agent.game}_final.pth')
                 ray.shutdown()
                 return
