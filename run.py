@@ -17,7 +17,7 @@ if __name__ == '__main__':
     kwargs = parse_arguments(params)
     ray.init(num_cpus=50, num_gpus=4)
     agent = Agent(**kwargs)
-    agent.run()
+    # agent.run()
 
 
 

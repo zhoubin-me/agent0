@@ -38,6 +38,7 @@ def default_hyperparams():
         total_steps=int(1e7),
         epoches=1000,
         random_seed=1234)
+
     return params
 
 @ray.remote(num_gpus=0.125)
@@ -171,7 +172,7 @@ class Agent:
 
     def run(self):
         epsilon_schedule = LinearSchedule(1.0, 0.01, int(self.total_steps * self.exploration_ratio))
-        actors = [Actor.remote(rank=rank) for rank in range(self.num_actors + 1)]
+        actors = [Actor.remote(rank=rank, **self.vars) for rank in range(self.num_actors + 1)]
         tester = actors[-1]
 
         steps_per_epoch = self.total_steps // self.epoches
