@@ -41,18 +41,17 @@ from src.agents.model import NatureCNN
 # In[2]:
 
 
-num_env = 5
+num_env = 8
 num_actors = 8
-total_steps = int(1e7)
+total_steps = int(2e7)
 epoches = 1000
-update_per_data = 8
 replay_size = int(1e6)
 discount = 0.99
 batch_size = 512
 lr = 1e-3
-agent_train_freq = 20
-target_net_update_freq = 250
-exploration_ratio = 0.1
+agent_train_freq = 10
+target_net_update_freq = 500
+exploration_ratio = 0.15
 steps_per_epoch = total_steps // epoches
 
 
@@ -156,8 +155,8 @@ class Agent:
             data = self.prefetcher.next()
 
         states, actions, rewards, next_states, terminals = data
-        states = states.float().div(255.0)
-        next_states = next_states.float().div(255.0)
+        states = states.float() / 255.0
+        next_states = next_states.float() / 255.0
         actions = actions.long()
         terminals = terminals.float()
         rewards = rewards.float()
@@ -176,7 +175,7 @@ class Agent:
         self.optimizer.step()
         self.update_steps += 1
 
-        if self.update_steps % 250 == 0:
+        if self.update_steps % target_net_update_freq == 0:
             self.model_target.load_state_dict(self.model.state_dict())
         return loss.detach()
 
@@ -190,7 +189,7 @@ def formated_print(var_name, xs):
             var_name, np.mean(xs), np.std(xs), np.max(xs), np.min(xs)))
 
 def train(game):
-    ray.init(num_cpus=25, num_gpus=2)
+    ray.init(num_gpus=4)
     epsilon_schedule = LinearSchedule(1.0, 0.01, int(total_steps * exploration_ratio))
     actors = [Actor.remote(rank, game) for rank in range(num_actors + 1)]
     tester = actors[-1]
@@ -258,6 +257,7 @@ def train(game):
                 toc = time.time()
                 print("=" * 100)
                 speed = steps / (toc - tic)
+                local_speed = len(local_replay) / np.mean(Etime[-100:])
                 print(f"Epoch:{epoch:4d}\t Steps:{steps:8d}\t Updates:{agent.update_steps:4d}  AvgSpeedFPS:{speed:8.2f}\t EstRemainMin:{(total_steps - steps) / speed / 60:8.2f}\t Epsilon:{epsilon:6.4}")
                 print('-' * 100)
                 formated_print("Training Reward   ", RRs[-1000:])
@@ -285,7 +285,7 @@ def train(game):
                     'Qs': QQs,
                     'Ls': LLs,
                     'time': toc - tic,
-                }, f'ckpt/{game}_e{epoch:04d}.pth')
+                }, f'ckptx/{game}_e{epoch:04d}.pth')
 
             epoch += 1
             if epoch == 10:
@@ -294,7 +294,7 @@ def train(game):
 
             if epoch > epoches:
                 print("Final Testing")
-                sample_ops = [a.sample.remote(0.01, agent.model.state_dict()) for a in actors] * 10
+                sample_ops = [tester.sample.remote(0.01, agent.model.state_dict()) for _ in range(100)]
                 TRs_final = []
                 for local_replay, Rs, Qs, rank, fps in ray.get(sample_ops):
                     TRs_final += Rs
@@ -311,7 +311,7 @@ def train(game):
                     'Ls': LLs,
                     'time': toc - tic,
                     'FinalTestReward': TRs_final
-                }, f'ckpt/{game}_final.pth')
+                }, f'ckptx/{game}_final.pth')
 
                 ray.shutdown()
                 return
