@@ -244,7 +244,7 @@ def run(agent):
                 print(f"Epoch:{epoch:4d}\t Steps:{steps:8d}\t "
                       f"Updates:{agent.update_steps:4d}\t "
                       f"TimePast(min):{(toc - tic) / 60:5.2}\t "
-                      f"EstTimeRem(min):{(agent.total_steps - steps) / speed / 60:8.2f}\t "
+                      f"EstTimeRem(min):{(agent.total_steps - steps) / speed / 60:8.2f}\n"
                       f"AvgSpeedFPS:{speed:8.2f}\t "
                       f"Epsilon:{epsilon:6.2}")
                 print('-' * 100)
@@ -274,7 +274,7 @@ def run(agent):
                     'Qs': QQs,
                     'Ls': LLs,
                     'time': toc - tic,
-                    # 'vars': agent.vars,
+                    'vars': agent.vars,
                 }, f'ckpt/{agent.env_id}_e{epoch:04d}.pth')
 
 
@@ -292,6 +292,7 @@ def run(agent):
                     'Qs': QQs,
                     'Ls': LLs,
                     'time': toc - tic,
+                    'vars': agent.vars,
                     'FTRs': TRs
                 }, f'ckpt/{agent.env_id}_final.pth')
                 ray.shutdown()

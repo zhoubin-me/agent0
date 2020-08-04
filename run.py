@@ -15,7 +15,6 @@ if __name__ == '__main__':
     params = default_hyperparams()
     kwargs = parse_arguments(params)
     agent = Agent(**kwargs)
-
     run(agent)
 
 
