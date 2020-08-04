@@ -63,12 +63,12 @@ def default_hyperparams():
 
 @ray.remote(num_gpus=0.125)
 class Actor:
-    def __init__(self, rank, **kwargs):
-
+    def __init__(self, **kwargs):
+        print(kwargs)
         for k, v in kwargs.items():
             setattr(self, k, v)
 
-        if rank < self.num_actors:
+        if self.rank < self.num_actors:
             self.envs = ShmemVecEnv([lambda: make_env(self.game) for _ in range(self.num_envs)], context='fork')
         else:
             self.envs = ShmemVecEnv([lambda: make_env(self.game, False, False) for _ in range(self.num_envs)], context='fork')
@@ -76,7 +76,6 @@ class Actor:
         self.obs = self.envs.reset()
         self.state_shape, self.action_dim = self.envs.observation_space.shape, self.envs.action_space.n
         self.model = NatureCNN(self.state_shape[0], self.action_dim).cuda()
-        self.rank = rank
 
     def sample(self, steps, epsilon, state_dict):
         self.model.load_state_dict(state_dict)
@@ -110,7 +109,7 @@ class Agent:
     def __init__(self, **kwargs):
         for k, v in kwargs.items():
             setattr(self, k, v)
-
+        print(kwargs)
         test_env = make_env(self.game)
         self.state_shape, self.action_dim = test_env.observation_space.shape, test_env.action_space.n
         self.model = NatureCNN(self.state_shape[0], self.action_dim).cuda()
@@ -165,7 +164,7 @@ class Agent:
 
 def run(game, total_steps, exploration_ratio, num_actors, agent_train_freq, batch_size, epoches, **kwargs):
     params = locals()
-
+    print(params)
     ray.init()
 
     steps_per_epoch = total_steps // epoches

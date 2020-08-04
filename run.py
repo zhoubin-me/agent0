@@ -2,7 +2,7 @@ import os
 
 import neptune
 import argparse
-from src.agents.dqn_agent import Agent, default_hyperparams, run
+from src.agents.dqn_agent import default_hyperparams, run
 
 def parse_arguments(params):
     parser = argparse.ArgumentParser()
