@@ -4,38 +4,23 @@
 # In[1]:
 
 
-import gym
-import os
-import random
-import time
-import cv2
-import copy
-import numpy as np
-import collections
-import matplotlib.pyplot as plt
-import json
-import scipy
 import argparse
-from PIL import Image
+import copy
+import json
+import time
 from collections import deque
-from tqdm import tqdm
+
+import numpy as np
 import ray
-from scipy.signal import savgol_filter
-# plt.style.use('')
-
-
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
-import torch.multiprocessing as mp
-import torchvision as tv
-from torch.utils.data import Dataset
-import pickle
 
+from src.agents.model import NatureCNN
 from src.common.atari_wrappers import wrap_deepmind, make_atari
 from src.common.utils import LinearSchedule, DataLoaderX, DataPrefetcher, ReplayDataset
-from src.common.vec_env import ShmemVecEnv, VecEnvWrapper, DummyVecEnv
-from src.agents.model import NatureCNN
+from src.common.vec_env import ShmemVecEnv
+
+# plt.style.use('')
 
 
 # In[2]:
@@ -182,7 +167,7 @@ class Agent:
 # In[ ]:
 
 
-def formated_print(var_name, xs):
+def pprint(var_name, xs):
     if len(xs) > 0:
         print("{0} mean/std/max/min\t {1:12.6f}\t{2:12.6f}\t{3:12.6f}\t{4:12.6}".format(
             var_name, np.mean(xs), np.std(xs), np.max(xs), np.min(xs)))
@@ -206,8 +191,8 @@ def train(game):
         else:
             TRRs += Rs
 
-    formated_print("Warming up Reward", RRs)
-    formated_print("Warming up Qmax", QQs)
+    pprint("Warming up Reward", RRs)
+    pprint("Warming up Qmax", QQs)
 
     steps = 0
     epoch = 0
@@ -257,17 +242,18 @@ def train(game):
                 print("=" * 100)
                 speed = steps / (toc - tic)
                 local_speed = len(local_replay) / np.mean(Etime[-100:])
-                print(f"Epoch:{epoch:4d}\t Steps:{steps:8d}\t Updates:{agent.update_steps:4d}  AvgSpeedFPS:{speed:8.2f}\t EstRemainMin:{(total_steps - steps) / speed / 60:8.2f}\t Epsilon:{epsilon:6.4}")
+                print(
+                    f"Epoch:{epoch:4d}\t Steps:{steps:8d}\t Updates:{agent.update_steps:4d}  AvgSpeedFPS:{speed:8.2f}\t EstRemainMin:{(total_steps - steps) / speed / 60:8.2f}\t Epsilon:{epsilon:6.4}")
                 print('-' * 100)
-                formated_print("Training Reward   ", RRs[-1000:])
-                formated_print("Loss              ", LLs[-1000:])
-                formated_print("Qmax              ", QQs[-1000:])
-                formated_print("Test Reward       ", TRRs[-1000:])
-                formated_print("Training Speed    ", Tfps[-10:])
-                formated_print("Training Time     ", Ttime[-10:])
-                formated_print("Iteration Time    ", Etime[-10:])
-                formated_print("Iteration FPS     ", Efps[-10:])
-                formated_print("Actor FPS         ", Sfps[-10:])
+                pprint("Training Reward   ", RRs[-1000:])
+                pprint("Loss              ", LLs[-1000:])
+                pprint("Qmax              ", QQs[-1000:])
+                pprint("Test Reward       ", TRRs[-1000:])
+                pprint("Training Speed    ", Tfps[-10:])
+                pprint("Training Time     ", Ttime[-10:])
+                pprint("Iteration Time    ", Etime[-10:])
+                pprint("Iteration FPS     ", Efps[-10:])
+                pprint("Actor FPS         ", Sfps[-10:])
 
                 print("=" * 100)
                 print(" " * 100)
