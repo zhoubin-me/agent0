@@ -170,8 +170,10 @@ class Agent:
         pass
 
 
-def run(agent):
-    ray.init()
+def run(**kwargs):
+    ray.init(num_gpus=4)
+
+    agent = Agent(**kwargs)
     epsilon_schedule = LinearSchedule(1.0, 0.01, int(agent.total_steps * agent.exploration_ratio))
     actors = [Actor.remote(rank=rank, **agent.vars) for rank in range(agent.num_actors + 1)]
     tester = actors[-1]
