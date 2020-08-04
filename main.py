@@ -310,7 +310,7 @@ def train(game):
                     'Qs': QQs,
                     'Ls': LLs,
                     'time': toc - tic,
-                    'FinalTestReward': TRs_final
+                    'FinalTestReward': TRs_final,
                 }, f'ckptx/{game}_final.pth')
 
                 ray.shutdown()

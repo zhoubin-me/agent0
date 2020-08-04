@@ -116,7 +116,8 @@ class Agent:
 
         # neptune.init('zhoubinxyz/agentzero')
         # neptune.create_experiment(name=self.env_id, params=vars(self))
-        print("input args:\n", json.dumps(vars(self), indent=4, separators=(",", ":")))
+        self.vars = vars(self)
+        print("input args:\n", json.dumps(self.vars, indent=4, separators=(",", ":")))
 
         self.envs = make_env(self.env_id)
         self.action_dim = self.envs.action_space.n
@@ -276,6 +277,7 @@ class Agent:
                         'Qs': QQs,
                         'Ls': LLs,
                         'time': toc - tic,
+                        'vars': self.vars,
                     }, f'ckpt/{self.env_id}_e{epoch:04d}.pth')
 
 
