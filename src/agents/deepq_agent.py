@@ -22,7 +22,7 @@ def default_hyperparams():
         env_id='Breakout',
 
         num_actors=8,
-        num_envs=32,
+        num_envs=8,
         num_data_workers=4,
 
         adam_lr=1e-3,
@@ -30,12 +30,12 @@ def default_hyperparams():
         batch_size=512,
         discount=0.99,
         replay_size=int(1e6),
-        exploration_ratio=0.1,
+        exploration_ratio=0.15,
 
         target_update_freq=250,
-        agent_train_freq=20,
+        agent_train_freq=10,
 
-        total_steps=int(1e7),
+        total_steps=int(2e7),
         epoches=1000,
         random_seed=1234)
 
@@ -48,7 +48,7 @@ class Actor:
             setattr(self, k, v)
         self.setup(**kwargs)
 
-    def setup(self):
+    def setup(self, **kwargs):
         if not hasattr(self, 'env_id'):
             kwargs_default = default_hyperparams()
             for k, v in kwargs_default.items():
@@ -112,8 +112,9 @@ class Agent:
 
         # neptune.init('zhoubinxyz/agentzero')
         # neptune.create_experiment(name=self.env_id, params=vars(self))
-        self.vars = vars(self)
-        print("input args:\n", json.dumps(self.vars, indent=4, separators=(",", ":")))
+        params = vars(self)
+        print("input args:\n", json.dumps(params, indent=4, separators=(",", ":")))
+        self.vars = params
 
         self.envs = make_env(self.env_id)
         self.action_dim = self.envs.action_space.n
@@ -180,7 +181,7 @@ class Agent:
 
         # Warming Up
         sample_ops = [a.sample.remote(actor_steps, 1.0, self.model.state_dict()) for a in actors]
-        RRs, QQs, TRRs, LLs = [], [], []
+        RRs, QQs, TRRs, LLs = [], [], [], []
         for local_replay, Rs, Qs, rank, fps in ray.get(sample_ops):
             if rank < self.num_actors:
                 self.replay.extend(local_replay)
