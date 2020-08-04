@@ -2,7 +2,7 @@ import torch
 import numpy as np
 from prefetch_generator import BackgroundGenerator
 from torch.utils.data import Dataset, DataLoader
-
+from src.common.atari_wrappers import wrap_deepmind, make_atari
 
 class DataPrefetcher:
     def __init__(self, dataloader, device):
@@ -59,3 +59,15 @@ class LinearSchedule:
         val = self.current
         self.current = self.bound(self.current + self.inc * steps, self.end)
         return val
+
+
+def make_env(game, episode_life=True, clip_rewards=True):
+    env = make_atari(f'{game}NoFrameskip-v4')
+    env = wrap_deepmind(env, episode_life=episode_life, clip_rewards=clip_rewards, frame_stack=True, scale=False, transpose_image=True)
+    return env
+
+
+def pprint(var_name, xs):
+    if len(xs) > 0:
+        print("{0} mean/std/max/min\t {1:12.6f}\t{2:12.6f}\t{3:12.6f}\t{4:12.6}".format(
+            var_name, np.mean(xs), np.std(xs), np.max(xs), np.min(xs)))

@@ -156,8 +156,8 @@ class Agent:
             data = self.prefetcher.next()
 
         states, actions, rewards, next_states, terminals = data
-        states = states.float() / 255.0
-        next_states = next_states.float() / 255.0
+        states = states.float().div(255.0)
+        next_states = next_states.float().div(255.0)
         actions = actions.long()
         terminals = terminals.float()
         rewards = rewards.float()
