@@ -1,20 +1,15 @@
-import ray
-import time
-import numpy as np
-from collections import deque
-import neptune
-from tqdm import tqdm
-from functools import reduce
 import json
+import time
+from collections import deque
 
+import numpy as np
+import ray
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
-import torchvision as tv
 
-from src.common.vec_env import ShmemVecEnv
-from src.common.utils import LinearSchedule, DataPrefetcher, ReplayDataset, DataLoaderX, pprint, make_env
 from src.agents.model import NatureCNN
+from src.common.utils import LinearSchedule, DataPrefetcher, ReplayDataset, DataLoaderX, pprint, make_env
+from src.common.vec_env import ShmemVecEnv
 
 
 def default_hyperparams():
@@ -82,7 +77,7 @@ class Actor:
             qs_max, qs_argmax = qs.max(dim=-1)
             action_greedy = qs_argmax.tolist()
             Qs.append(qs_max.mean().item())
-            action = [act_greedy if p > epsilon else act_random for p, act_greedy, act_random in
+            action = [act_greedy if p > epsilon else act_random for p, act_random, act_greedy in
                       zip(np.random.rand(self.num_envs), action_random, action_greedy)]
 
             obs_next, reward, done, info = self.envs.step(action)
