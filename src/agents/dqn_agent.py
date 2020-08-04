@@ -141,15 +141,7 @@ class Agent:
         return loss.detach()
 
 
-# In[ ]:
-
-
-def formated_print(var_name, xs):
-    if len(xs) > 0:
-        print("{0} mean/std/max/min\t {1:12.6f}\t{2:12.6f}\t{3:12.6f}\t{4:12.6}".format(
-            var_name, np.mean(xs), np.std(xs), np.max(xs), np.min(xs)))
-
-def train(**kwargs):
+def run(**kwargs):
 
     ray.init(num_gpus=4)
     agent = Agent(**kwargs)
@@ -158,27 +150,28 @@ def train(**kwargs):
     actors = [Actor.remote(rank=rank, **kwargs) for rank in range(agent.num_actors + 1)]
     tester = actors[-1]
 
-    sample_ops = [a.sample.remote(1.0, agent.model.state_dict()) for a in actors]
+    steps_per_epoch = agent.total_steps // agent.epoches
+    actor_steps = steps_per_epoch // (agent.num_envs * agent.num_actors)
 
-    TRRs, RRs, QQs, LLs, Sfps, Tfps, Efps, Etime, Ttime = [], [], [], [], [], [], [], [], []
+    sample_ops = [a.sample.remote(1.0, agent.model.state_dict()) for a in actors]
+    RRs, QQs, TRRs, LLs = [], [], [], []
     for local_replay, Rs, Qs, rank, fps in ray.get(sample_ops):
         if rank < agent.num_actors:
             agent.append_data(local_replay)
             RRs += Rs
             QQs += Qs
-            Sfps += [fps]
         else:
             TRRs += Rs
 
-    formated_print("Warming up Reward", RRs)
-    formated_print("Warming up Qmax", QQs)
+    pprint("Warming up Reward", RRs)
+    pprint("Warming up Qmax ", QQs)
 
-    steps = 0
-    epoch = 0
+    actor_fps, training_fps, iteration_fps, iteration_time, training_time = [], [], [], [], []
+    epoch, steps = 0, 0
     tic = time.time()
     while True:
-        ttic = time.time()
 
+        sampler_tic = time.time()
         done_id, sample_ops = ray.wait(sample_ops)
         data = ray.get(done_id)
         local_replay, Rs, Qs, rank, duration = data[0]
@@ -201,24 +194,31 @@ def train(**kwargs):
             TRRs += Rs
 
         # Trainer
-        ticc = time.time()
+        trainer_tic = time.time()
         Ls = []
         for _ in range(agent.agent_train_freq):
             loss = agent.train_step()
             Ls.append(loss)
         Ls = torch.stack(Ls).tolist()
         LLs += Ls
-        tocc = time.time()
-        Tfps.append((agent.batch_size * agent.agent_train_freq) / (tocc - ticc))
-        Ttime.append(tocc - ticc)
 
 
-
+        toc = time.time()
+        training_fps += [(agent.batch_size * agent.agent_train_freq) / (toc - trainer_tic)]
+        iteration_fps += [len(local_replay) / (toc - sampler_tic)]
+        iteration_time += [toc - sampler_tic]
+        training_time += [toc - trainer_tic]
         # Logging and saving
-        if (steps // agent.steps_per_epoch) > epoch:
-            if epoch % 10 == 0:
+        if (steps // steps_per_epoch) > epoch:
+            # Start Testing at Epoch 10
+            epoch += 1
+            if epoch == 10:
+                sample_ops.append(tester.sample.remote(0.01, agent.model.state_dict()))
+
+            if epoch % 10 == 1:
                 toc = time.time()
                 speed = steps / (toc - tic)
+
 
                 print("=" * 100)
                 print(f"Epoch:{epoch:4d}\t Steps:{steps:8d}\t "
@@ -228,21 +228,20 @@ def train(**kwargs):
                       f"AvgSpeedFPS:{speed:8.2f}\t "
                       f"Epsilon:{epsilon:6.2}")
                 print('-' * 100)
-                print('-' * 100)
                 pprint("Training Reward   ", RRs[-1000:])
                 pprint("Loss              ", LLs[-1000:])
                 pprint("Qmax              ", QQs[-1000:])
                 pprint("Test Reward       ", TRRs[-1000:])
-                pprint("Training Speed    ", Tfps[-10:])
-                pprint("Training Time     ", Ttime[-10:])
-                pprint("Iteration Time    ", Etime[-10:])
-                pprint("Iteration FPS     ", Efps[-10:])
-                pprint("Actor FPS         ", Sfps[-10:])
+                pprint("Training Speed    ", training_fps[-20:])
+                pprint("Training Time     ", training_time[-20:])
+                pprint("Iteration Time    ", iteration_time[-20:])
+                pprint("Iteration FPS     ", iteration_fps[-20:])
+                pprint("Actor FPS         ", actor_fps[-20:])
 
                 print("=" * 100)
                 print(" " * 100)
 
-            if epoch % 50 == 0:
+            if epoch % 50 == 1:
                 torch.save({
                     'model': agent.model.state_dict(),
                     'optim': agent.optimizer.state_dict(),
@@ -256,18 +255,10 @@ def train(**kwargs):
                     'time': toc - tic,
                 }, f'ckptx/{agent.game}_e{epoch:04d}.pth')
 
-            epoch += 1
-            if epoch == 10:
-                sample_ops.append(tester.sample.remote(0.01, agent.model.state_dict()))
-
 
             if epoch > agent.epoches:
                 print("Final Testing")
-                sample_ops = [tester.sample.remote(0.01, agent.model.state_dict()) for _ in range(100)]
-                TRs_final = []
-                for local_replay, Rs, Qs, rank, fps in ray.get(sample_ops):
-                    TRs_final += Rs
-
+                TRs = ray.get(tester.sample.remote(actor_steps * 10, 0.01, agent.model.state_dict()))[1]
                 torch.save({
                     'model': agent.model.state_dict(),
                     'optim': agent.optimizer.state_dict(),
@@ -279,16 +270,11 @@ def train(**kwargs):
                     'Qs': QQs,
                     'Ls': LLs,
                     'time': toc - tic,
-                    'FinalTestReward': TRs_final,
-                }, f'ckptx/{agent.game}_final.pth')
-
+                    'vars': vars(kwargs),
+                    'FTRs': TRs
+                }, f'ckpt/{agent.env_id}_final.pth')
                 ray.shutdown()
                 return
-
-        ttoc = time.time()
-        Etime.append(ttoc - ttic)
-        Efps.append(len(local_replay) / (ttoc - ttic))
-
 
 
 
