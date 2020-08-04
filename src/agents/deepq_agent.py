@@ -37,12 +37,7 @@ def default_hyperparams():
 
         total_steps=int(1e7),
         epoches=1000,
-        random_seed=1234,
-    )
-
-    params.update(
-        min_epsilons=np.random.choice([0.01, 0.02, 0.05, 0.1], size=params['num_actors'], p=[0.7, 0.1, 0.1, 0.1])
-    )
+        random_seed=1234)
     return params
 
 @ray.remote(num_gpus=0.125)
