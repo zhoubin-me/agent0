@@ -252,6 +252,7 @@ def run(**kwargs):
                     'TRs': TRRs,
                     'Qs': QQs,
                     'Ls': LLs,
+                    'params': kwargs,
                     'time': toc - tic,
                 }, f'ckptx/{agent.game}_e{epoch:04d}.pth')
 
@@ -269,8 +270,8 @@ def run(**kwargs):
                     'TRs': TRRs,
                     'Qs': QQs,
                     'Ls': LLs,
+                    'params': kwargs,
                     'time': toc - tic,
-                    'vars': vars(kwargs),
                     'FTRs': TRs
                 }, f'ckpt/{agent.env_id}_final.pth')
                 ray.shutdown()
