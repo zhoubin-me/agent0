@@ -41,7 +41,7 @@ from src.agents.model import NatureCNN
 # In[2]:
 
 
-num_env = 8
+num_env = 16
 num_actors = 8
 total_steps = int(2e7)
 epoches = 1000
@@ -50,7 +50,7 @@ discount = 0.99
 batch_size = 512
 lr = 1e-3
 agent_train_freq = 10
-target_net_update_freq = 500
+target_net_update_freq = 250
 exploration_ratio = 0.15
 steps_per_epoch = total_steps // epoches
 
