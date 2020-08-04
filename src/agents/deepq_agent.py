@@ -57,10 +57,10 @@ class Actor:
 
         if self.rank == self.num_actors:
             # Testing
-            self.envs = ShmemVecEnv([lambda: make_env(self.env_id, False, False) for _ in range(self.num_envs)])
+            self.envs = ShmemVecEnv([lambda: make_env(self.env_id, False, False) for _ in range(self.num_envs)], context='fork')
         else:
             # Training
-            self.envs = ShmemVecEnv([lambda: make_env(self.env_id, True, True) for _ in range(self.num_envs)])
+            self.envs = ShmemVecEnv([lambda: make_env(self.env_id, True, True) for _ in range(self.num_envs)], context='fork')
         self.action_dim = self.envs.action_space.n
         self.state_shape = self.envs.observation_space.shape
 
