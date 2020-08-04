@@ -107,12 +107,13 @@ class Actor:
         return local_replay, Rs, Qs, self.rank, len(local_replay) / (toc - tic)
 
 class Agent:
-    def __init__(self, game, lr, relay_size, discount, batch_size):
+    def __init__(self, game, lr, relay_size, discount, batch_size, num_data_workers):
         self.game = game
         self.lr = lr
         self.replay_size = relay_size
         self.discount = discount
         self.batch_size = batch_size
+        self.num_data_workers = num_data_workers
 
         test_env = make_env(self.game)
         self.state_shape, self.action_dim = test_env.observation_space.shape, test_env.action_space.n
@@ -125,7 +126,7 @@ class Agent:
 
     def get_datafetcher(self):
         dataset = ReplayDataset(self.replay)
-        dataloader = DataLoaderX(dataset, batch_size=self.batch_size, shuffle=True, num_workers=4, pin_memory=True)
+        dataloader = DataLoaderX(dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_data_workers, pin_memory=True)
         datafetcher = DataPrefetcher(dataloader, self.device)
         return datafetcher
 
@@ -166,7 +167,9 @@ class Agent:
 
 
 
-def run(total_steps, epoches, num_envs, num_actors, exploration_ratio, game, lr, batch_size, replay_size, discount, relay_size, agent_train_freq):
+def run(total_steps, epoches, num_envs, num_actors, exploration_ratio, num_data_workers,
+        game, lr, batch_size, replay_size, discount, relay_size, agent_train_freq):
+
     ray.init()
 
     steps_per_epoch = total_steps // epoches
@@ -175,7 +178,7 @@ def run(total_steps, epoches, num_envs, num_actors, exploration_ratio, game, lr,
     actors = [Actor.remote(rank, game, num_envs, replay_size) for rank in range(num_actors + 1)]
     tester = actors[-1]
 
-    agent = Agent(game, lr, relay_size, discount, batch_size)
+    agent = Agent(game, lr, relay_size, discount, batch_size, num_data_workers)
     sample_ops = [a.sample.remote(actor_steps, 1.0, agent.model.state_dict()) for a in actors]
 
     TRRs, RRs, QQs, LLs, Sfps, Tfps, Efps, Etime, Ttime = [], [], [], [], [], [], [], [], []
