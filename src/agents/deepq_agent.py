@@ -32,8 +32,8 @@ def default_hyperparams():
         replay_size=int(1e6),
         exploration_ratio=0.15,
 
-        target_update_freq=250,
-        agent_train_freq=10,
+        target_update_freq=500,
+        agent_train_freq=20,
 
         total_steps=int(2e7),
         epoches=1000,
@@ -112,7 +112,7 @@ class Agent:
 
         # neptune.init('zhoubinxyz/agentzero')
         # neptune.create_experiment(name=self.env_id, params=vars(self))
-        self.vars = json.load(json.dumps(vars(self)))
+        self.vars = json.loads(json.dumps(vars(self)))
         print("input args:\n", json.dumps(self.vars, indent=4, separators=(",", ":")))
 
         self.envs = make_env(self.env_id)
