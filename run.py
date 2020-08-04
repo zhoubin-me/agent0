@@ -1,9 +1,8 @@
-import os
-
-import neptune
-import json
 import argparse
-from src.agents.dqn_agent import default_hyperparams, run
+import json
+
+from src.agents.deepq_agent import default_hyperparams, run
+
 
 def parse_arguments(params):
     parser = argparse.ArgumentParser()

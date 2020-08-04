@@ -74,7 +74,7 @@ class Actor:
         tic = time.time()
         for _ in range(steps):
             action_random = np.random.randint(0, self.action_dim, self.num_envs)
-            st = torch.from_numpy(np.array(self.obs)).float().div(255.0).to(self.device)
+            st = torch.from_numpy(np.array(self.obs)).to(self.device).float().div(255.0)
             qs = self.model(st)
             qs_max, qs_argmax = qs.max(dim=-1)
             action_greedy = qs_argmax.tolist()
@@ -137,8 +137,8 @@ class Agent:
             data = self.prefetcher.next()
 
         states, actions, rewards, next_states, terminals = data
-        states = states.float() / 255.0
-        next_states = next_states.float() / 255.0
+        states = states.float().div(255.0)
+        next_states = next_states.float().div(255.0)
         actions = actions.long()
         terminals = terminals.float()
         rewards = rewards.float()
