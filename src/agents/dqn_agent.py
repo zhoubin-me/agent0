@@ -59,7 +59,7 @@ class Actor:
 
     def sample(self, epsilon, state_dict):
         self.model.load_state_dict(state_dict)
-        steps = self.steps_per_epoch // (self.num_envs * self.num_actors)
+        steps = self.total_steps // (self.epoches * self.num_envs * self.num_actors)
         Rs, Qs = [], []
         tic = time.time()
         local_replay = deque(maxlen=self.replay_size)
