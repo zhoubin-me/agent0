@@ -113,8 +113,6 @@ class Agent:
         # neptune.init('zhoubinxyz/agentzero')
         # neptune.create_experiment(name=self.env_id, params=vars(self))
         self.vars = json.loads(json.dumps(vars(self)))
-        print("input args:\n", json.dumps(self.vars, indent=4, separators=(",", ":")))
-
         self.envs = make_env(self.env_id)
         self.action_dim = self.envs.action_space.n
         self.state_shape = self.envs.observation_space.shape

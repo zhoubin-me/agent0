@@ -62,13 +62,10 @@ def default_hyperparams():
 
 @ray.remote(num_gpus=0.125)
 class Actor:
-    def __init__(self, rank, game, num_envs, replay_size, num_actors):
+    def __init__(self, **kwargs):
+        for k, v in kwargs.items():
+            setattr(self, k, v)
 
-        self.rank = rank
-        self.game = game
-        self.num_envs = num_envs
-        self.replay_size = replay_size
-        self.num_actors =  num_actors
 
         if self.rank < self.num_actors:
             self.envs = ShmemVecEnv([lambda: make_env(self.game) for _ in range(self.num_envs)], context='fork')
@@ -108,14 +105,11 @@ class Actor:
         return local_replay, Rs, Qs, self.rank, len(local_replay) / (toc - tic)
 
 class Agent:
-    def __init__(self, game, lr, relay_size, discount, batch_size, num_data_workers, target_net_update_freq):
-        self.game = game
-        self.lr = lr
-        self.replay_size = relay_size
-        self.discount = discount
-        self.batch_size = batch_size
-        self.num_data_workers = num_data_workers
-        self.target_net_update_freq = target_net_update_freq
+    def __init__(self, **kwargs):
+
+        for k, v in kwargs.items():
+            setattr(self, k, v)
+        self.vars = json.loads(json.dumps(vars(self)))
 
         test_env = make_env(self.game)
         self.state_shape, self.action_dim = test_env.observation_space.shape, test_env.action_space.n
@@ -169,98 +163,106 @@ class Agent:
 
 
 
-def run(total_steps, epoches, num_envs, num_actors, exploration_ratio, num_data_workers,
-        game, lr, batch_size, replay_size, discount, agent_train_freq, target_net_update_freq, **kwargs):
-
+def run(**kwargs):
     ray.init()
-
-    steps_per_epoch = total_steps // epoches
-    actor_steps = steps_per_epoch // (num_envs * num_actors)
-    epsilon_schedule = LinearSchedule(1.0, 0.01, int(total_steps * exploration_ratio))
-
-    actors = [Actor.remote(rank, game, num_envs, replay_size, num_actors) for rank in range(num_actors + 1)]
+    agent = Agent(**kwargs)
+    epsilon_schedule = LinearSchedule(1.0, 0.01, int(agent.total_steps * agent.exploration_ratio))
+    actors = [Actor.remote(**kwargs) for rank in range(agent.num_actors + 1)]
     tester = actors[-1]
 
-    agent = Agent(game, lr, replay_size, discount, batch_size, num_data_workers, target_net_update_freq)
-    sample_ops = [a.sample.remote(actor_steps, 1.0, agent.model.state_dict()) for a in actors]
+    steps_per_epoch = agent.total_steps // agent.epoches
+    actor_steps = steps_per_epoch // (agent.num_envs * agent.num_actors)
 
-    TRRs, RRs, QQs, LLs, Sfps, Tfps, Efps, Etime, Ttime = [], [], [], [], [], [], [], [], []
+    # Warming Up
+    sample_ops = [a.sample.remote(actor_steps, 1.0, agent.model.state_dict()) for a in actors]
+    RRs, QQs, TRRs, LLs = [], [], [], []
     for local_replay, Rs, Qs, rank, fps in ray.get(sample_ops):
-        if rank < num_actors:
+        if rank < agent.num_actors:
             agent.append_data(local_replay)
             RRs += Rs
             QQs += Qs
-            Sfps += [fps]
         else:
             TRRs += Rs
-
     pprint("Warming up Reward", RRs)
     pprint("Warming up Qmax", QQs)
 
+
+    actor_fps, training_fps, iteration_fps, iteration_time, training_time = [], [], [], [], []
     steps = 0
     epoch = 0
     tic = time.time()
     while True:
-        ttic = time.time()
 
+        # Sample data
+        sampler_tic = time.time()
         done_id, sample_ops = ray.wait(sample_ops)
         data = ray.get(done_id)
-        local_replay, Rs, Qs, rank, duration = data[0]
+        local_replay, Rs, Qs, rank, fps = data[0]
 
-        if rank < num_actors:
+        if rank < agent.num_actors:
             # Actor
-            agent.append_data(local_replay)
-            steps += len(local_replay)
+            agent.replay.extend(local_replay)
             epsilon = epsilon_schedule(len(local_replay))
-
             if epsilon == 0.01:
                 epsilon=np.random.choice([0.01, 0.02, 0.05, 0.1], p=[0.7, 0.1, 0.1, 0.1])
-
             sample_ops.append(actors[rank].sample.remote(actor_steps, epsilon, agent.model.state_dict()))
+
+            actor_fps.append(fps)
             RRs += Rs
             QQs += Qs
+            steps += len(local_replay)
         else:
             # Tester
             sample_ops.append(tester.sample.remote(actor_steps, 0.01, agent.model.state_dict()))
             TRRs += Rs
 
         # Trainer
-        ticc = time.time()
-        Ls = []
-        for _ in range(agent_train_freq):
-            loss = agent.train_step()
-            Ls.append(loss)
+        trainer_tic = time.time()
+        Ls = [agent.train_step() for _ in range(agent.agent_train_freq)]
         Ls = torch.stack(Ls).tolist()
         LLs += Ls
-        tocc = time.time()
-        Tfps.append((batch_size * agent_train_freq) / (tocc - ticc))
-        Ttime.append(tocc - ticc)
 
 
 
+        toc = time.time()
+        training_fps += [(agent.batch_size * agent.agent_train_freq) / (toc - trainer_tic)]
+        iteration_fps += [len(local_replay) / (toc - sampler_tic)]
+        iteration_time += [toc - sampler_tic]
+        training_time += [toc - trainer_tic]
         # Logging and saving
         if (steps // steps_per_epoch) > epoch:
-            if epoch % 10 == 0:
+            epoch += 1
+
+            # Start testing at Epoch 10
+            if epoch == 10:
+                sample_ops.append(tester.sample.remote(actor_steps, 0.01, agent.model.state_dict()))
+
+            if epoch % 10 == 1:
                 toc = time.time()
-                print("=" * 100)
                 speed = steps / (toc - tic)
-                local_speed = len(local_replay) / np.mean(Etime[-100:])
-                print(f"Epoch:{epoch:4d}\t Steps:{steps:8d}\t Updates:{agent.update_steps:4d}  AvgSpeedFPS:{speed:8.2f}\t EstRemainMin:{(total_steps - steps) / speed / 60:8.2f}\t Epsilon:{epsilon:6.4}")
+                print("=" * 100)
+                print(f"Epoch:{epoch:4d}\t Steps:{steps:8d}\t "
+                      f"Updates:{agent.update_steps:4d}\t "
+                      f"TimePast(min):{(toc - tic) / 60:5.2}\t "
+                      f"EstTimeRem(min):{(agent.total_steps - steps) / speed / 60:8.2f}\n"
+                      f"AvgSpeedFPS:{speed:8.2f}\t "
+                      f"Epsilon:{epsilon:6.2}")
                 print('-' * 100)
+
                 pprint("Training Reward   ", RRs[-1000:])
                 pprint("Loss              ", LLs[-1000:])
                 pprint("Qmax              ", QQs[-1000:])
                 pprint("Test Reward       ", TRRs[-1000:])
-                pprint("Training Speed    ", Tfps[-10:])
-                pprint("Training Time     ", Ttime[-10:])
-                pprint("Iteration Time    ", Etime[-10:])
-                pprint("Iteration FPS     ", Efps[-10:])
-                pprint("Actor FPS         ", Sfps[-10:])
+                pprint("Training Speed    ", training_fps[-20:])
+                pprint("Training Time     ", training_time[-20:])
+                pprint("Iteration Time    ", iteration_time[-20:])
+                pprint("Iteration FPS     ", iteration_fps[-20:])
+                pprint("Actor FPS         ", actor_fps[-20:])
 
                 print("=" * 100)
                 print(" " * 100)
 
-            if epoch % 50 == 0:
+            if epoch % 50 == 1:
                 torch.save({
                     'model': agent.model.state_dict(),
                     'optim': agent.optimizer.state_dict(),
@@ -272,20 +274,12 @@ def run(total_steps, epoches, num_envs, num_actors, exploration_ratio, num_data_
                     'Qs': QQs,
                     'Ls': LLs,
                     'time': toc - tic,
-                }, f'ckptx/{game}_e{epoch:04d}.pth')
+                    'vars': agent.vars,
+                }, f'ckpt/{agent.env_id}_e{epoch:04d}.pth')
 
-            epoch += 1
-            if epoch == 10:
-                sample_ops.append(tester.sample.remote(actor_steps, 0.01, agent.model.state_dict()))
-
-
-            if epoch > epoches:
+            if epoch > agent.epoches:
                 print("Final Testing")
-                sample_ops = [tester.sample.remote(actor_steps, 0.01, agent.model.state_dict()) for _ in range(100)]
-                TRs_final = []
-                for local_replay, Rs, Qs, rank, fps in ray.get(sample_ops):
-                    TRs_final += Rs
-
+                TRs = [x[1] for x in ray.get(tester.sample.remote(actor_steps * 10, 0.01, agent.model.state_dict()))]
                 torch.save({
                     'model': agent.model.state_dict(),
                     'optim': agent.optimizer.state_dict(),
@@ -297,15 +291,12 @@ def run(total_steps, epoches, num_envs, num_actors, exploration_ratio, num_data_
                     'Qs': QQs,
                     'Ls': LLs,
                     'time': toc - tic,
-                    'FinalTestReward': TRs_final,
-                }, f'ckptx/{game}_final.pth')
-
+                    'vars': agent.vars,
+                    'FTRs': TRs
+                }, f'ckpt/{agent.env_id}_final.pth')
                 ray.shutdown()
                 return
 
-        ttoc = time.time()
-        Etime.append(ttoc - ttic)
-        Efps.append(len(local_replay) / (ttoc - ttic))
 
 
 
