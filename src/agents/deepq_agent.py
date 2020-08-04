@@ -238,7 +238,7 @@ def run(**kwargs):
                 print("=" * 100)
                 print(f"Epoch:{epoch:4d}\t Steps:{steps:8d}\t "
                       f"Updates:{agent.update_steps:4d}\t "
-                      f"TimePast(min):{(toc - tic) / 60:5.2}\t "
+                      f"TimePast(min):{(toc - tic) / 60:8.2f}\t "
                       f"EstTimeRem(min):{(agent.total_steps - steps) / speed / 60:8.2f}\n"
                       f"AvgSpeedFPS:{speed:8.2f}\t "
                       f"Epsilon:{epsilon:6.2}")
