@@ -126,7 +126,7 @@ class Agent:
         self.model_target = NatureCNN(self.state_shape[0], self.action_dim).to(self.device)
 
         self.optimizer = torch.optim.Adam(self.model.parameters(), self.adam_lr)
-        self.update_count = 0
+        self.update_steps = 0
         self.replay = deque(maxlen=self.replay_size)
 
     def get_datafetcher(self):
@@ -193,7 +193,7 @@ def run(agent):
     pprint("Warming up Reward", RRs)
     pprint("Warming up Qmax", QQs)
 
-    actor_fps, training_fps, iteration_fps, iteration_time, training_time = [], [], [], []
+    actor_fps, training_fps, iteration_fps, iteration_time, training_time = [], [], [], [], []
     epoch, steps = 0, 0
     tic = time.time()
     while True:
