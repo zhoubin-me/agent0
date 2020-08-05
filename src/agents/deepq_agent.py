@@ -267,6 +267,7 @@ def run(config=None, **kwargs):
                 print(" " * 100)
 
             if epoch % 50 == 1:
+                """
                 torch.save({
                     'model': agent.model.state_dict(),
                     'optim': agent.optimizer.state_dict(),
@@ -280,11 +281,13 @@ def run(config=None, **kwargs):
                     'time': toc - tic,
                     'params': kwargs,
                 }, f'{agent.save_prefix}/{agent.game}_e{epoch:04d}.pth')
+                """
 
 
             if epoch > agent.epoches:
                 print("Final Testing")
                 TRs = ray.get(tester.sample.remote(actor_steps * 100, 0.01, agent.model.state_dict()))[1]
+                """
                 torch.save({
                     'model': agent.model.state_dict(),
                     'optim': agent.optimizer.state_dict(),
@@ -299,6 +302,9 @@ def run(config=None, **kwargs):
                     'params': kwargs,
                     'FTRs': TRs
                 }, f'{agent.save_prefix}/{agent.game}_final.pth')
+
+
+                """
 
                 if config is None:
                     tune.report(final_test_rewards=np.mean(TRs))
