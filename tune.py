@@ -1,10 +1,25 @@
+import argparse
+import json
+
 import ray
 from ray import tune
 
-from src.agents.deepq_agent import run
+from src.agents.deepq_agent import run, default_hyperparams
+
+
+def parse_arguments(params):
+    parser = argparse.ArgumentParser()
+    for k, v in params.items():
+        parser.add_argument(f"--{k}", type=type(v), default=v)
+    args = parser.parse_args()
+    print("input args:\n", json.dumps(vars(args), indent=4, separators=(",", ":")))
+    return vars(args)
+
 
 if __name__ == '__main__':
-    ray.init(memory=200 * 1024 * 1024 * 1024, object_store_memory= 100 * 1024 * 1024 * 1024)
+    params = default_hyperparams()
+    kwargs = parse_arguments(params)
+    ray.init(memory=100 * 2 ** 30, object_store_memory=200 * 2 ** 30)
     analysis = tune.run(
         run,
         config={

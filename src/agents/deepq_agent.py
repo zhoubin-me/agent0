@@ -1,12 +1,13 @@
+import os
 import time
 from collections import deque
-import os
 
 import numpy as np
 import ray
 import torch
 import torch.nn.functional as F
 from ray import tune
+from ray.tune.trial import ExportFormat
 
 from src.agents.model import NatureCNN
 from src.common.utils import LinearSchedule, DataPrefetcher, ReplayDataset, DataLoaderX, pprint, make_env
@@ -156,6 +157,85 @@ class Agent:
         if self.update_steps % self.target_update_freq == 0:
             self.model_target.load_state_dict(self.model.state_dict())
         return loss.detach()
+
+
+class Trainer(tune.Trainable):
+    def _setup(self, config):
+        kwargs = default_hyperparams()
+        for k, v in config.items():
+            kwargs[k] = v
+
+        self.agent = Agent(**kwargs)
+        self.epsilon_schedule = LinearSchedule(1.0, 0.01, int(self.total_steps * self.exploration_ratio))
+        self.actors = [Actor.remote(rank=rank, **kwargs) for rank in range(self.num_actors + 1)]
+        self.tester = self.actors[-1]
+
+        self.steps_per_epoch = self.total_steps // self.epoches
+        self.actor_steps = self.steps_per_epoch // (self.num_envs * self.num_actors)
+
+        # Warming Up
+        self.sample_ops = [a.sample.remote(self.actor_steps, 1.0, self.agent.model.state_dict()) for a in self.actors]
+        self.frame_count = 0
+
+    def _train(self):
+        done_id, sample_ops = ray.wait(self.sample_ops)
+        data = ray.get(done_id)
+        local_replay, Rs, Qs, rank, fps = data[0]
+        if rank < self.num_actors:
+            # Actors
+            self.agent.replay.extend(local_replay)
+            epsilon = self.epsilon_schedule(len(local_replay))
+            if epsilon == 0.01:
+                epsilon = np.random.choice([0.01, 0.02, 0.05, 0.1], p=[0.7, 0.1, 0.1, 0.1])
+            sample_ops.append(self.actors[rank].sample.remote(self.actor_steps, epsilon, self.agent.model.state_dict()))
+            self.frame_count += len(local_replay)
+            result = dict(ep_reward_train=np.mean(Rs))
+        else:
+            # Tester
+            sample_ops.append(self.tester.sample.remote(self.actor_steps, 0.01, self.agent.model.state_dict()))
+            result = dict(ep_reward_test=np.mean(Rs))
+
+        if self.frame_count > self.start_training:
+            tic = time.time()
+            loss = [self.agent.train_step() for _ in range(self.agent_train_freq)]
+            loss = torch.stack(loss).mean.item()
+            toc = time.time()
+            result.update(loss=loss, train_time=toc - tic)
+
+        result.update(frames=self.frame_count, done=self.frame_count > self.total_steps)
+
+        return result
+
+    def _save(self, checkpoint_dir):
+        torch.save({
+            'model': self.agent.model.state_dict(),
+            'optim': self.agent.optimizer.state_dict(),
+            'model_target': self.agent.model_target.state_dict(),
+        }, os.path.join(checkpoint_dir, 'model.pth'))
+
+    def _restore(self, checkpoint_dir):
+        data = torch.load(os.path.join(checkpoint_dir, 'model.pth'))
+        self.agent.model.load_state_dict(data['model'])
+        self.agent.model_target.load_state_dict(data['model_target'])
+        self.agent.optimizer.load_state_dict(data['optim'])
+
+    def _export_model(self, export_formats, export_dir):
+        if export_formats == [ExportFormat.MODEL]:
+            path = os.path.join(export_dir, "exported_models")
+            torch.save({
+                "model": self.agent.model.state_dict(),
+            }, path)
+            return {ExportFormat.MODEL: path}
+        else:
+            raise ValueError("unexpected formats: " + str(export_formats))
+
+    def reset_config(self, new_config):
+        for param_group in self.agent.optimizer.param_groups:
+            if "adam_lr" in new_config:
+                param_group["lr"] = new_config["lr"]
+
+        self.config = new_config
+        return True
 
 
 def run(config=None, **kwargs):
