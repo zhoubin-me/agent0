@@ -28,7 +28,7 @@ if __name__ == '__main__':
         time_attr='training_iteration',
         metric='ep_reward_train',
         mode='max',
-        perturbation_interval=600.0,
+        perturbation_interval=100,
         hyperparam_mutations={
             "adam_lr": lambda: random.uniform(1e-5, 1e-3),
             "target_update_freq": [500, 250],
@@ -41,7 +41,6 @@ if __name__ == '__main__':
         checkpoint_at_end=True,
         checkpoint_freq=800,
         reuse_actors=True,
-        verbose=1,
         scheduler=pbt_scheduler,
         resources_per_trial={"gpu": 4},
         fail_fast=True,

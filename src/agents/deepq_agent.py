@@ -38,6 +38,7 @@ def default_hyperparams():
         target_update_freq=500,
         agent_train_freq=20,
 
+        start_training=int(2e4),
         total_steps=int(1e7),
         epoches=1000,
         random_seed=1234)
@@ -165,6 +166,9 @@ class Trainer(tune.Trainable):
         for k, v in config.items():
             kwargs[k] = v
 
+        for k, v in kwargs.items():
+            setattr(self, k, v)
+
         self.agent = Agent(**kwargs)
         self.epsilon_schedule = LinearSchedule(1.0, 0.01, int(self.total_steps * self.exploration_ratio))
         self.actors = [Actor.remote(rank=rank, **kwargs) for rank in range(self.num_actors + 1)]
@@ -198,12 +202,11 @@ class Trainer(tune.Trainable):
         if self.frame_count > self.start_training:
             tic = time.time()
             loss = [self.agent.train_step() for _ in range(self.agent_train_freq)]
-            loss = torch.stack(loss).mean.item()
+            loss = torch.stack(loss).mean().item()
             toc = time.time()
             result.update(loss=loss, train_time=toc - tic)
 
         result.update(frames=self.frame_count, done=self.frame_count > self.total_steps)
-
         return result
 
     def _save(self, checkpoint_dir):
