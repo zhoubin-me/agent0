@@ -1,8 +1,10 @@
+import ray
 from ray import tune
 
 from src.agents.deepq_agent import run
 
 if __name__ == '__main__':
+
     analysis = tune.run(
         run,
         config={
@@ -10,7 +12,10 @@ if __name__ == '__main__':
             "target_update_freq": tune.grid_search([500, 200]),
             "agent_train_freq": tune.grid_search([20, 16]),
             "game": tune.grid_search(["Breakout"])
-        })
+        },
+        resources_per_trial={"gpu": 4},
+        fail_fast=True,
+    )
 
     print("Best config: ", analysis.get_best_config(metric="final_test_rewards"))
     df = analysis.dataframe()

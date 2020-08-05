@@ -1,5 +1,6 @@
 import time
 from collections import deque
+import os
 
 import numpy as np
 import ray
@@ -20,6 +21,7 @@ def default_hyperparams():
         prioritize=True,
         distributional=True,
         noisy=True,
+        save_prefix="ckpt_tune",
 
         num_actors=8,
         num_envs=16,
@@ -41,7 +43,7 @@ def default_hyperparams():
 
     return params
 
-@ray.remote(num_gpus=0.125)
+@ray.remote(num_gpus=0.1)
 class Actor:
     def __init__(self, **kwargs):
         for k, v in kwargs.items():
@@ -167,8 +169,12 @@ def run(config=None, **kwargs):
             if k not in kwargs:
                 kwargs[k] = v
 
-    ray.init()
     agent = Agent(**kwargs)
+
+    try:
+        os.mkdir(agent.ckpt_tune)
+    except:
+        pass
 
     epsilon_schedule = LinearSchedule(1.0, 0.01, int(agent.total_steps * agent.exploration_ratio))
     actors = [Actor.remote(rank=rank, **kwargs) for rank in range(agent.num_actors + 1)]
@@ -273,7 +279,7 @@ def run(config=None, **kwargs):
                     'Ls': LLs,
                     'time': toc - tic,
                     'params': kwargs,
-                }, f'ckpt/{agent.game}_e{epoch:04d}.pth')
+                }, f'{agent.save_prefix}/{agent.game}_e{epoch:04d}.pth')
 
 
             if epoch > agent.epoches:
@@ -292,7 +298,7 @@ def run(config=None, **kwargs):
                     'time': toc - tic,
                     'params': kwargs,
                     'FTRs': TRs
-                }, f'ckpt/{agent.game}_final.pth')
+                }, f'{agent.save_prefix}/{agent.game}_final.pth')
 
                 if config is None:
                     tune.report(final_test_rewards=np.mean(TRs))

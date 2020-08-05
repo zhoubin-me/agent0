@@ -1,5 +1,6 @@
 import argparse
 import json
+import ray
 
 from src.agents.deepq_agent import default_hyperparams, run
 
@@ -15,4 +16,5 @@ def parse_arguments(params):
 if __name__ == '__main__':
     params = default_hyperparams()
     kwargs = parse_arguments(params)
+    ray.init()
     run(**kwargs)
