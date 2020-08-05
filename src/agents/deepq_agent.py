@@ -15,6 +15,11 @@ from src.common.vec_env import ShmemVecEnv
 def default_hyperparams():
     params = dict(
         game='Breakout',
+        double_q=True,
+        dueling=True,
+        prioritize=True,
+        distributional=True,
+        noisy=True,
 
         num_actors=8,
         num_envs=16,
@@ -30,7 +35,7 @@ def default_hyperparams():
         target_update_freq=500,
         agent_train_freq=20,
 
-        total_steps=int(2e7),
+        total_steps=int(1e7),
         epoches=1000,
         random_seed=1234)
 
@@ -54,7 +59,7 @@ class Actor:
         self.state_shape = self.envs.observation_space.shape
 
         self.device = torch.device('cuda:0')
-        self.model = NatureCNN(self.state_shape[0], self.action_dim).to(self.device)
+        self.model = NatureCNN(self.state_shape[0], self.action_dim, self.dueling).to(self.device)
 
         self.R = np.zeros(self.num_envs)
         self.obs = self.envs.reset()
@@ -66,8 +71,11 @@ class Actor:
         tic = time.time()
         for _ in range(steps):
             action_random = np.random.randint(0, self.action_dim, self.num_envs)
-            st = torch.from_numpy(np.array(self.obs)).to(self.device).float().div(255.0)
-            qs = self.model(st)
+
+            with torch.no_grad():
+                st = torch.from_numpy(np.array(self.obs)).to(self.device).float().div(255.0)
+                qs = self.model(st)
+
             qs_max, qs_argmax = qs.max(dim=-1)
             action_greedy = qs_argmax.tolist()
             Qs.append(qs_max.mean().item())
@@ -91,16 +99,13 @@ class Agent:
         for k, v in kwargs.items():
             setattr(self, k, v)
 
-        # neptune.init('zhoubinxyz/agentzero')
-        # neptune.create_experiment(name=self.game, params=vars(self))
         self.envs = make_env(self.game)
         self.action_dim = self.envs.action_space.n
         self.state_shape = self.envs.observation_space.shape
 
-
         self.device = torch.device('cuda:0')
-        self.model = NatureCNN(self.state_shape[0], self.action_dim).to(self.device)
-        self.model_target = NatureCNN(self.state_shape[0], self.action_dim).to(self.device)
+        self.model = NatureCNN(self.state_shape[0], self.action_dim, self.dueling).to(self.device)
+        self.model_target = NatureCNN(self.state_shape[0], self.action_dim, self.dueling).to(self.device)
 
         self.optimizer = torch.optim.Adam(self.model.parameters(), self.adam_lr)
         self.update_steps = 0
@@ -128,9 +133,14 @@ class Agent:
         rewards = rewards.float()
 
         with torch.no_grad():
-            q_next = self.model_target(next_states)
-            q_next_online = self.model(next_states)
-            q_next = q_next.gather(1, q_next_online.argmax(dim=-1).unsqueeze(-1)).squeeze(-1)
+
+            if self.double_q:
+                q_next = self.model_target(next_states)
+                q_next_online = self.model(next_states)
+                q_next = q_next.gather(1, q_next_online.argmax(dim=-1, keepdim=True)).squeeze(-1)
+            else:
+                q_next, _ = self.model_target(next_states).max(dim=-1)
+
             q_target = rewards + self.discount * (1 - terminals) * q_next
 
         q = self.model(states).gather(1, actions.unsqueeze(-1)).squeeze(-1)
@@ -157,7 +167,7 @@ def run(config=None, **kwargs):
             if k not in kwargs:
                 kwargs[k] = v
 
-    ray.init(num_gpus=4)
+    ray.init()
     agent = Agent(**kwargs)
 
     epsilon_schedule = LinearSchedule(1.0, 0.01, int(agent.total_steps * agent.exploration_ratio))
