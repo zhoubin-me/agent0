@@ -16,5 +16,5 @@ def parse_arguments(params):
 if __name__ == '__main__':
     params = default_hyperparams()
     kwargs = parse_arguments(params)
-    ray.init()
+    ray.init(memory=230 * 1024 * 1024 * 1024, object_store_memory= 100 * 1024 * 1024 * 1024)
     run(**kwargs)
