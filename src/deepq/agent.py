@@ -188,7 +188,7 @@ class Trainer(tune.Trainable):
         self.sample_ops = [a.sample.remote(self.actor_steps, 1.0, self.agent.model.state_dict()) for a in
                            self.actors[:-1]]
         self.frame_count = 0
-
+        self.start_time = time.time()
         self.Rs, self.Qs, self.TRs, self.Ls, self.speed = [], [], [], [], []
 
     def _train(self):
@@ -295,15 +295,21 @@ class Trainer(tune.Trainable):
         return True
 
     def logstat(self):
-        print("=" * 100)
-        print(f"Game: {self.game:<10s}\t"
-              f"Epoch:[{self.frame_count // self.steps_per_epoch:4d}-{self.epoches}]\t"
-              f"Frame Count:{self.frame_count:8d}\t "
-              f"Update Count:{self.iteration:4d}\t\n"
-              f"Speed: {np.mean(self.speed[-100:]):4.0f}\t"
+        print("=" * 105)
+        speed = np.mean(self.speed[-100:])
+        print(f"Epoch:[{self.frame_count // self.steps_per_epoch:4d}/{self.epoches}]\t"
+              f"Game: {self.game:<10s}\t"
+              f"Frame Count:{self.frame_count:8d}\t\t"
+              f"Update Count:{self.iteration:4d}\t\t\n"
+              f"Speed: {speed:4.0f}\t\t"
+              f"TimePast: {(time.time() - self.start_time):4.0f}\t\t"
+              f"EstTimeRem: {(self.total_steps - self.frame_count) / speed:4.0f}\t\t"
               f"Epsilon:{self.epsilon:6.4}")
-        print('-' * 100)
+        print('-' * 105)
         pprint("Training EP Reward ", self.Rs[-1000:])
         pprint("Loss               ", self.Ls[-1000:])
         pprint("Qmax               ", self.Qs[-1000:])
         pprint("Test EP Reward     ", self.TRs[-1000:])
+        print("=" * 105)
+        print(" " * 105)
+        print(" " * 105)

@@ -27,7 +27,7 @@ if __name__ == '__main__':
         checkpoint_freq=800,
         config={
             "adam_lr": tune.grid_search([5e-4, 1e-4, 2e-4]),
-            "agent_train_freq": tune.grid_search([20, 10]),
+            "agent_train_freq": tune.grid_search([15, 10]),
             "game": tune.grid_search(["Breakout"])
         },
         resources_per_trial={"gpu": 4},
