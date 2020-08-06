@@ -4,7 +4,7 @@ import json
 import ray
 from ray import tune
 
-from src.deepq.deepq_agent import default_hyperparams, Trainer
+from src.deepq.agent import default_hyperparams, Trainer
 
 
 def parse_arguments(params):

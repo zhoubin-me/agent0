@@ -189,9 +189,10 @@ class Trainer(tune.Trainable):
                            self.actors[:-1]]
         self.frame_count = 0
 
-        self.Rs, self.Qs, self.TRs, self.Ls = [], [], [], []
+        self.Rs, self.Qs, self.TRs, self.Ls, self.speed = [], [], [], [], []
 
     def _train(self):
+        tic = time.time()
         done_id, self.sample_ops = ray.wait(self.sample_ops)
         data = ray.get(done_id)
         local_replay, Rs, Qs, rank, fps = data[0]
@@ -232,7 +233,8 @@ class Trainer(tune.Trainable):
 
         if self.iteration % 100 == 0:
             self.logstat()
-
+        toc = time.time()
+        self.speeed.append(len(local_replay) / (toc - tic))
         return result
 
     def _save(self, checkpoint_dir):
@@ -293,13 +295,14 @@ class Trainer(tune.Trainable):
         return True
 
     def logstat(self):
-        print("=" * 100)
+        print("=" * 150)
         print(f"Game: {self.game:<10s}\t"
               f"Epoch:[{self.frame_count // self.steps_per_epoch:4d}-{self.epoches}]\t"
               f"Frame Count:{self.frame_count:8d}\t "
               f"Update Count:{self.iteration:4d}\t "
+              f"Speed: {np.mean(self.speed[-100:]):4.0f}\t"
               f"Epsilon:{self.epsilon:6.4}")
-        print('-' * 100)
+        print('-' * 150)
         pprint("Training EP Reward ", self.Rs[-1000:])
         pprint("Loss               ", self.Ls[-1000:])
         pprint("Qmax               ", self.Qs[-1000:])
