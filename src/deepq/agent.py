@@ -237,7 +237,7 @@ class Trainer(tune.Trainable):
             self.training_fps += [(self.batch_size * self.agent_train_freq) / (train_toc - train_tic)]
             self.training_time += [train_toc - train_tic]
             self.iteration_time += [train_toc - self.train_itr_end_time]
-            self.iteration_fps += [len(local_replay) / (self.train_itr_end_time - train_toc)]
+            self.iteration_fps += [len(local_replay) / (train_toc - self.train_itr_end_time)]
 
         result.update(frames=self.frame_count, done=self.frame_count > self.total_steps)
 
