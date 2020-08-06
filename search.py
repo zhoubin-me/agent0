@@ -23,6 +23,8 @@ if __name__ == '__main__':
     analysis = tune.run(
         Trainer,
         verbose=0,
+        checkpoint_at_end=True,
+        checkpoint_freq=800,
         config={
             "adam_lr": tune.grid_search([5e-4, 1e-4, 2e-4]),
             "agent_train_freq": tune.grid_search([20, 10]),

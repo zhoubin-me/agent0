@@ -22,7 +22,7 @@ def default_hyperparams():
         prioritize=True,
         distributional=True,
         noisy=True,
-        save_prefix="ckpt_tune",
+        save_prefix="ckpt",
 
         num_actors=8,
         num_envs=16,
