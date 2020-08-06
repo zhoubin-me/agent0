@@ -6,7 +6,7 @@ import ray
 from ray import tune
 from ray.tune.schedulers import PopulationBasedTraining
 
-from src.agents.deepq_agent import Trainer, default_hyperparams
+from src.deepq.deepq_agent import Trainer, default_hyperparams
 
 
 def parse_arguments(params):
