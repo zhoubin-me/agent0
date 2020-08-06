@@ -196,7 +196,6 @@ class Trainer(tune.Trainable):
 
     def _train(self):
         self.training_iter_start_time = tic = time.time()
-
         done_id, self.sample_ops = ray.wait(self.sample_ops)
         data = ray.get(done_id)
         local_replay, Rs, Qs, rank, fps = data[0]
