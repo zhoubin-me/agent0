@@ -4,7 +4,7 @@ import json
 import ray
 from ray import tune
 
-from src.agents.deepq_agent import run, default_hyperparams
+from src.agents.deepq_agent import run, default_hyperparams, Trainer
 
 
 def parse_arguments(params):
@@ -21,12 +21,12 @@ if __name__ == '__main__':
     kwargs = parse_arguments(params)
     ray.init(memory=100 * 2 ** 30, object_store_memory=200 * 2 ** 30)
     analysis = tune.run(
-        run,
+        Trainer,
         config={
-            "adam_lr": tune.grid_search([1e-3, 1e-4, 2e-4]),
-            "target_update_freq": tune.grid_search([500, 200]),
-            "agent_train_freq": tune.grid_search([20, 16]),
-            "game": tune.grid_search(["Breakout"])
+            "adam_lr": tune.grid_search([5e-4, 1e-4, 2e-4]),
+            # "target_update_freq": tune.grid_search([500, 200]),
+            # "agent_train_freq": tune.grid_search([20, 16]),
+            "game": tune.grid_search(["Breakout", "Pong"])
         },
         resources_per_trial={"gpu": 4},
     )
