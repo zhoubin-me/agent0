@@ -221,13 +221,13 @@ class Trainer(tune.Trainable):
 
         # Start training at
         if self.frame_count > self.start_training_step:
-            tic = time.time()
+            train_tic = time.time()
             loss = [self.agent.train_step() for _ in range(self.agent_train_freq)]
             loss = torch.stack(loss)
             self.Ls += loss.tolist()
             loss = loss.mean().item()
-            toc = time.time()
-            result.update(loss=loss, train_time=toc - tic)
+            train_toc = time.time()
+            result.update(loss=loss, train_time=train_toc-train_tic)
 
         result.update(frames=self.frame_count, done=self.frame_count > self.total_steps)
 
