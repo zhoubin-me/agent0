@@ -22,7 +22,7 @@ if __name__ == '__main__':
     params = default_hyperparams()
     kwargs = parse_arguments(params)
 
-    ray.init(memory=100 * 2 ** 30, object_store_memory=200 * 2 ** 30)
+    ray.init(memory=20 * 2 ** 30, object_store_memory=100 * 2 ** 30)
 
     pbt_scheduler = PopulationBasedTraining(
         time_attr='training_iteration',
@@ -42,7 +42,7 @@ if __name__ == '__main__':
         checkpoint_freq=800,
         reuse_actors=True,
         scheduler=pbt_scheduler,
-        resources_per_trial={"gpu": 4},
+        resources_per_trial={"gpu": 3},
         fail_fast=True,
         config={
             "adam_lr": 1e-3,

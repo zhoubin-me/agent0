@@ -210,14 +210,13 @@ class Trainer(tune.Trainable):
         return result
 
     def _save(self, checkpoint_dir):
-        torch.save({
+        return {
             'model': self.agent.model.state_dict(),
             'optim': self.agent.optimizer.state_dict(),
             'model_target': self.agent.model_target.state_dict(),
-        }, os.path.join(checkpoint_dir, 'model.pth'))
+        }
 
-    def _restore(self, checkpoint_dir):
-        data = torch.load(os.path.join(checkpoint_dir, 'model.pth'))
+    def _restore(self, data):
         self.agent.model.load_state_dict(data['model'])
         self.agent.model_target.load_state_dict(data['model_target'])
         self.agent.optimizer.load_state_dict(data['optim'])
