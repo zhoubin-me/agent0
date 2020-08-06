@@ -35,7 +35,7 @@ def default_hyperparams():
         replay_size=int(1e6),
         exploration_ratio=0.15,
 
-        target_update_freq=200,
+        target_update_freq=500,
         agent_train_freq=16,
 
         start_training_step=int(2e4),
