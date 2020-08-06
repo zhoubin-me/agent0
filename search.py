@@ -22,7 +22,7 @@ if __name__ == '__main__':
     ray.init(memory=100 * 2 ** 30, object_store_memory=200 * 2 ** 30)
     analysis = tune.run(
         Trainer,
-        verbose=1,
+        verbose=0,
         config={
             "adam_lr": tune.grid_search([5e-4, 1e-4, 2e-4]),
             "agent_train_freq": tune.grid_search([20, 10]),

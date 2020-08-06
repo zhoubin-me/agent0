@@ -183,15 +183,15 @@ class Trainer(tune.Trainable):
         self.tester = self.actors[-1]
 
         self.steps_per_epoch = self.total_steps // self.epoches
-        self.actor_steps = self.steps_per_epoch // (self.num_envs * self.num_actors)
+        self.actor_steps = self.total_steps // (self.epoches * self.num_envs * self.num_actors)
 
-        self.sample_ops = [a.sample.remote(self.actor_steps, 1.0, self.agent.model.state_dict()) for a in self.actors]
+        self.sample_ops = [a.sample.remote(self.actor_steps, 1.0, self.agent.model.state_dict()) for a in self.actors[:-1]]
         self.frame_count = 0
 
         self.Rs, self.Qs, self.TRs, self.Ls = [], [], [], []
 
     def _train(self):
-        done_id, sample_ops = ray.wait(self.sample_ops)
+        done_id, self.sample_ops = ray.wait(self.sample_ops)
         data = ray.get(done_id)
         local_replay, Rs, Qs, rank, fps = data[0]
         if rank < self.num_actors:
@@ -200,18 +200,24 @@ class Trainer(tune.Trainable):
             self.epsilon = self.epsilon_schedule(len(local_replay))
             if self.epsilon == 0.01:
                 epsilon = np.random.choice([0.01, 0.02, 0.05, 0.1], p=[0.7, 0.1, 0.1, 0.1])
-            sample_ops.append(
+            self.sample_ops.append(
                 self.actors[rank].sample.remote(self.actor_steps, self.epsilon, self.agent.model.state_dict()))
             self.frame_count += len(local_replay)
-            result = dict(ep_reward_train=np.mean(Rs))
+            result = dict(ep_reward_train=np.mean(Rs)) if len(Rs) > 0 else dict()
             self.Rs += Rs
             self.Qs += Qs
         else:
             # Tester
-            sample_ops.append(self.tester.sample.remote(self.actor_steps, 0.01, self.agent.model.state_dict()))
-            result = dict(ep_reward_test=np.mean(Rs))
+            self.sample_ops.append(self.tester.sample.remote(self.actor_steps, 0.01, self.agent.model.state_dict()))
+            result = dict(ep_reward_test=np.mean(Rs)) if len(Rs) > 0 else dict()
             self.TRs += Rs
 
+        # Start testing at itr > 100
+        if self.iteration == 100:
+            print("Testing Started ... ")
+            self.sample_ops.append(self.tester.sample.remote(self.actor_steps, 0.01, self.agent.model.state_dict()))
+
+        # Start training at
         if self.frame_count > self.start_training_step:
             tic = time.time()
             loss = [self.agent.train_step() for _ in range(self.agent_train_freq)]
@@ -220,6 +226,7 @@ class Trainer(tune.Trainable):
             loss = loss.mean().item()
             toc = time.time()
             result.update(loss=loss, train_time=toc - tic)
+
         result.update(frames=self.frame_count, done=self.frame_count > self.total_steps)
 
         if self.iteration % 100 == 0:
