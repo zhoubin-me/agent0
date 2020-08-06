@@ -231,10 +231,10 @@ class Trainer(tune.Trainable):
 
         result.update(frames=self.frame_count, done=self.frame_count > self.total_steps)
 
+        toc = time.time()
         self.speed.append(len(local_replay) / (toc - tic))
         if self.iteration % 100 == 0:
             self.logstat()
-        toc = time.time()
         return result
 
     def _save(self, checkpoint_dir):
