@@ -222,7 +222,7 @@ class Trainer(tune.Trainable):
             result.update(loss=loss, train_time=toc - tic)
         result.update(frames=self.frame_count, done=self.frame_count > self.total_steps)
 
-        if self.iteration % 1000 == 0:
+        if self.iteration % 100 == 0:
             self.logstat()
 
         return result
