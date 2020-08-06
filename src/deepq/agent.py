@@ -295,14 +295,14 @@ class Trainer(tune.Trainable):
         return True
 
     def logstat(self):
-        print("=" * 150)
+        print("=" * 100)
         print(f"Game: {self.game:<10s}\t"
               f"Epoch:[{self.frame_count // self.steps_per_epoch:4d}-{self.epoches}]\t"
               f"Frame Count:{self.frame_count:8d}\t "
-              f"Update Count:{self.iteration:4d}\t "
+              f"Update Count:{self.iteration:4d}\t\n"
               f"Speed: {np.mean(self.speed[-100:]):4.0f}\t"
               f"Epsilon:{self.epsilon:6.4}")
-        print('-' * 150)
+        print('-' * 100)
         pprint("Training EP Reward ", self.Rs[-1000:])
         pprint("Loss               ", self.Ls[-1000:])
         pprint("Qmax               ", self.Qs[-1000:])
