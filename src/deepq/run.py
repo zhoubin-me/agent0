@@ -132,7 +132,7 @@ def run(config=None, **kwargs):
                     'Ls': LLs,
                     'time': toc - tic,
                     'params': kwargs,
-                }, f'./{agent.game}_e{epoch:04d}.pth')
+                }, f'{agent.save_prefix}/{agent.game}_e{epoch:04d}.pth')
 
             if epoch > agent.epoches:
                 print("Final Testing")
@@ -150,7 +150,7 @@ def run(config=None, **kwargs):
                     'time': toc - tic,
                     'params': kwargs,
                     'FTRs': TRs
-                }, f'./{agent.game}_final.pth')
+                }, f'{agent.save_prefix}./{agent.game}_final.pth')
 
                 if config is None:
                     tune.report(final_test_rewards=np.mean(TRs))
