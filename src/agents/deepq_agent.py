@@ -28,14 +28,14 @@ def default_hyperparams():
         num_envs=16,
         num_data_workers=4,
 
-        adam_lr=1e-3,
+        adam_lr=2e-4,
 
         batch_size=512,
         discount=0.99,
         replay_size=int(1e6),
         exploration_ratio=0.15,
 
-        target_update_freq=500,
+        target_update_freq=200,
         agent_train_freq=20,
 
         start_training_step=int(2e4),
@@ -178,6 +178,7 @@ class Trainer(tune.Trainable):
 
         self.agent = Agent(**kwargs)
         self.epsilon_schedule = LinearSchedule(1.0, 0.01, int(self.total_steps * self.exploration_ratio))
+        self.epsilon = 1.0
         self.actors = [Actor.remote(rank=rank, **kwargs) for rank in range(self.num_actors + 1)]
         self.tester = self.actors[-1]
 
@@ -197,10 +198,11 @@ class Trainer(tune.Trainable):
         if rank < self.num_actors:
             # Actors
             self.agent.replay.extend(local_replay)
-            epsilon = self.epsilon_schedule(len(local_replay))
-            if epsilon == 0.01:
+            self.epsilon = self.epsilon_schedule(len(local_replay))
+            if self.epsilon == 0.01:
                 epsilon = np.random.choice([0.01, 0.02, 0.05, 0.1], p=[0.7, 0.1, 0.1, 0.1])
-            sample_ops.append(self.actors[rank].sample.remote(self.actor_steps, epsilon, self.agent.model.state_dict()))
+            sample_ops.append(
+                self.actors[rank].sample.remote(self.actor_steps, self.epsilon, self.agent.model.state_dict()))
             self.frame_count += len(local_replay)
             result = dict(ep_reward_train=np.mean(Rs))
             self.Rs += Rs
@@ -220,6 +222,10 @@ class Trainer(tune.Trainable):
             toc = time.time()
             result.update(loss=loss, train_time=toc - tic)
         result.update(frames=self.frame_count, done=self.frame_count > self.total_steps)
+
+        if self.iteration % 1000 == 0:
+            self.logstat()
+
         return result
 
     def _save(self, checkpoint_dir):
@@ -252,6 +258,27 @@ class Trainer(tune.Trainable):
         else:
             raise ValueError("unexpected formats: " + str(export_formats))
 
+    def _stop(self):
+        print("Final Testing")
+        ray.get([a.reset_envs.remote(False, False) for a in self.actors])
+
+        datas = ray.get([a.sample.remote(self.actor_steps, self.epsilon, self.agent.model.state_dict())
+                         for a in self.actors])
+
+        FTRs = []
+        for local_replay, Rs, Qs, rank, fps in datas:
+            FTRs += Rs
+
+        torch.save({
+            'model': self.agent.model.state_dict(),
+            'optim': self.agent.optimizer.state_dict(),
+            'FTRs': FTRs,
+            'Ls': self.Ls,
+            'Rs': self.Rs,
+            'Qs': self.Qs,
+            'TRs': self.TRs
+        }, f'./final.pth')
+
     def reset_config(self, new_config):
         for param_group in self.agent.optimizer.param_groups:
             if "adam_lr" in new_config:
@@ -259,6 +286,17 @@ class Trainer(tune.Trainable):
 
         self.config = new_config
         return True
+
+    def logstat(self):
+        print("=" * 100)
+        print(f"Epoch:{self.frame_count // self.steps_per_epoch:4d}\t Steps:{self.frame_count:8d}\t "
+              f"Updates:{self.iteration:4d}\t "
+              f"Epsilon:{self.epsilon:6.4}")
+        print('-' * 100)
+        pprint("Training Reward   ", self.Rs[-1000:])
+        pprint("Loss              ", self.Ls[-1000:])
+        pprint("Qmax              ", self.Qs[-1000:])
+        pprint("Test Reward       ", self.TRs[-1000:])
 
 
 def run(config=None, **kwargs):
