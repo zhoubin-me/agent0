@@ -190,6 +190,7 @@ class Trainer(tune.Trainable):
         self.frame_count = 0
         self.start_time = time.time()
         self.Rs, self.Qs, self.TRs, self.Ls, self.speed = [], [], [], [], []
+        self.actor_fps, self.training_fps, self.iteration_speed, self.iteration_time, self.training_time = [], [], [], [], []
 
     def _train(self):
         tic = time.time()
@@ -208,6 +209,7 @@ class Trainer(tune.Trainable):
             result = dict(ep_reward_train=np.mean(Rs)) if len(Rs) > 0 else dict()
             self.Rs += Rs
             self.Qs += Qs
+            self.actor_fps.append(fps)
         else:
             # Tester
             self.sample_ops.append(self.tester.sample.remote(self.actor_steps, 0.01, self.agent.model.state_dict()))
@@ -227,7 +229,12 @@ class Trainer(tune.Trainable):
             self.Ls += loss.tolist()
             loss = loss.mean().item()
             train_toc = time.time()
-            result.update(loss=loss, train_time=train_toc-train_tic)
+            result.update(loss=loss, train_time=train_toc - train_tic)
+
+            self.training_fps += [(self.batch_size * self.agent_train_freq) / (train_toc - train_tic)]
+            self.iteration_fps += [len(local_replay) / (train_toc - tic)]
+            self.iteration_time += [train_toc - tic]
+            self.training_time += [train_toc - train_tic]
 
         result.update(frames=self.frame_count, done=self.frame_count > self.total_steps)
 
@@ -310,6 +317,11 @@ class Trainer(tune.Trainable):
         pprint("Loss               ", self.Ls[-1000:])
         pprint("Qmax               ", self.Qs[-1000:])
         pprint("Test EP Reward     ", self.TRs[-1000:])
+        pprint("Training Speed    ", self.training_fps[-20:])
+        pprint("Training Time     ", self.training_time[-20:])
+        pprint("Iteration Time    ", self.iteration_time[-20:])
+        pprint("Iteration FPS     ", self.iteration_fps[-20:])
+        pprint("Actor FPS         ", self.actor_fps[-20:])
         print("=" * 105)
         print(" " * 105)
         print(" " * 105)
