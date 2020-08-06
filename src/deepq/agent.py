@@ -104,7 +104,7 @@ class Actor:
         self.envs.close()
         self.envs = ShmemVecEnv([lambda: make_env(self.game, episode_life, clip_rewards)
                                  for _ in range(self.num_envs)], context='fork')
-
+        self.obs = self.envs.reset()
     def close_envs(self):
         self.envs.close()
 
@@ -271,7 +271,7 @@ class Trainer(tune.Trainable):
     def _stop(self):
         print("Final Testing")
         ray.get([a.reset_envs.remote(False, False) for a in self.actors])
-        datas = ray.get([a.sample.remote(self.actor_steps, self.epsilon, self.agent.model.state_dict())
+        datas = ray.get([a.sample.remote(self.actor_steps * 10, self.epsilon, self.agent.model.state_dict())
                          for a in self.actors])
         ray.get([a.close_envs.remote() for a in self.actors])
         FTRs = []
