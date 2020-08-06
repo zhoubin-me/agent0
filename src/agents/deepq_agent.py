@@ -38,7 +38,7 @@ def default_hyperparams():
         target_update_freq=500,
         agent_train_freq=20,
 
-        start_training=int(2e4),
+        start_training_step=int(2e4),
         total_steps=int(1e7),
         epoches=1000,
         random_seed=1234)
@@ -53,12 +53,12 @@ class Actor:
 
         if self.rank == self.num_actors:
             # Testing
-            self.envs = ShmemVecEnv([lambda: make_env(self.game, False, False) for _ in range(self.num_envs)],
-                                    context='fork')
+            self.envs = ShmemVecEnv([lambda: make_env(self.game, False, False)
+                                     for _ in range(self.num_envs)], context='fork')
         else:
             # Training
-            self.envs = ShmemVecEnv([lambda: make_env(self.game, True, True) for _ in range(self.num_envs)],
-                                    context='fork')
+            self.envs = ShmemVecEnv([lambda: make_env(self.game, True, True)
+                                     for _ in range(self.num_envs)], context='fork')
         self.action_dim = self.envs.action_space.n
         self.state_shape = self.envs.observation_space.shape
 
@@ -97,6 +97,12 @@ class Actor:
                     self.R[idx] = 0
         toc = time.time()
         return replay, Rs, Qs, self.rank, len(replay) / (toc - tic)
+
+    def reset_envs(self, episode_life=True, clip_rewards=True):
+        self.envs.close()
+        self.envs = ShmemVecEnv([lambda: make_env(self.game, episode_life, clip_rewards)
+                                 for _ in range(self.num_envs)], context='fork')
+
 
 class Agent:
     def __init__(self, **kwargs):
@@ -160,6 +166,7 @@ class Agent:
         return loss.detach()
 
 
+
 class Trainer(tune.Trainable):
     def _setup(self, config):
         kwargs = default_hyperparams()
@@ -181,6 +188,8 @@ class Trainer(tune.Trainable):
         self.sample_ops = [a.sample.remote(self.actor_steps, 1.0, self.agent.model.state_dict()) for a in self.actors]
         self.frame_count = 0
 
+        self.Rs, self.Qs, self.TRs, self.Ls = [], [], [], []
+
     def _train(self):
         done_id, sample_ops = ray.wait(self.sample_ops)
         data = ray.get(done_id)
@@ -194,18 +203,22 @@ class Trainer(tune.Trainable):
             sample_ops.append(self.actors[rank].sample.remote(self.actor_steps, epsilon, self.agent.model.state_dict()))
             self.frame_count += len(local_replay)
             result = dict(ep_reward_train=np.mean(Rs))
+            self.Rs += Rs
+            self.Qs += Qs
         else:
             # Tester
             sample_ops.append(self.tester.sample.remote(self.actor_steps, 0.01, self.agent.model.state_dict()))
             result = dict(ep_reward_test=np.mean(Rs))
+            self.TRs += Rs
 
-        if self.frame_count > self.start_training:
+        if self.frame_count > self.start_training_step:
             tic = time.time()
             loss = [self.agent.train_step() for _ in range(self.agent_train_freq)]
-            loss = torch.stack(loss).mean().item()
+            loss = torch.stack(loss)
+            self.Ls += loss.tolist()
+            loss = loss.mean().item()
             toc = time.time()
             result.update(loss=loss, train_time=toc - tic)
-
         result.update(frames=self.frame_count, done=self.frame_count > self.total_steps)
         return result
 
@@ -214,12 +227,20 @@ class Trainer(tune.Trainable):
             'model': self.agent.model.state_dict(),
             'optim': self.agent.optimizer.state_dict(),
             'model_target': self.agent.model_target.state_dict(),
+            'Ls': self.Ls,
+            'Rs': self.Rs,
+            'Qs': self.Qs,
+            'TRs': self.TRs
         }
 
-    def _restore(self, data):
-        self.agent.model.load_state_dict(data['model'])
-        self.agent.model_target.load_state_dict(data['model_target'])
-        self.agent.optimizer.load_state_dict(data['optim'])
+    def _restore(self, checkpoint):
+        self.agent.model.load_state_dict(checkpoint['model'])
+        self.agent.model_target.load_state_dict(checkpoint['model_target'])
+        self.agent.optimizer.load_state_dict(checkpoint['optim'])
+        self.Ls = checkpoint['Ls']
+        self.Qs = checkpoint['Qs']
+        self.Rs = checkpoint['Rs']
+        self.TRs = checkpoint['TRs']
 
     def _export_model(self, export_formats, export_dir):
         if export_formats == [ExportFormat.MODEL]:
