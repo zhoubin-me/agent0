@@ -105,6 +105,9 @@ class Actor:
         self.envs = ShmemVecEnv([lambda: make_env(self.game, episode_life, clip_rewards)
                                  for _ in range(self.num_envs)], context='fork')
 
+    def close_envs(self):
+        self.envs.close()
+
 
 class Agent:
     def __init__(self, **kwargs):
@@ -228,8 +231,7 @@ class Trainer(tune.Trainable):
             train_toc = time.time()
             result.update(loss=loss, train_time=train_toc - train_tic)
 
-
-        result.update(frames=self.frame_count, done=self.frame_count > self.total_steps)
+        result.update(frames=self.frame_count)
 
         if self.iteration % 100 == 10:
             self.logstat()
@@ -271,6 +273,7 @@ class Trainer(tune.Trainable):
         ray.get([a.reset_envs.remote(False, False) for a in self.actors])
         datas = ray.get([a.sample.remote(self.actor_steps, self.epsilon, self.agent.model.state_dict())
                          for a in self.actors])
+        ray.get([a.close_envs.remote() for a in self.actors])
         FTRs = []
         for local_replay, Rs, Qs, rank, fps in datas:
             FTRs += Rs
@@ -283,7 +286,7 @@ class Trainer(tune.Trainable):
             'Rs': self.Rs,
             'Qs': self.Qs,
             'TRs': self.TRs
-        }, f'./final.pth')
+        }, './final.pth')
 
     def reset_config(self, new_config):
         for param_group in self.agent.optimizer.param_groups:
