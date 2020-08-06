@@ -261,10 +261,8 @@ class Trainer(tune.Trainable):
     def _stop(self):
         print("Final Testing")
         ray.get([a.reset_envs.remote(False, False) for a in self.actors])
-
         datas = ray.get([a.sample.remote(self.actor_steps, self.epsilon, self.agent.model.state_dict())
                          for a in self.actors])
-
         FTRs = []
         for local_replay, Rs, Qs, rank, fps in datas:
             FTRs += Rs
