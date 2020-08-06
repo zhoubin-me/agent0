@@ -190,7 +190,7 @@ class Trainer(tune.Trainable):
         self.frame_count = 0
         self.start_time = time.time()
         self.Rs, self.Qs, self.TRs, self.Ls, self.speed = [], [], [], [], []
-        self.actor_fps, self.training_fps, self.iteration_speed, self.iteration_time, self.training_time = [], [], [], [], []
+        self.actor_fps, self.training_fps, self.iteration_fps, self.iteration_time, self.training_time = [], [], [], [], []
 
     def _train(self):
         tic = time.time()
