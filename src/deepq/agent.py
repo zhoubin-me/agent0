@@ -191,9 +191,12 @@ class Trainer(tune.Trainable):
         self.start_time = time.time()
         self.Rs, self.Qs, self.TRs, self.Ls, self.speed = [], [], [], [], []
         self.actor_fps, self.training_fps, self.iteration_fps, self.iteration_time, self.training_time = [], [], [], [], []
+        self.train_iter_start_time = 0
+        self.train_iter_end_time = 0
 
     def _train(self):
-        tic = time.time()
+        self.training_iter_start_time = tic = time.time()
+
         done_id, self.sample_ops = ray.wait(self.sample_ops)
         data = ray.get(done_id)
         local_replay, Rs, Qs, rank, fps = data[0]
@@ -232,16 +235,17 @@ class Trainer(tune.Trainable):
             result.update(loss=loss, train_time=train_toc - train_tic)
 
             self.training_fps += [(self.batch_size * self.agent_train_freq) / (train_toc - train_tic)]
-            self.iteration_fps += [len(local_replay) / (train_toc - tic)]
-            self.iteration_time += [train_toc - tic]
             self.training_time += [train_toc - train_tic]
+            self.speed.append(len(local_replay) / (train_toc - tic))
+            self.iteration_time += [self.train_itr_end_time - train_toc]
+            self.iteration_fps += [len(local_replay) / (self.train_itr_end_time - train_toc)]
 
         result.update(frames=self.frame_count, done=self.frame_count > self.total_steps)
 
-        toc = time.time()
-        self.speed.append(len(local_replay) / (toc - tic))
-        if self.iteration % 100 == 0:
+        if self.iteration % 100 == 1:
             self.logstat()
+
+        self.train_itr_end_time = toc = time.time()
         return result
 
     def _save(self, checkpoint_dir):
