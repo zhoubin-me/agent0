@@ -22,6 +22,7 @@ if __name__ == '__main__':
     ray.init(memory=100 * 2 ** 30, object_store_memory=200 * 2 ** 30)
     analysis = tune.run(
         Trainer,
+        name=kwargs['exp_name'],
         verbose=0,
         checkpoint_at_end=True,
         checkpoint_freq=800,

@@ -22,6 +22,7 @@ def default_hyperparams():
         prioritize=True,
         distributional=True,
         noisy=True,
+        exp_name='atari_deepq',
         save_prefix="ckpt",
 
         num_actors=8,
@@ -188,14 +189,9 @@ class Trainer(tune.Trainable):
         self.sample_ops = [a.sample.remote(self.actor_steps, 1.0, self.agent.model.state_dict()) for a in
                            self.actors[:-1]]
         self.frame_count = 0
-        self.start_time = time.time()
-        self.Rs, self.Qs, self.TRs, self.Ls, self.speed = [], [], [], [], []
-        self.actor_fps, self.training_fps, self.iteration_fps, self.iteration_time, self.training_time = [], [], [], [], []
-        self.train_iter_start_time = 0
-        self.train_iter_end_time = 0
+        self.Rs, self.Qs, self.TRs, self.Ls = [], [], [], []
 
     def _train(self):
-        self.training_iter_start_time = tic = time.time()
         done_id, self.sample_ops = ray.wait(self.sample_ops)
         data = ray.get(done_id)
         local_replay, Rs, Qs, rank, fps = data[0]
@@ -233,18 +229,12 @@ class Trainer(tune.Trainable):
             train_toc = time.time()
             result.update(loss=loss, train_time=train_toc - train_tic)
 
-            self.training_fps += [(self.batch_size * self.agent_train_freq) / (train_toc - train_tic)]
-            self.training_time += [train_toc - train_tic]
-            self.iteration_time += [train_toc - self.train_itr_end_time]
-            self.iteration_fps += [len(local_replay) / (train_toc - self.train_itr_end_time)]
 
         result.update(frames=self.frame_count, done=self.frame_count > self.total_steps)
 
         if self.iteration % 100 == 1:
             self.logstat()
 
-        self.train_itr_end_time = toc = time.time()
-        self.speed.append(len(local_replay) / (toc - tic))
         return result
 
     def _save(self, checkpoint_dir):
@@ -305,26 +295,20 @@ class Trainer(tune.Trainable):
         return True
 
     def logstat(self):
+        rem_time = (self.total_steps - self.frame_count) / (self.frame_count / self._time_total)
         print("=" * 105)
-        speed = np.mean(self.speed[-100:])
         print(f"Epoch:[{self.frame_count // self.steps_per_epoch:4d}/{self.epoches}]\t"
               f"Game: {self.game:<10s}\t"
+              f"TimeElapsed: {self._time_total:6.0f}\t"
+              f"TimeRemEst: {rem_time:6.0f}\t"
               f"Frame Count:{self.frame_count:8d}\t\t"
               f"Update Count:{self.iteration:4d}\t\t\n"
-              f"Speed: {speed:4.0f}\t\t"
-              f"TimePast: {(time.time() - self.start_time):4.0f}\t\t"
-              f"EstTimeRem: {(self.total_steps - self.frame_count) / speed:4.0f}\t\t"
               f"Epsilon:{self.epsilon:6.4}")
         print('-' * 105)
         pprint("Training EP Reward ", self.Rs[-1000:])
         pprint("Loss               ", self.Ls[-1000:])
         pprint("Qmax               ", self.Qs[-1000:])
         pprint("Test EP Reward     ", self.TRs[-1000:])
-        pprint("Training Speed     ", self.training_fps[-100:])
-        pprint("Training Time      ", self.training_time[-100:])
-        pprint("Iteration Time     ", self.iteration_time[-100:])
-        pprint("Iteration FPS      ", self.iteration_fps[-100:])
-        pprint("Actor FPS          ", self.actor_fps[-100:])
         print("=" * 105)
         print(" " * 105)
         print(" " * 105)
