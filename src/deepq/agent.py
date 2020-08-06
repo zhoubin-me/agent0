@@ -294,11 +294,13 @@ class Trainer(tune.Trainable):
 
     def logstat(self):
         print("=" * 100)
-        print(f"Epoch:{self.frame_count // self.steps_per_epoch:4d}\t Steps:{self.frame_count:8d}\t "
-              f"Updates:{self.iteration:4d}\t "
+        print(f"Game: {self.game:<10s}\t"
+              f"Epoch:[{self.frame_count // self.steps_per_epoch:4d}-{self.epoches}]\t"
+              f"Frame Count:{self.frame_count:8d}\t "
+              f"Update Count:{self.iteration:4d}\t "
               f"Epsilon:{self.epsilon:6.4}")
         print('-' * 100)
-        pprint("Training Reward   ", self.Rs[-1000:])
-        pprint("Loss              ", self.Ls[-1000:])
-        pprint("Qmax              ", self.Qs[-1000:])
-        pprint("Test Reward       ", self.TRs[-1000:])
+        pprint("Training EP Reward ", self.Rs[-1000:])
+        pprint("Loss               ", self.Ls[-1000:])
+        pprint("Qmax               ", self.Qs[-1000:])
+        pprint("Test EP Reward     ", self.TRs[-1000:])
