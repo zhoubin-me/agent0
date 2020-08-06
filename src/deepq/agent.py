@@ -45,6 +45,7 @@ def default_hyperparams():
 
     return params
 
+
 @ray.remote(num_gpus=0.1)
 class Actor:
     def __init__(self, **kwargs):
@@ -166,7 +167,6 @@ class Agent:
         return loss.detach()
 
 
-
 class Trainer(tune.Trainable):
     def _setup(self, config):
         kwargs = default_hyperparams()
@@ -185,7 +185,8 @@ class Trainer(tune.Trainable):
         self.steps_per_epoch = self.total_steps // self.epoches
         self.actor_steps = self.total_steps // (self.epoches * self.num_envs * self.num_actors)
 
-        self.sample_ops = [a.sample.remote(self.actor_steps, 1.0, self.agent.model.state_dict()) for a in self.actors[:-1]]
+        self.sample_ops = [a.sample.remote(self.actor_steps, 1.0, self.agent.model.state_dict()) for a in
+                           self.actors[:-1]]
         self.frame_count = 0
 
         self.Rs, self.Qs, self.TRs, self.Ls = [], [], [], []

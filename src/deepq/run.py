@@ -9,7 +9,7 @@ import torch
 from ray import tune
 
 from src.common.utils import LinearSchedule, pprint
-from src.deepq.deepq_agent import default_hyperparams, Actor, Agent
+from src.deepq.agent import default_hyperparams, Actor, Agent
 
 
 def run(config=None, **kwargs):
