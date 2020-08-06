@@ -19,12 +19,13 @@ def parse_arguments(params):
 if __name__ == '__main__':
     params = default_hyperparams()
     kwargs = parse_arguments(params)
-    ray.init(memory=100 * 2 ** 30, object_store_memory=200 * 2 ** 30)
+    ray.init(memory=20 * 2 ** 30, object_store_memory=80 * 2 ** 30)
     analysis = tune.run(
         Trainer,
         name=kwargs['exp_name'],
         verbose=0,
         checkpoint_at_end=True,
+        fail_fast=True,
         checkpoint_freq=800,
         config={
             "exploration_ratio": tune.grid_search([0.1, 0.15]),
@@ -32,7 +33,7 @@ if __name__ == '__main__':
             "agent_train_freq": tune.grid_search([15, 10]),
             "game": tune.grid_search(["Breakout"])
         },
-        resources_per_trial={"gpu": 4},
+        resources_per_trial={"gpu": 3},
     )
 
     print("Best config: ", analysis.get_best_config(metric="final_test_rewards"))

@@ -207,7 +207,6 @@ class Trainer(tune.Trainable):
             result = dict(ep_reward_train=np.mean(Rs)) if len(Rs) > 0 else dict()
             self.Rs += Rs
             self.Qs += Qs
-            self.actor_fps.append(fps)
         else:
             # Tester
             self.sample_ops.append(self.tester.sample.remote(self.actor_steps, 0.01, self.agent.model.state_dict()))
@@ -232,7 +231,7 @@ class Trainer(tune.Trainable):
 
         result.update(frames=self.frame_count, done=self.frame_count > self.total_steps)
 
-        if self.iteration % 100 == 1:
+        if self.iteration % 100 == 10:
             self.logstat()
 
         return result
@@ -299,10 +298,10 @@ class Trainer(tune.Trainable):
         print("=" * 105)
         print(f"Epoch:[{self.frame_count // self.steps_per_epoch:4d}/{self.epoches}]\t"
               f"Game: {self.game:<10s}\t"
-              f"TimeElapsed: {self._time_total:6.0f}\t"
-              f"TimeRemEst: {rem_time:6.0f}\t"
-              f"Frame Count:{self.frame_count:8d}\t\t"
-              f"Update Count:{self.iteration:4d}\t\t\n"
+              f"TimeElapsed: {self._time_total:6.0f}\t\t"
+              f"TimeRemEst: {rem_time:6.0f}\t\n"
+              f"FrameCount:{self.frame_count:8d}\t"
+              f"UpdateCount:{self.iteration:6d}\t"
               f"Epsilon:{self.epsilon:6.4}")
         print('-' * 105)
         pprint("Training EP Reward ", self.Rs[-1000:])
