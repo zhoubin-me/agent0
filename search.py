@@ -3,10 +3,10 @@ import json
 
 import ray
 from ray import tune
+from ray.tune import CLIReporter
 from ray.tune import Stopper
 
 from src.deepq.agent import default_hyperparams, Trainer
-from src.deepq.run import run
 
 
 def parse_arguments(params):
@@ -37,13 +37,17 @@ if __name__ == '__main__':
     kwargs = parse_arguments(params)
     ray.init(memory=20 * 2 ** 30, object_store_memory=80 * 2 ** 30)
     # stopper = CustomStopper(kwargs['total_steps'])
+    reporter = CLIReporter(
+        parameter_columns=["exploration_ratio", "adam_lr", "lr", "agent_train_freq"],
+        metric_columns=["frames", "loss", "ep_reward_test", "ep_reward_train"])
+
     analysis = tune.run(
         Trainer,
         name=kwargs['exp_name'],
         verbose=0,
         checkpoint_at_end=True,
         fail_fast=True,
-        stop = {'training_iteration': kwargs['epoches'] * (1 + kwargs['num_actors'])},
+        stop={'training_iteration': kwargs['epoches'] * (1 + kwargs['num_actors'])},
         # stop = {'training_iteration': self.epoches * (self.num_actors + 1)},
         checkpoint_freq=800,
         config={
@@ -52,6 +56,7 @@ if __name__ == '__main__':
             "agent_train_freq": tune.grid_search([15, 10]),
             "game": tune.grid_search(["Breakout"])
         },
+        progress_reporter=reporter,
         resources_per_trial={"gpu": 3},
     )
 
