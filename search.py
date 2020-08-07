@@ -39,7 +39,7 @@ if __name__ == '__main__':
     # stopper = CustomStopper(kwargs['total_steps'])
     reporter = CLIReporter(
         metric_columns=["exploration_ratio", "adam_lr", "lr", "agent_train_freq", "frames", "loss", "ep_reward_test",
-                        "ep_reward_train"])
+                        "ep_reward_train", "time_past", "time_remain", "speed"])
 
     analysis = tune.run(
         Trainer,
