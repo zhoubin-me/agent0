@@ -55,6 +55,6 @@ if __name__ == '__main__':
         resources_per_trial={"gpu": 3},
     )
 
-    print("Best config: ", analysis.get_best_config(metric="ep_reward_train"))
+    print("Best config: ", analysis.get_best_config(metric="ep_reward_test"))
     df = analysis.dataframe()
     df.to_csv('out.csv')
