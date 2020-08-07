@@ -50,11 +50,11 @@ if __name__ == '__main__':
             "exploration_ratio": tune.grid_search([0.1, 0.15]),
             "adam_lr": tune.grid_search([5e-4, 1e-4, 2e-4]),
             "agent_train_freq": tune.grid_search([15, 10]),
-            "game": tune.grid_search(["BeamRider"])
+            "game": tune.grid_search(["SpaceInvaders"])
         },
         resources_per_trial={"gpu": 3},
     )
 
-    print("Best config: ", analysis.get_best_config(metric="final_test_rewards"))
+    print("Best config: ", analysis.get_best_config(metric="ep_reward_test"))
     df = analysis.dataframe()
     df.to_csv('out.csv')
