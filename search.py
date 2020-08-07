@@ -43,8 +43,8 @@ if __name__ == '__main__':
         verbose=0,
         checkpoint_at_end=True,
         fail_fast=True,
-        # stop=stopper,
-        stop = {'training_iteration': kwargs['epoches'] * (1 + kwargs['num_actors'])},
+        # stop = {'training_iteration': kwargs['epoches'] * (1 + kwargs['num_actors'])},
+        stop = {'training_iteration': 100},
         checkpoint_freq=800,
         config={
             "exploration_ratio": tune.grid_search([0.1, 0.15]),

@@ -100,11 +100,6 @@ class Actor:
         toc = time.time()
         return replay, Rs, Qs, self.rank, len(replay) / (toc - tic)
 
-    def reset_envs(self, episode_life=True, clip_rewards=True):
-        self.envs.close()
-        self.envs = ShmemVecEnv([lambda: make_env(self.game, episode_life, clip_rewards)
-                                 for _ in range(self.num_envs)], context='fork')
-        self.obs = self.envs.reset()
     def close_envs(self):
         self.envs.close()
 
@@ -270,22 +265,19 @@ class Trainer(tune.Trainable):
 
     def _stop(self):
         print("Final Testing")
-        ray.get([a.reset_envs.remote(False, False) for a in self.actors])
-        datas = ray.get([a.sample.remote(self.actor_steps * 10, self.epsilon, self.agent.model.state_dict())
-                         for a in self.actors])
-        ray.get([a.close_envs.remote() for a in self.actors])
-        FTRs = []
-        for local_replay, Rs, Qs, rank, fps in datas:
-            FTRs += Rs
+        local_replay, Rs, Qs, rank, fps  = ray.get(self.tester.sample.remote(self.actor_steps * self.num_envs * self.num_actors, self.epsilon, self.agent.model.state_dict()))
         torch.save({
             'model': self.agent.model.state_dict(),
             'optim': self.agent.optimizer.state_dict(),
-            'FTRs': FTRs,
+            'FTRs': Rs,
             'Ls': self.Ls,
             'Rs': self.Rs,
             'Qs': self.Qs,
             'TRs': self.TRs
         }, './final.pth')
+        import pdb
+        pdb.set_trace()
+        ray.get([a.close_envs.remote() for a in self.actors])
 
     def reset_config(self, new_config):
         for param_group in self.agent.optimizer.param_groups:
