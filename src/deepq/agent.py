@@ -205,6 +205,16 @@ class Trainer(tune.Trainable):
             result = dict(ep_reward_train=np.mean(Rs)) if len(Rs) > 0 else dict()
             self.Rs += Rs
             self.Qs += Qs
+            # Start training at
+            if self.frame_count > self.start_training_step:
+                train_tic = time.time()
+                loss = [self.agent.train_step() for _ in range(self.agent_train_freq)]
+                loss = torch.stack(loss)
+                self.Ls += loss.tolist()
+                loss = loss.mean().item()
+                train_toc = time.time()
+                result.update(loss=loss, train_time=train_toc - train_tic)
+
         else:
             # Tester
             self.sample_ops.append(self.tester.sample.remote(self.actor_steps, 0.01, self.agent.model.state_dict()))
@@ -216,20 +226,8 @@ class Trainer(tune.Trainable):
             print("Testing Started ... ")
             self.sample_ops.append(self.tester.sample.remote(self.actor_steps, 0.01, self.agent.model.state_dict()))
 
-        # Start training at
-        if self.frame_count > self.start_training_step:
-            train_tic = time.time()
-            loss = [self.agent.train_step() for _ in range(self.agent_train_freq)]
-            loss = torch.stack(loss)
-            self.Ls += loss.tolist()
-            loss = loss.mean().item()
-            train_toc = time.time()
-            result.update(loss=loss, train_time=train_toc - train_tic)
-
-        result.update(frames=self.frame_count)
-
-        # if self.iteration % 100 == 10:
-        #     self.logstat()
+        result.update(time_past=self._time_total, frames=self.frame_count,
+                      time_remain=(self.total_steps - self.frame_count) / (self.frame_count / self._time_total))
 
         return result
 
