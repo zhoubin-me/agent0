@@ -44,7 +44,7 @@ if __name__ == '__main__':
     analysis = tune.run(
         Trainer,
         name=kwargs['exp_name'],
-        verbose=0,
+        verbose=1,
         checkpoint_at_end=True,
         fail_fast=True,
         stop={'training_iteration': kwargs['epoches'] * (1 + kwargs['num_actors'])},
