@@ -226,8 +226,9 @@ class Trainer(tune.Trainable):
             print("Testing Started ... ")
             self.sample_ops.append(self.tester.sample.remote(self.actor_steps, 0.01, self.agent.model.state_dict()))
 
-        result.update(time_past=self._time_total, frames=self.frame_count, speed=self.frame_count / self._time_total,
-                      time_remain=(self.total_steps - self.frame_count) / (self.frame_count / self._time_total))
+        result.update(time_past=self._time_total, frames=self.frame_count,
+                      speed=self.frame_count / (self._time_total + 1),
+                      time_remain=(self.total_steps - self.frame_count) / (self.frame_count / (self._time_total + 1)))
 
         return result
 
