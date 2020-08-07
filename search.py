@@ -18,28 +18,14 @@ def parse_arguments(params):
     return vars(args)
 
 
-class CustomStopper(Stopper):
-    def __init__(self, max_frames):
-        self.should_stop = False
-        self.max_frames = max_frames
-
-    def __call__(self, trial_id, result):
-        if not self.should_stop and result['frames'] > int(1e5):
-            self.should_stop = True
-        return self.should_stop
-
-    def stop_all(self):
-        return self.should_stop
 
 
 if __name__ == '__main__':
     params = default_hyperparams()
     kwargs = parse_arguments(params)
-    ray.init(memory=20 * 2 ** 30, object_store_memory=80 * 2 ** 30)
-    # stopper = CustomStopper(kwargs['total_steps'])
+    ray.init(memory=40 * 2 ** 30, object_store_memory=120 * 2 ** 30)
     reporter = CLIReporter(
-        metric_columns=["exploration_ratio", "adam_lr", "lr", "agent_train_freq", "frames", "loss", "ep_reward_test",
-                        "ep_reward_train", "time_past", "time_remain", "speed"])
+        metric_columns=["frames", "loss", "ep_reward_test", "ep_reward_train", "time_past", "time_remain", "speed"])
 
     analysis = tune.run(
         Trainer,
@@ -47,15 +33,13 @@ if __name__ == '__main__':
         verbose=1,
         checkpoint_at_end=True,
         fail_fast=True,
-        # stop={'training_iteration': kwargs['epoches'] * (1 + kwargs['num_actors'])},
         stop = lambda trial_id, result: result['frames'] > kwargs['total_steps'],
-        # stop = {'training_iteration': self.epoches * (self.num_actors + 1)},
         checkpoint_freq=800,
         config={
             "exploration_ratio": tune.grid_search([0.1, 0.15]),
             "adam_lr": tune.grid_search([5e-4, 1e-4, 2e-4]),
             "agent_train_freq": tune.grid_search([15, 10]),
-            "game": tune.grid_search(["Breakout"])
+            "game": tune.grid_search([kwargs['game']])
         },
         progress_reporter=reporter,
         resources_per_trial={"gpu": 3},
