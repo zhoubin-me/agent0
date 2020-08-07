@@ -277,7 +277,6 @@ class Trainer(tune.Trainable):
         FTRs = []
         for local_replay, Rs, Qs, rank, fps in datas:
             FTRs += Rs
-
         torch.save({
             'model': self.agent.model.state_dict(),
             'optim': self.agent.optimizer.state_dict(),

@@ -136,7 +136,13 @@ def run(config=None, **kwargs):
 
             if epoch > agent.epoches:
                 print("Final Testing")
-                TRs = ray.get(tester.sample.remote(actor_steps * 100, 0.01, agent.model.state_dict()))[1]
+                FTRs = []
+                ray.get([a.reset_envs.remote(False, False) for a in self.actors])
+                datas = ray.get([a.sample.remote(self.actor_steps * 10, self.epsilon, self.agent.model.state_dict())
+                         for a in self.actors])
+                ray.get([a.close_envs.remote() for a in self.actors])
+                for local_replay, Rs, Qs, rank, fps in datas:
+                    FTRs += Rs
                 torch.save({
                     'model': agent.model.state_dict(),
                     'optim': agent.optimizer.state_dict(),
@@ -145,6 +151,7 @@ def run(config=None, **kwargs):
                     'steps': steps,
                     'Rs': RRs,
                     'TRs': TRRs,
+                    'FTRs': FTRs,
                     'Qs': QQs,
                     'Ls': LLs,
                     'time': toc - tic,
@@ -152,7 +159,9 @@ def run(config=None, **kwargs):
                     'FTRs': TRs
                 }, f'{agent.save_prefix}./{agent.game}_final.pth')
 
-                if config is None:
+
+
+                if config is not None:
                     tune.report(final_test_rewards=np.mean(TRs))
                 return
 

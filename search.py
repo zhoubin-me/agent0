@@ -6,6 +6,7 @@ from ray import tune
 from ray.tune import Stopper
 
 from src.deepq.agent import default_hyperparams, Trainer
+from src.deepq.run import run
 
 
 def parse_arguments(params):
@@ -23,7 +24,7 @@ class CustomStopper(Stopper):
         self.max_frames = max_frames
 
     def __call__(self, trial_id, result):
-        if not self.should_stop and result['frames'] > self.max_frames:
+        if not self.should_stop and result['frames'] > int(1e5):
             self.should_stop = True
         return self.should_stop
 
@@ -35,20 +36,21 @@ if __name__ == '__main__':
     params = default_hyperparams()
     kwargs = parse_arguments(params)
     ray.init(memory=20 * 2 ** 30, object_store_memory=80 * 2 ** 30)
-    stopper = CustomStopper(kwargs['total_steps'])
+    # stopper = CustomStopper(kwargs['total_steps'])
     analysis = tune.run(
         Trainer,
         name=kwargs['exp_name'],
         verbose=0,
         checkpoint_at_end=True,
         fail_fast=True,
-        stop=stopper,
+        # stop=stopper,
+        stop = {'training_iteration': kwargs['epoches'] * (1 + kwargs['num_actors'])},
         checkpoint_freq=800,
         config={
             "exploration_ratio": tune.grid_search([0.1, 0.15]),
             "adam_lr": tune.grid_search([5e-4, 1e-4, 2e-4]),
             "agent_train_freq": tune.grid_search([15, 10]),
-            "game": tune.grid_search(["Breakout"])
+            "game": tune.grid_search(["BeamRider"])
         },
         resources_per_trial={"gpu": 3},
     )
