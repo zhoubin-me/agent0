@@ -266,6 +266,7 @@ class Trainer(tune.Trainable):
     def _stop(self):
         print("Final Testing")
         local_replay, Rs, Qs, rank, fps  = ray.get(self.tester.sample.remote(self.actor_steps * self.num_envs * self.num_actors, self.epsilon, self.agent.model.state_dict()))
+        print(f"Final Test Result: {np.mean(Rs)}\t{np.std(Rs)}\t{np.max(Rs)}\t{len(Rs)}")
         torch.save({
             'model': self.agent.model.state_dict(),
             'optim': self.agent.optimizer.state_dict(),
