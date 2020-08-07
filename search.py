@@ -47,7 +47,8 @@ if __name__ == '__main__':
         verbose=1,
         checkpoint_at_end=True,
         fail_fast=True,
-        stop={'training_iteration': kwargs['epoches'] * (1 + kwargs['num_actors'])},
+        # stop={'training_iteration': kwargs['epoches'] * (1 + kwargs['num_actors'])},
+        stop = lambda trial_id, result: result['frames'] > kwargs['total_steps'],
         # stop = {'training_iteration': self.epoches * (self.num_actors + 1)},
         checkpoint_freq=800,
         config={
