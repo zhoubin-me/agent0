@@ -280,13 +280,13 @@ class Trainer(tune.Trainable):
         pdb.set_trace()
         ray.get([a.close_envs.remote() for a in self.actors])
 
-    def reset_config(self, new_config):
-        for param_group in self.agent.optimizer.param_groups:
-            if "adam_lr" in new_config:
-                param_group["lr"] = new_config["lr"]
-
-        self.config = new_config
-        return True
+    # def reset_config(self, new_config):
+    #     for param_group in self.agent.optimizer.param_groups:
+    #         if "adam_lr" in new_config:
+    #             param_group["lr"] = new_config["lr"]
+    #
+    #     self.config = new_config
+    #     return True
 
     def logstat(self):
         rem_time = (self.total_steps - self.frame_count) / (self.frame_count / self._time_total)
