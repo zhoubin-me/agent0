@@ -276,8 +276,6 @@ class Trainer(tune.Trainable):
             'Qs': self.Qs,
             'TRs': self.TRs
         }, './final.pth')
-        import pdb
-        pdb.set_trace()
         ray.get([a.close_envs.remote() for a in self.actors])
 
     # def reset_config(self, new_config):

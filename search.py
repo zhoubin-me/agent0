@@ -43,14 +43,14 @@ if __name__ == '__main__':
         verbose=0,
         checkpoint_at_end=True,
         fail_fast=True,
-        # stop = {'training_iteration': kwargs['epoches'] * (1 + kwargs['num_actors'])},
-        stop = {'training_iteration': 100},
+        stop = {'training_iteration': kwargs['epoches'] * (1 + kwargs['num_actors'])},
+        # stop = {'training_iteration': self.epoches * (self.num_actors + 1)},
         checkpoint_freq=800,
         config={
             "exploration_ratio": tune.grid_search([0.1, 0.15]),
             "adam_lr": tune.grid_search([5e-4, 1e-4, 2e-4]),
             "agent_train_freq": tune.grid_search([15, 10]),
-            "game": tune.grid_search(["SpaceInvaders"])
+            "game": tune.grid_search(["Breakout"])
         },
         resources_per_trial={"gpu": 3},
     )
