@@ -228,8 +228,8 @@ class Trainer(tune.Trainable):
 
         result.update(frames=self.frame_count)
 
-        if self.iteration % 100 == 10:
-            self.logstat()
+        # if self.iteration % 100 == 10:
+        #     self.logstat()
 
         return result
 

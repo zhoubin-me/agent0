@@ -3,7 +3,7 @@ import json
 
 import ray
 from ray import tune
-from ray.tune import CLIReporter
+from ray.tune import JupyterNotebookReporter
 from ray.tune import Stopper
 
 from src.deepq.agent import default_hyperparams, Trainer
@@ -37,9 +37,9 @@ if __name__ == '__main__':
     kwargs = parse_arguments(params)
     ray.init(memory=20 * 2 ** 30, object_store_memory=80 * 2 ** 30)
     # stopper = CustomStopper(kwargs['total_steps'])
-    reporter = CLIReporter(
-        parameter_columns=["exploration_ratio", "adam_lr", "lr", "agent_train_freq", "frames", "loss", "ep_reward_test",
-                           "ep_reward_train"])
+    reporter = JupyterNotebookReporter(
+        metric_columns=["exploration_ratio", "adam_lr", "lr", "agent_train_freq", "frames", "loss", "ep_reward_test",
+                        "ep_reward_train"])
 
     analysis = tune.run(
         Trainer,
