@@ -23,7 +23,7 @@ def parse_arguments(params):
 if __name__ == '__main__':
     params = default_hyperparams()
     kwargs = parse_arguments(params)
-    ray.init(memory=40 * 2 ** 30, object_store_memory=120 * 2 ** 30)
+    ray.init(memory=20 * 2 ** 30, object_store_memory=80 * 2 ** 30)
     reporter = CLIReporter(
         metric_columns=["frames", "loss", "ep_reward_test", "ep_reward_train", "time_past", "time_remain", "speed"])
 
