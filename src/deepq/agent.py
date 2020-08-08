@@ -240,12 +240,14 @@ class Trainer(tune.Trainable):
             'Qs': self.Qs,
             'TRs': self.TRs,
             'frame_count': self.frame_count,
+            'replay': self.agent.replay
         }
 
     def _restore(self, checkpoint):
         self.agent.model.load_state_dict(checkpoint['model'])
         self.agent.model_target.load_state_dict(checkpoint['model_target'])
         self.agent.optimizer.load_state_dict(checkpoint['optim'])
+        self.agent.replay = checkpoint['replay']
         self.Ls = checkpoint['Ls']
         self.Qs = checkpoint['Qs']
         self.Rs = checkpoint['Rs']
