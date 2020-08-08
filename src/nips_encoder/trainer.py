@@ -1,3 +1,4 @@
+import pickle
 from collections import deque
 
 import gym
@@ -57,16 +58,17 @@ class Trainer(tune.Trainable):
 
         print("Sampling replay")
         obs = self.envs.reset()
-        step = 0
         steps = int(1e6) // self.num_envs + 1
-        for step in tqdm(range(steps)):
+        for _ in tqdm(range(steps)):
             action_random = np.random.randint(0, self.action_dim, self.num_envs)
             obs_next, reward, done, info = self.envs.step(action_random)
 
             for entry in zip(obs, action_random, reward, obs_next, done):
                 self.replay.append(entry)
 
-        print("Done")
+        print("Saving replay")
+        with open('replay.pkl', 'wb') as f:
+            pickle.dump(self.replay, f)
         self.envs.close()
 
     def get_datafetcher(self):

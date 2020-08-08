@@ -47,7 +47,7 @@ if __name__ == '__main__':
         checkpoint_freq=800,
         reuse_actors=True,
         scheduler=pbt_scheduler,
-        resources_per_trial={"gpu": 1},
+        resources_per_trial={"gpu": 3},
         fail_fast=True,
         config={
             "adam_lr": tune.grid_search([5e-5, 1e-4, 2e-4, 5e-4]),
