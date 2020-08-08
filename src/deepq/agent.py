@@ -124,7 +124,7 @@ class Agent:
     def get_datafetcher(self):
         dataset = ReplayDataset(self.replay)
         self.dataloader = DataLoaderX(dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_data_workers,
-                                 pin_memory=True)
+                                 pin_memory=False)
         datafetcher = DataPrefetcher(self.dataloader, self.device)
         return datafetcher
 
@@ -292,7 +292,7 @@ class Trainer(tune.Trainable):
             }, './final.pth')
         try:
             ray.get([a.close_envs.remote() for a in self.actors])
-            del self.agent.dataloader
+            self.agent.dataloader._shutdown_workers()
         except:
             pass
 
