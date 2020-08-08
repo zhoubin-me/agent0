@@ -1,5 +1,5 @@
 
-for game in Breakout SpaceInvaders BeamRider Qbert Pong
+for game in Seaquest, Enduro, Riverraid, Enduro
 do
     python tune.py --game $game
 done
