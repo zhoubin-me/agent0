@@ -197,8 +197,7 @@ class Trainer(tune.Trainable):
             # Actors
             self.agent.replay.extend(local_replay)
             self.epsilon = self.epsilon_schedule(len(local_replay))
-            if self.epsilon == 0.01:
-                epsilon = np.random.choice([0.01, 0.02, 0.05, 0.1], p=[0.7, 0.1, 0.1, 0.1])
+
             self.sample_ops.append(
                 self.actors[rank].sample.remote(self.actor_steps, self.epsilon, self.agent.model.state_dict()))
             self.frame_count += len(local_replay)
@@ -221,6 +220,7 @@ class Trainer(tune.Trainable):
 
         result = dict(
             time_past=self._time_total,
+            epsilon=self.epsilon,
             frames=self.frame_count,
             speed=self.frame_count / (self._time_total + 1),
             time_remain=(self.total_steps - self.frame_count) / (self.frame_count / (self._time_total + 1)),
@@ -241,14 +241,12 @@ class Trainer(tune.Trainable):
             'Qs': self.Qs,
             'TRs': self.TRs,
             'frame_count': self.frame_count,
-            'replay': self.agent.replay
         }
 
     def _restore(self, checkpoint):
         self.agent.model.load_state_dict(checkpoint['model'])
         self.agent.model_target.load_state_dict(checkpoint['model_target'])
         self.agent.optimizer.load_state_dict(checkpoint['optim'])
-        self.agent.replay = checkpoint['replay']
         self.Ls = checkpoint['Ls']
         self.Qs = checkpoint['Qs']
         self.Rs = checkpoint['Rs']
