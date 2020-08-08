@@ -32,7 +32,7 @@ if __name__ == '__main__':
         time_attr='training_iteration',
         metric='loss',
         mode='min',
-        perturbation_interval=50,
+        perturbation_interval=1000,
         hyperparam_mutations={
             "adam_lr": lambda: random.uniform(1e-5, 1e-4),
         })
@@ -44,7 +44,7 @@ if __name__ == '__main__':
         stop=lambda trial_id, result: result['epoch'] > kwargs['epoches'],
         checkpoint_at_end=True,
         progress_reporter=reporter,
-        checkpoint_freq=800,
+        checkpoint_freq=1000,
         reuse_actors=True,
         scheduler=pbt_scheduler,
         resources_per_trial={"gpu": 3},

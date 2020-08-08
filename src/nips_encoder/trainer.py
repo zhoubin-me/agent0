@@ -16,10 +16,10 @@ from src.nips_encoder.model import ModelEncoder
 def default_hyperparams():
     params = dict(
         game='Breakout',
-        epoches=50,
+        epoches=30,
         batch_size=128,
         num_envs=32,
-        replay_size=int(1e6),
+        replay_size=int(1e5),
         adam_lr=1e-4,
         num_data_workers=4,
         pin_memory=True,
@@ -62,14 +62,14 @@ class Trainer(tune.Trainable):
             raise ValueError("No such optimizer")
 
         self.replay = []
-        self.read_replay()
+        self.sample()
 
     def sample(self):
         self.envs = ShmemVecEnv([lambda: make_atari(f"{self.game}NoFrameskip-v4") for _ in range(self.num_envs)],
                                 context='fork')
         print("Sampling replay")
         obs = self.envs.reset()
-        steps = int(1e6) // self.num_envs
+        steps = int(self.replay_size) // self.num_envs
         replay = []
         for _ in range(steps):
             action_random = np.random.randint(0, self.action_dim, self.num_envs)
