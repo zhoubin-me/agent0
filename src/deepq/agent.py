@@ -123,9 +123,9 @@ class Agent:
 
     def get_datafetcher(self):
         dataset = ReplayDataset(self.replay)
-        dataloader = DataLoaderX(dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_data_workers,
+        self.dataloader = DataLoaderX(dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_data_workers,
                                  pin_memory=True)
-        datafetcher = DataPrefetcher(dataloader, self.device)
+        datafetcher = DataPrefetcher(self.dataloader, self.device)
         return datafetcher
 
     def train_step(self):
@@ -219,6 +219,7 @@ class Trainer(tune.Trainable):
             self.sample_ops.append(self.tester.sample.remote(self.actor_steps, 0.01, self.agent.model.state_dict()))
 
         result = dict(
+            game=self.game,
             time_past=self._time_total,
             epsilon=self.epsilon,
             frames=self.frame_count,
@@ -291,6 +292,7 @@ class Trainer(tune.Trainable):
             }, './final.pth')
         try:
             ray.get([a.close_envs.remote() for a in self.actors])
+            del self.agent.dataloader
         except:
             pass
 
