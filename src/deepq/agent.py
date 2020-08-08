@@ -202,23 +202,16 @@ class Trainer(tune.Trainable):
             self.sample_ops.append(
                 self.actors[rank].sample.remote(self.actor_steps, self.epsilon, self.agent.model.state_dict()))
             self.frame_count += len(local_replay)
-            result = dict(ep_reward_train=np.mean(Rs)) if len(Rs) > 0 else dict()
             self.Rs += Rs
             self.Qs += Qs
             # Start training at
             if self.frame_count > self.start_training_step:
-                train_tic = time.time()
                 loss = [self.agent.train_step() for _ in range(self.agent_train_freq)]
                 loss = torch.stack(loss)
                 self.Ls += loss.tolist()
-                loss = loss.mean().item()
-                train_toc = time.time()
-                result.update(loss=loss, train_time=train_toc - train_tic)
-
         else:
             # Tester
             self.sample_ops.append(self.tester.sample.remote(self.actor_steps, 0.01, self.agent.model.state_dict()))
-            result = dict(ep_reward_test=np.mean(Rs)) if len(Rs) > 0 else dict()
             self.TRs += Rs
 
         # Start testing at itr > 100
@@ -226,10 +219,15 @@ class Trainer(tune.Trainable):
             print("Testing Started ... ")
             self.sample_ops.append(self.tester.sample.remote(self.actor_steps, 0.01, self.agent.model.state_dict()))
 
-        result.update(time_past=self._time_total, frames=self.frame_count,
-                      speed=self.frame_count / (self._time_total + 1),
-                      time_remain=(self.total_steps - self.frame_count) / (self.frame_count / (self._time_total + 1)))
-
+        result = dict(
+            time_past=self._time_total,
+            frames=self.frame_count,
+            speed=self.frame_count / (self._time_total + 1),
+            time_remain=(self.total_steps - self.frame_count) / (self.frame_count / (self._time_total + 1)),
+            loss=np.mean(self.Ls[-100:]) if len(self.Ls) > 0 else 0,
+            ep_reward_test=np.mean(self.Rs[-100:]) if len(self.Rs) > 0 else 0,
+            ep_reward_train=np.mean(self.TRs[-100:]) if len(self.TRs) > 0 else 0,
+        )
         return result
 
     def _save(self, checkpoint_dir):
