@@ -225,8 +225,8 @@ class Trainer(tune.Trainable):
             speed=self.frame_count / (self._time_total + 1),
             time_remain=(self.total_steps - self.frame_count) / (self.frame_count / (self._time_total + 1)),
             loss=np.mean(self.Ls[-100:]) if len(self.Ls) > 0 else 0,
-            ep_reward_test=np.mean(self.TRs[-100:]) if len(self.Rs) > 0 else 0,
-            ep_reward_train=np.mean(self.Rs[-100:]) if len(self.TRs) > 0 else 0,
+            ep_reward_test=np.mean(self.TRs[-100:]) if len(self.TRs) > 0 else 0,
+            ep_reward_train=np.mean(self.Rs[-100:]) if len(self.Rs) > 0 else 0,
         )
         return result
 
