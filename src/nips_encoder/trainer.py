@@ -1,13 +1,15 @@
-import pickle
 from collections import deque
 
 import gym
+import numpy as np
 import torch
 import torch.nn.functional as F
 from ray import tune
 from torch.utils.data import Dataset
 
+from src.common.atari_wrappers import make_atari
 from src.common.utils import ReplayDataset, DataPrefetcher, DataLoaderX
+from src.common.vec_env import ShmemVecEnv
 from src.nips_encoder.model import ModelEncoder
 
 
@@ -62,10 +64,19 @@ class Trainer(tune.Trainable):
         self.replay = []
         self.read_replay()
 
-    def read_replay(self):
-        print("Reading replay")
-        with open('/home/bzhou/AgentZero/replay.pkl', 'rb') as f:
-            replay = pickle.load(f)
+    def sample(self):
+        self.envs = ShmemVecEnv([lambda: make_atari(f"{self.game}NoFrameskip-v4") for _ in range(self.num_envs)],
+                                context='fork')
+        print("Sampling replay")
+        obs = self.envs.reset()
+        steps = int(1e6) // self.num_envs
+        replay = []
+        for _ in range(steps):
+            action_random = np.random.randint(0, self.action_dim, self.num_envs)
+            obs_next, reward, done, info = self.envs.step(action_random)
+            replay.append((obs, action_random, reward, done))
+            obs = obs_next
+        self.envs.close()
 
         for i, (S, A, R, D) in enumerate(replay[:-1]):
             for j, (s, a, r, d) in enumerate(zip(S, A, R, D)):
