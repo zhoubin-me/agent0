@@ -225,8 +225,9 @@ class Trainer(tune.Trainable):
             speed=self.frame_count / (self._time_total + 1),
             time_remain=(self.total_steps - self.frame_count) / (self.frame_count / (self._time_total + 1)),
             loss=np.mean(self.Ls[-100:]) if len(self.Ls) > 0 else 0,
-            ep_reward_test=np.mean(self.TRs[-100:]) if len(self.Rs) > 0 else 0,
-            ep_reward_train=np.mean(self.Rs[-100:]) if len(self.TRs) > 0 else 0,
+            ep_reward_test=np.mean(self.TRs[-100:]) if len(self.TRs) > 0 else 0,
+            ep_reward_train=np.mean(self.Rs[-100:]) if len(self.Rs) > 0 else 0,
+            ep_reawrd_test_max=np.max(self.TRs) if len(self.TRs) > 0 else 0,
         )
         return result
 
@@ -240,12 +241,14 @@ class Trainer(tune.Trainable):
             'Qs': self.Qs,
             'TRs': self.TRs,
             'frame_count': self.frame_count,
+            'replay': self.agent.replay
         }
 
     def _restore(self, checkpoint):
         self.agent.model.load_state_dict(checkpoint['model'])
         self.agent.model_target.load_state_dict(checkpoint['model_target'])
         self.agent.optimizer.load_state_dict(checkpoint['optim'])
+        self.agent.replay = checkpoint['replay']
         self.Ls = checkpoint['Ls']
         self.Qs = checkpoint['Qs']
         self.Rs = checkpoint['Rs']
