@@ -24,6 +24,7 @@ def default_hyperparams():
         noisy=True,
         exp_name='atari_deepq',
         save_prefix="ckpt",
+        pin_memory=False,
 
         num_actors=8,
         num_envs=16,
@@ -123,8 +124,8 @@ class Agent:
 
     def get_datafetcher(self):
         dataset = ReplayDataset(self.replay)
-        self.dataloader = DataLoaderX(dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_data_workers,
-                                 pin_memory=False)
+        self.dataloader = DataLoaderX(dataset, batch_size=self.batch_size, shuffle=True,
+                                      num_workers=self.num_data_workers, pin_memory=self.pin_memory)
         datafetcher = DataPrefetcher(self.dataloader, self.device)
         return datafetcher
 
@@ -222,6 +223,7 @@ class Trainer(tune.Trainable):
             game=self.game,
             time_past=self._time_total,
             epsilon=self.epsilon,
+            learning_rate=self.adam_lr,
             frames=self.frame_count,
             speed=self.frame_count / (self._time_total + 1),
             time_remain=(self.total_steps - self.frame_count) / (self.frame_count / (self._time_total + 1)),
@@ -268,6 +270,7 @@ class Trainer(tune.Trainable):
 
     def reset_config(self, new_config):
         if "adam_lr" in new_config:
+            self.adam_lr = new_config['adam_lr']
             for param_group in self.agent.optimizer.param_groups:
                 param_group['lr'] = new_config['adam_lr']
 
