@@ -29,7 +29,7 @@ def default_hyperparams():
         num_envs=16,
         num_data_workers=4,
 
-        adam_lr=2e-4,
+        adam_lr=5e-4,
 
         batch_size=512,
         discount=0.99,
@@ -37,7 +37,7 @@ def default_hyperparams():
         exploration_ratio=0.15,
 
         target_update_freq=500,
-        agent_train_freq=16,
+        agent_train_freq=15,
 
         start_training_step=int(2e4),
         total_steps=int(1e7),

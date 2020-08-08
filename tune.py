@@ -32,7 +32,7 @@ if __name__ == '__main__':
         time_attr='training_iteration',
         metric='ep_reward_train',
         mode='max',
-        perturbation_interval=100,
+        perturbation_interval=50,
         hyperparam_mutations={
             "adam_lr": lambda: random.uniform(1e-5, 1e-4),
         })
