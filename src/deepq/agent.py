@@ -223,7 +223,7 @@ class Trainer(tune.Trainable):
             game=self.game,
             time_past=self._time_total,
             epsilon=self.epsilon,
-            learning_rate=self.adam_lr,
+            adam_lr=self.adam_lr,
             frames=self.frame_count,
             speed=self.frame_count / (self._time_total + 1),
             time_remain=(self.total_steps - self.frame_count) / (self.frame_count / (self._time_total + 1)),
