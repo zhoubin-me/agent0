@@ -238,7 +238,8 @@ class Trainer(tune.Trainable):
             'Ls': self.Ls,
             'Rs': self.Rs,
             'Qs': self.Qs,
-            'TRs': self.TRs
+            'TRs': self.TRs,
+            'frame_count': self.frame_count,
         }
 
     def _restore(self, checkpoint):
@@ -249,30 +250,44 @@ class Trainer(tune.Trainable):
         self.Qs = checkpoint['Qs']
         self.Rs = checkpoint['Rs']
         self.TRs = checkpoint['TRs']
+        self.frame_count = checkpoint['framecount']
+        self.epsilon_schedule(self.frame_count)
 
     def _export_model(self, export_formats, export_dir):
         if export_formats == [ExportFormat.MODEL]:
             path = os.path.join(export_dir, "exported_models")
             torch.save({
                 "model": self.agent.model.state_dict(),
+                "optim": self.agent.optimizer.state_dict()
             }, path)
             return {ExportFormat.MODEL: path}
         else:
             raise ValueError("unexpected formats: " + str(export_formats))
 
+    def reset_config(self, new_config):
+        if "adam_lr" in new_config:
+            for param_group in self.agent.optimizer.param_groups:
+                param_group['lr'] = new_config['adam_lr']
+
+        self.config = new_config
+        return True
+
     def _stop(self):
         print("Final Testing")
-        local_replay, Rs, Qs, rank, fps  = ray.get(self.tester.sample.remote(self.actor_steps * self.num_envs * self.num_actors, self.epsilon, self.agent.model.state_dict()))
-        print(f"Final Test Result: {np.mean(Rs)}\t{np.std(Rs)}\t{np.max(Rs)}\t{len(Rs)}")
-        torch.save({
-            'model': self.agent.model.state_dict(),
-            'optim': self.agent.optimizer.state_dict(),
-            'FTRs': Rs,
-            'Ls': self.Ls,
-            'Rs': self.Rs,
-            'Qs': self.Qs,
-            'TRs': self.TRs
-        }, './final.pth')
+        if self.frame_count > self.total_steps:
+            local_replay, Rs, Qs, rank, fps = ray.get(
+                self.tester.sample.remote(self.actor_steps * self.num_envs * self.num_actors, self.epsilon,
+                                          self.agent.model.state_dict()))
+            print(f"Final Test Result: {np.mean(Rs)}\t{np.std(Rs)}\t{np.max(Rs)}\t{len(Rs)}")
+            torch.save({
+                'model': self.agent.model.state_dict(),
+                'optim': self.agent.optimizer.state_dict(),
+                'FTRs': Rs,
+                'Ls': self.Ls,
+                'Rs': self.Rs,
+                'Qs': self.Qs,
+                'TRs': self.TRs
+            }, './final.pth')
         ray.get([a.close_envs.remote() for a in self.actors])
 
 
