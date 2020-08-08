@@ -5,6 +5,7 @@ import gym
 import torch
 import torch.nn.functional as F
 from ray import tune
+from torch.utils.data import Dataset
 
 from src.common.utils import ReplayDataset, DataPrefetcher, DataLoaderX
 from src.nips_encoder.model import ModelEncoder
@@ -22,6 +23,17 @@ def default_hyperparams():
         pin_memory=True,
         optim='adam')
     return params
+
+
+class EncoderDataset(Dataset):
+    def __init__(self, data):
+        self.data = data
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        return self.data[idx]
 
 
 class Trainer(tune.Trainable):
@@ -47,13 +59,19 @@ class Trainer(tune.Trainable):
         else:
             raise ValueError("No such optimizer")
 
+        self.replay = []
         self.read_replay()
 
     def read_replay(self):
-
-        print("Saving replay")
+        print("Reading replay")
         with open('/home/bzhou/AgentZero/replay.pkl', 'rb') as f:
-            self.replay = pickle.load(f)
+            replay = pickle.load(f)
+
+        for i, (S, A, R, D) in enumerate(replay[:-1]):
+            for j, (s, a, r, d) in enumerate(zip(S, A, R, D)):
+                if not replay[i + 1][-1][j]:
+                    s_next = replay[i + 1][-0][j]
+                    self.replay.append((s, a, s_next))
 
     def get_datafetcher(self):
         dataset = ReplayDataset(self.replay)
