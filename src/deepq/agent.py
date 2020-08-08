@@ -250,7 +250,7 @@ class Trainer(tune.Trainable):
         self.Qs = checkpoint['Qs']
         self.Rs = checkpoint['Rs']
         self.TRs = checkpoint['TRs']
-        self.frame_count = checkpoint['framecount']
+        self.frame_count = checkpoint['frame_count']
         self.epsilon_schedule(self.frame_count)
 
     def _export_model(self, export_formats, export_dir):
