@@ -23,7 +23,7 @@ if __name__ == '__main__':
     params = default_hyperparams()
     kwargs = parse_arguments(params)
 
-    ray.init(memory=30 * 2 ** 30, object_store_memory=130 * 2 ** 30)
+    ray.init(memory=20 * 2 ** 30, object_store_memory=80 * 2 ** 30)
     reporter = CLIReporter(
         metric_columns=["game", "frames", "loss", "ep_reward_test", "ep_reward_train", "ep_reward_test_max", "time_past",
                         "time_remain", "speed", "epsilon"]
@@ -48,7 +48,7 @@ if __name__ == '__main__':
         checkpoint_freq=800,
         reuse_actors=True,
         scheduler=pbt_scheduler,
-        resources_per_trial={"gpu": 2},
+        resources_per_trial={"gpu": 3},
         fail_fast=True,
         config={
             "adam_lr": tune.grid_search([5e-5, 1e-4, 2e-4, 5e-4]),
