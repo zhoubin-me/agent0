@@ -52,10 +52,6 @@ if __name__ == '__main__':
         fail_fast=True,
         config={
             "adam_lr": tune.grid_search([5e-5, 1e-4, 2e-4, 5e-4]),
-            "game": "Breakout"
+            "game": kwargs['game']
         }
     )
-
-    print("Best config: ", analysis.get_best_config(metric="final_test_rewards"))
-    df = analysis.dataframe()
-    df.to_csv('ptb_atari_breakout.csv')

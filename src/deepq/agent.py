@@ -289,7 +289,10 @@ class Trainer(tune.Trainable):
                 'Qs': self.Qs,
                 'TRs': self.TRs
             }, './final.pth')
-        ray.get([a.close_envs.remote() for a in self.actors])
+        try:
+            ray.get([a.close_envs.remote() for a in self.actors])
+        except:
+            pass
 
 
     def logstat(self):
