@@ -80,8 +80,8 @@ class Trainer(tune.Trainable):
 
         for i, (S, A, R, D) in enumerate(replay[:-1]):
             for j, (s, a, r, d) in enumerate(zip(S, A, R, D)):
-                if not replay[i + 1][-1][j]:
-                    s_next = replay[i + 1][-0][j]
+                if not d:
+                    s_next = replay[i + 1][0][j]
                     self.replay.append((s, a, s_next))
 
     def get_datafetcher(self):
