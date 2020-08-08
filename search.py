@@ -4,7 +4,6 @@ import json
 import ray
 from ray import tune
 from ray.tune import CLIReporter
-from ray.tune import Stopper
 
 from src.deepq.agent import default_hyperparams, Trainer
 
@@ -25,7 +24,9 @@ if __name__ == '__main__':
     kwargs = parse_arguments(params)
     ray.init(memory=20 * 2 ** 30, object_store_memory=80 * 2 ** 30)
     reporter = CLIReporter(
-        metric_columns=["frames", "loss", "ep_reward_test", "ep_reward_train", "time_past", "time_remain", "speed"])
+        metric_columns=["game", "frames", "loss", "ep_reward_test", "ep_reward_train", "ep_reward_test_max",
+                        "time_past",
+                        "time_remain", "speed", "epsilon"])
 
     analysis = tune.run(
         Trainer,
