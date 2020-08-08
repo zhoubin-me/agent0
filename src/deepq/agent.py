@@ -225,8 +225,8 @@ class Trainer(tune.Trainable):
             speed=self.frame_count / (self._time_total + 1),
             time_remain=(self.total_steps - self.frame_count) / (self.frame_count / (self._time_total + 1)),
             loss=np.mean(self.Ls[-100:]) if len(self.Ls) > 0 else 0,
-            ep_reward_test=np.mean(self.Rs[-100:]) if len(self.Rs) > 0 else 0,
-            ep_reward_train=np.mean(self.TRs[-100:]) if len(self.TRs) > 0 else 0,
+            ep_reward_test=np.mean(self.TRs[-100:]) if len(self.Rs) > 0 else 0,
+            ep_reward_train=np.mean(self.Rs[-100:]) if len(self.TRs) > 0 else 0,
         )
         return result
 
@@ -250,7 +250,7 @@ class Trainer(tune.Trainable):
         self.Qs = checkpoint['Qs']
         self.Rs = checkpoint['Rs']
         self.TRs = checkpoint['TRs']
-        self.frame_count = checkpoint['framecount']
+        self.frame_count = checkpoint['frame_count']
         self.epsilon_schedule(self.frame_count)
 
     def _export_model(self, export_formats, export_dir):

@@ -30,7 +30,7 @@ if __name__ == '__main__':
 
     pbt_scheduler = PopulationBasedTraining(
         time_attr='training_iteration',
-        metric='ep_reward_test',
+        metric='ep_reward_train',
         mode='max',
         perturbation_interval=100,
         hyperparam_mutations={
