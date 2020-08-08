@@ -39,7 +39,7 @@ if __name__ == '__main__':
 
     analysis = tune.run(
         Trainer,
-        name='atari_deepq_tune',
+        name='nips_encoder_tune',
         verbose=1,
         stop=lambda trial_id, result: result['epoch'] > kwargs['epoches'],
         checkpoint_at_end=True,

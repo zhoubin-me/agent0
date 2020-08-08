@@ -5,6 +5,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from ray import tune
+from tqdm import tqdm
 
 from src.common.utils import ReplayDataset, DataPrefetcher, DataLoaderX, make_env
 from src.common.vec_env import ShmemVecEnv
@@ -54,16 +55,19 @@ class Trainer(tune.Trainable):
         self.envs = ShmemVecEnv([lambda: make_env(self.game, False, False)
                                  for _ in range(self.num_envs)], context='fork')
 
+        print("Sampling replay")
         obs = self.envs.reset()
-        while True:
+        step = 0
+        steps = int(1e6) // self.num_envs + 1
+        for step in tqdm(range(steps)):
             action_random = np.random.randint(0, self.action_dim, self.num_envs)
             obs_next, reward, done, info = self.envs.step(action_random)
 
             for entry in zip(obs, action_random, reward, obs_next, done):
                 self.replay.append(entry)
 
-            if len(self.replay) == self.replay_size:
-                break
+        print("Done")
+        self.envs.close()
 
     def get_datafetcher(self):
         dataset = ReplayDataset(self.replay)
@@ -94,10 +98,11 @@ class Trainer(tune.Trainable):
         result = dict(
             loss=loss.item(),
             adam_lr=self.adam_lr,
+            epoch=(self._iteration * self.batch_size) // self.replay_size,
             speed=self._iteration * self.batch_size / (self._time_total + 1),
             time_past=self._time_total,
             time_remain=(self.epoches * self.replay_size - self._iteration * self.batch_size) / (
-                        (self._iteration * self.batch_size) / (self._time_total + 1)),
+                    (self._iteration * self.batch_size) / (self._time_total + 1)),
         )
         return result
 
