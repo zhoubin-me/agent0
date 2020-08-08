@@ -2,15 +2,11 @@ import pickle
 from collections import deque
 
 import gym
-import numpy as np
 import torch
 import torch.nn.functional as F
 from ray import tune
-from tqdm import tqdm
 
-from src.common.atari_wrappers import make_atari, wrap_deepmind
 from src.common.utils import ReplayDataset, DataPrefetcher, DataLoaderX
-from src.common.vec_env import ShmemVecEnv
 from src.nips_encoder.model import ModelEncoder
 
 
@@ -55,29 +51,29 @@ class Trainer(tune.Trainable):
 
     def read_replay(self):
 
-        def make_env(game, episode_life=True, clip_rewards=True):
-            env = make_atari(f'{game}NoFrameskip-v4')
-            env = wrap_deepmind(env, episode_life=episode_life, clip_rewards=clip_rewards, frame_stack=False,
-                                scale=False, transpose_image=False)
-            return env
-
-        self.envs = ShmemVecEnv([lambda: make_env(self.game, False, False)
-                                 for _ in range(self.num_envs)], context='fork')
-
-        print("Sampling replay")
-        obs = self.envs.reset()
-        steps = int(1e6) // self.num_envs + 1
-        for _ in tqdm(range(steps)):
-            action_random = np.random.randint(0, self.action_dim, self.num_envs)
-            obs_next, reward, done, info = self.envs.step(action_random)
-
-            for entry in zip(obs, action_random, reward, obs_next, done):
-                self.replay.append(entry)
-        self.envs.close()
+        # def make_env(game, episode_life=True, clip_rewards=True):
+        #     env = make_atari(f'{game}NoFrameskip-v4')
+        #     env = wrap_deepmind(env, episode_life=episode_life, clip_rewards=clip_rewards, frame_stack=False,
+        #                         scale=False, transpose_image=False)
+        #     return env
+        #
+        # self.envs = ShmemVecEnv([lambda: make_env(self.game, False, False)
+        #                          for _ in range(self.num_envs)], context='fork')
+        #
+        # print("Sampling replay")
+        # obs = self.envs.reset()
+        # steps = int(1e6) // self.num_envs + 1
+        # for _ in tqdm(range(steps)):
+        #     action_random = np.random.randint(0, self.action_dim, self.num_envs)
+        #     obs_next, reward, done, info = self.envs.step(action_random)
+        #
+        #     for entry in zip(obs, action_random, reward, obs_next, done):
+        #         self.replay.append(entry)
+        # self.envs.close()
 
         print("Saving replay")
-        with open('replay.pkl', 'wb') as f:
-            pickle.dump(self.replay, f)
+        with open('replay.pkl', 'rb') as f:
+            self.replay = pickle.load(f)
 
     def get_datafetcher(self):
         dataset = ReplayDataset(self.replay)
