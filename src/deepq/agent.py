@@ -169,7 +169,8 @@ class Agent:
 
 
 class Trainer(tune.Trainable):
-    def _setup(self, config, **kwargs):
+    def _setup(self, config):
+        kwargs = default_hyperparams()
         for k, v in config.items():
             kwargs[k] = v
 
