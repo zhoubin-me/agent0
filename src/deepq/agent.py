@@ -167,6 +167,9 @@ class Agent:
             self.model_target.load_state_dict(self.model.state_dict())
         return loss.detach()
 
+    def adjust_lr(self, lr):
+        for param_group in self.optimizer.param_groups:
+            param_group['lr'] = lr
 
 class Trainer(tune.Trainable):
     def _setup(self, config):
@@ -191,6 +194,7 @@ class Trainer(tune.Trainable):
         self.sample_ops = [a.sample.remote(self.actor_steps, 1.0, self.agent.model.state_dict()) for a in
                            self.actors[:-1]]
         self.frame_count = 0
+        self.lr_updated = False
         self.Rs, self.Qs, self.TRs, self.Ls = [], [], [], []
 
     def _train(self):
@@ -221,6 +225,9 @@ class Trainer(tune.Trainable):
         if self.iteration == 100:
             print("Testing Started ... ")
             self.sample_ops.append(self.tester.sample.remote(self.actor_steps, 0.01, self.agent.model.state_dict()))
+
+        if self.frame_count > (self.total_steps * self.exploration_ratio) and not self.lr_updated:
+            self.agent.adjust_lr(self.adam_lr * 0.1)
 
         result = dict(
             game=self.game,
