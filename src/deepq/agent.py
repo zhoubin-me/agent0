@@ -1,3 +1,4 @@
+import json
 import os
 import time
 from collections import deque
@@ -168,13 +169,14 @@ class Agent:
 
 
 class Trainer(tune.Trainable):
-    def _setup(self, config):
-        kwargs = default_hyperparams()
+    def _setup(self, config, **kwargs):
         for k, v in config.items():
             kwargs[k] = v
 
         for k, v in kwargs.items():
             setattr(self, k, v)
+
+        print("input args:\n", json.dumps(kwargs, indent=4, separators=(",", ":")))
 
         self.agent = Agent(**kwargs)
         self.epsilon_schedule = LinearSchedule(1.0, 0.01, int(self.total_steps * self.exploration_ratio))

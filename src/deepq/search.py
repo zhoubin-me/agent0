@@ -28,7 +28,7 @@ if __name__ == '__main__':
                         "time_past", "time_remain", "speed", "epsilon"])
 
     analysis = tune.run(
-        Trainer,
+        lambda x: Trainer(config=x, **kwargs),
         name=kwargs['exp_name'],
         verbose=1,
         checkpoint_at_end=True,
