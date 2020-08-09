@@ -85,7 +85,7 @@ class Trainer(tune.Trainable):
                     self.replay.append((s, a, s_next))
 
     def get_datafetcher(self):
-        dataset = ReplayDataset(self.replay)
+        dataset = EncoderDataset(self.replay)
         self.dataloader = DataLoaderX(dataset, batch_size=self.batch_size, shuffle=True,
                                       num_workers=self.num_data_workers, pin_memory=self.pin_memory)
 
@@ -100,9 +100,9 @@ class Trainer(tune.Trainable):
             self.prefetcher = self.get_datafetcher()
             data = self.prefetcher.next()
 
-        states, actions, rewards, next_states, terminals = data
-        states = states.float().div(255.0)
-        next_states = next_states.float().div(255.0)
+        states, actions, next_states = data
+        states = states.float().div(255.0).permute(0, 3, 1, 2)
+        next_states = next_states.float().div(255.0).permute(0, 3, 1, 2)
         actions = actions.long()
 
         states_pred = self.model(states, actions)
@@ -118,7 +118,7 @@ class Trainer(tune.Trainable):
             speed=self._iteration * self.batch_size / (self._time_total + 1),
             time_past=self._time_total,
             time_remain=(self.epoches * self.replay_size - self._iteration * self.batch_size) / (
-                    (self._iteration * self.batch_size) / (self._time_total + 1)),
+                    (self._iteration * self.batch_size + 1) / (self._time_total + 1)),
         )
         return result
 

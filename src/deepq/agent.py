@@ -35,10 +35,10 @@ def default_hyperparams():
         batch_size=512,
         discount=0.99,
         replay_size=int(1e6),
-        exploration_ratio=0.15,
+        exploration_ratio=0.1,
 
         target_update_freq=500,
-        agent_train_freq=15,
+        agent_train_freq=10,
 
         start_training_step=int(2e4),
         total_steps=int(1e7),
