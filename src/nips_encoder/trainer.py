@@ -92,6 +92,7 @@ class Trainer(tune.Trainable):
         datafetcher = DataPrefetcher(self.dataloader, self.device)
         return datafetcher
 
+
     def _train(self):
         try:
             data = self.prefetcher.next()
@@ -123,7 +124,7 @@ class Trainer(tune.Trainable):
 
     def _stop(self):
         epoch = (self._iteration * self.batch_size) / len(self.replay)
-        if epoch > self.epoches:
+        if epoch >= self.epoches:
             torch.save({
                 'model': self.model.state_dict()
             }, './final.pth')
