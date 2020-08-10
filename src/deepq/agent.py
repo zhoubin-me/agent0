@@ -206,6 +206,9 @@ class Trainer(tune.Trainable):
             self.agent.replay.extend(local_replay)
             self.epsilon = self.epsilon_schedule(len(local_replay))
 
+            if self.epsilon == 0.01:
+                self.epsilon = np.random.choice([0.01, 0.02, 0.05, 0.1], p=[0.7, 0.1, 0.1, 0.1])
+
             self.sample_ops.append(
                 self.actors[rank].sample.remote(self.actor_steps, self.epsilon, self.agent.model.state_dict()))
             self.frame_count += len(local_replay)
@@ -228,6 +231,8 @@ class Trainer(tune.Trainable):
 
         if self.frame_count > (self.total_steps * self.exploration_ratio) and not self.lr_updated:
             self.agent.adjust_lr(self.adam_lr * 0.1)
+            # self.agent_train_freq *= 2
+            self.lr_updated = True
 
         result = dict(
             game=self.game,

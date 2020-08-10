@@ -35,9 +35,12 @@ if __name__ == '__main__':
         fail_fast=True,
         stop=lambda trial_id, result: result['frames'] > kwargs['total_steps'],
         checkpoint_freq=1000,
-        config={
-            "game": tune.grid_search(['Breakout', 'BeamRider', 'Qbert', 'SpaceInvaders'])
-        },
+        config=dict(
+            game="Enduro",
+            agent_train_freq=tune.grid_search([15, 10]),
+            exploration_ratio=tune.grid_search([0.1, 0.15]),
+            # "game": tune.grid_search(['BeamRider', 'Qbert', 'Enduro', 'Riverraid']),
+        ),
         progress_reporter=reporter,
         resources_per_trial={"gpu": 3},
     )
