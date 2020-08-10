@@ -5,7 +5,7 @@ import random
 import ray
 from ray import tune
 from ray.tune import CLIReporter
-from ray.tune.schedulers import PopulationBasedTraining, ASHAScheduler
+from ray.tune.schedulers import PopulationBasedTraining
 
 from src.deepq.agent import Trainer, default_hyperparams
 
@@ -25,17 +25,10 @@ if __name__ == '__main__':
 
     ray.init(memory=20 * 2 ** 30, object_store_memory=80 * 2 ** 30)
     reporter = CLIReporter(
-        metric_columns=["game", "frames", "loss", "ep_reward_test", "ep_reward_train", "ep_reward_test_max", "time_past",
-                        "time_remain", "speed", "epsilon", "adam_lr"]
+        metric_columns=["game", "frames", "loss", "ep_reward_test", "ep_reward_train", "ep_reward_test_max",
+                        "time_past",
+                        "time_remain", "speed", "epsilon", "adam_lr", "qmax"]
     )
-
-    asha_scheduler = ASHAScheduler(
-	time_attr='training_iteration',
-	metric='ep_reward_train',
-	mode='max',
-	grace_period=100,
-	reduction_factor=3,
-	brackets=1)
 
     pbt_scheduler = PopulationBasedTraining(
         time_attr='training_iteration',
@@ -43,7 +36,7 @@ if __name__ == '__main__':
         mode='max',
         perturbation_interval=100,
         hyperparam_mutations={
-            "adam_lr": lambda: random.uniform(1e-5, 1e-4),
+            "adam_lr": lambda: random.uniform(1e-5, 1e-3),
         })
 
     analysis = tune.run(
@@ -55,7 +48,7 @@ if __name__ == '__main__':
         progress_reporter=reporter,
         checkpoint_freq=800,
         reuse_actors=True,
-        scheduler=asha_scheduler,
+        scheduler=pbt_scheduler,
         resources_per_trial={"gpu": 3},
         fail_fast=True,
         config={

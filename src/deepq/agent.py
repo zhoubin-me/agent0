@@ -246,6 +246,7 @@ class Trainer(tune.Trainable):
             ep_reward_test=np.mean(self.TRs[-100:]) if len(self.TRs) > 0 else 0,
             ep_reward_train=np.mean(self.Rs[-100:]) if len(self.Rs) > 0 else 0,
             ep_reward_test_max=np.max(self.TRs) if len(self.TRs) > 0 else 0,
+            qmax=np.mean(self.Qs[-100:]) if len(self.Qs) > 0 else 0
         )
         return result
 
