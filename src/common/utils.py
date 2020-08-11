@@ -1,8 +1,12 @@
-import torch
+import random
+
 import numpy as np
+import torch
 from prefetch_generator import BackgroundGenerator
 from torch.utils.data import Dataset, DataLoader
+
 from src.common.atari_wrappers import wrap_deepmind, make_atari
+
 
 class DataPrefetcher:
     def __init__(self, dataloader, device):
@@ -25,6 +29,15 @@ class DataPrefetcher:
         data = self.next_data
         self.preload()
         return data
+
+
+class NumpyLoader:
+    def __init__(self, data):
+        self.data = data
+
+    def __next__(self):
+        return random.choice(self.data)
+
 
 class ReplayDataset(Dataset):
     def __init__(self, data):
@@ -61,9 +74,10 @@ class LinearSchedule:
         return val
 
 
-def make_env(game, episode_life=True, clip_rewards=True):
+def make_env(game, episode_life=True, clip_rewards=True, frame_stack=True, transpose_image=True):
     env = make_atari(f'{game}NoFrameskip-v4')
-    env = wrap_deepmind(env, episode_life=episode_life, clip_rewards=clip_rewards, frame_stack=True, scale=False, transpose_image=True)
+    env = wrap_deepmind(env, episode_life=episode_life, clip_rewards=clip_rewards, frame_stack=frame_stack, scale=False,
+                        transpose_image=transpose_image)
     return env
 
 

@@ -1,7 +1,6 @@
 import json
 import os
 import time
-from collections import deque
 
 import numpy as np
 import ray
@@ -10,7 +9,8 @@ import torch.nn.functional as F
 from ray import tune
 from ray.tune.trial import ExportFormat
 
-from src.common.utils import LinearSchedule, DataPrefetcher, ReplayDataset, DataLoaderX, pprint, make_env
+from src.common.efficient_replay import NPReplay
+from src.common.utils import LinearSchedule, DataPrefetcher, pprint, make_env
 from src.common.vec_env import ShmemVecEnv
 from src.deepq.model import NatureCNN
 
@@ -26,6 +26,7 @@ def default_hyperparams():
         exp_name='atari_deepq',
         save_prefix="ckpt",
         pin_memory=False,
+        n_stack=4,
 
         num_actors=8,
         num_envs=16,
@@ -57,11 +58,11 @@ class Actor:
 
         if self.rank == self.num_actors:
             # Testing
-            self.envs = ShmemVecEnv([lambda: make_env(self.game, False, False)
+            self.envs = ShmemVecEnv([lambda: make_env(self.game, False, False, False, False)
                                      for _ in range(self.num_envs)], context='fork')
         else:
             # Training
-            self.envs = ShmemVecEnv([lambda: make_env(self.game, True, True)
+            self.envs = ShmemVecEnv([lambda: make_env(self.game, True, True, False, False)
                                      for _ in range(self.num_envs)], context='fork')
         self.action_dim = self.envs.action_space.n
         self.state_shape = self.envs.observation_space.shape
@@ -71,10 +72,10 @@ class Actor:
 
         self.R = np.zeros(self.num_envs)
         self.obs = self.envs.reset()
+        self.replay = NPReplay(self.replay_size // self.num_actors, self.num_envs, self.state_shape[1:], self.n_stack)
 
     def sample(self, steps, epsilon, state_dict):
         self.model.load_state_dict(state_dict)
-        replay = deque(maxlen=self.replay_size)
         Rs, Qs = [], []
         tic = time.time()
         for _ in range(steps):
@@ -91,8 +92,7 @@ class Actor:
                       zip(np.random.rand(self.num_envs), action_random, action_greedy)]
 
             obs_next, reward, done, info = self.envs.step(action)
-            for entry in zip(self.obs, action, reward, obs_next, done):
-                replay.append(entry)
+            self.replay.add(self.obs, action, reward, done)
             self.obs = obs_next
             self.R += np.array(reward)
             for idx, d in enumerate(done):
@@ -100,7 +100,11 @@ class Actor:
                     Rs.append(self.R[idx])
                     self.R[idx] = 0
         toc = time.time()
-        return replay, Rs, Qs, self.rank, len(replay) / (toc - tic)
+        datas = []
+        for _ in range(self.agent_update_freq):
+            data = self.replay.sample_batch(self.batch_size)
+            datas.append(data)
+        return datas, Rs, Qs, self.rank, (steps * self.num_envs) / (toc - tic)
 
     def close_envs(self):
         self.envs.close()
@@ -121,13 +125,13 @@ class Agent:
 
         self.optimizer = torch.optim.Adam(self.model.parameters(), self.adam_lr)
         self.update_steps = 0
-        self.replay = deque(maxlen=self.replay_size)
+        self.replay = None
 
     def get_datafetcher(self):
-        dataset = ReplayDataset(self.replay)
-        self.dataloader = DataLoaderX(dataset, batch_size=self.batch_size, shuffle=True,
-                                      num_workers=self.num_data_workers, pin_memory=self.pin_memory)
-        datafetcher = DataPrefetcher(self.dataloader, self.device)
+        # dataset = ReplayDataset(self.replay)
+        # self.dataloader = DataLoaderX(dataset, batch_size=self.batch_size, shuffle=True,
+        #                               num_workers=self.num_data_workers, pin_memory=self.pin_memory)
+        datafetcher = DataPrefetcher(iter(self.replay), self.device)
         return datafetcher
 
     def train_step(self):
@@ -200,18 +204,15 @@ class Trainer(tune.Trainable):
     def _train(self):
         done_id, self.sample_ops = ray.wait(self.sample_ops)
         data = ray.get(done_id)
-        local_replay, Rs, Qs, rank, fps = data[0]
+        batches, Rs, Qs, rank, fps = data[0]
         if rank < self.num_actors:
             # Actors
-            self.agent.replay.extend(local_replay)
-            self.epsilon = self.epsilon_schedule(len(local_replay))
-
-            if self.epsilon == 0.01:
-                self.epsilon = np.random.choice([0.01, 0.02, 0.05, 0.1], p=[0.7, 0.1, 0.1, 0.1])
+            self.agent.replay = batches
+            self.epsilon = self.epsilon_schedule(self.actor_steps * self.num_envs)
 
             self.sample_ops.append(
                 self.actors[rank].sample.remote(self.actor_steps, self.epsilon, self.agent.model.state_dict()))
-            self.frame_count += len(local_replay)
+            self.frame_count += self.actor_steps * self.num_envs
             self.Rs += Rs
             self.Qs += Qs
             # Start training at
