@@ -70,15 +70,10 @@ class Actor:
 
         self.device = torch.device('cuda:0')
         self.model = NatureCNN(self.n_stack, self.action_dim, self.dueling).to(self.device)
-        self.replay = NPReplay(self.replay_size // self.num_actors, self.num_envs, self.state_shape[1:], self.n_stack)
 
         self.R = np.zeros(self.num_envs)
         self.obs = self.envs.reset()
-        self.st = np.zeros(self.num_envs, self.n_stack, *self.state_shape[1:])
-        for i in range(self.n_stack):
-            self.st[:, i, :, :] = self.obs.squeeze()
-
-        self.ptr = 0
+        self.replay = NPReplay(self.replay_size // self.num_actors, self.num_envs, self.state_shape[1:], self.n_stack)
 
     def sample(self, steps, epsilon, state_dict):
         self.model.load_state_dict(state_dict)
@@ -88,8 +83,7 @@ class Actor:
             action_random = np.random.randint(0, self.action_dim, self.num_envs)
 
             with torch.no_grad():
-                st = self.st.take(np.arange(self.ptr - self.n_stack + 1, self.ptr + 1), axis=0)
-                st = torch.from_numpy(st).to(self.device).float().div(255.0)
+                st = torch.from_numpy(np.array(self.obs)).to(self.device).float().div(255.0)
                 qs = self.model(st)
 
             qs_max, qs_argmax = qs.max(dim=-1)
@@ -97,9 +91,8 @@ class Actor:
             Qs.append(qs_max.mean().item())
             action = [act_greedy if p > epsilon else act_random for p, act_random, act_greedy in
                       zip(np.random.rand(self.num_envs), action_random, action_greedy)]
+
             obs_next, reward, done, info = self.envs.step(action)
-            self.st[:, self.ptr, :, :] = obs_next.squeeze()
-            self.ptr = (self.ptr + 1) % self.n_stack
             self.replay.add(self.obs, action, reward, done)
             self.obs = obs_next
             self.R += np.array(reward)
@@ -107,9 +100,6 @@ class Actor:
                 if d:
                     Rs.append(self.R[idx])
                     self.R[idx] = 0
-                    for i in range(self.n_stack):
-                        self.st[idx, i, :, :] = self.obs[idx].squeeze()
-
         toc = time.time()
         datas = []
         for _ in range(self.agent_update_freq):
@@ -222,6 +212,7 @@ class Trainer(tune.Trainable):
             self.epsilon = self.epsilon_schedule(self.actor_steps * self.num_envs)
             if self.epsilon == self.min_epsilon:
                 self.epsilon = np.random.choice([0.01, 0.02, 0.05, 0.1], p=[0.7, 0.1, 0.1, 0.1])
+
             self.sample_ops.append(
                 self.actors[rank].sample.remote(self.actor_steps, self.epsilon, self.agent.model.state_dict()))
             self.frame_count += self.actor_steps * self.num_envs
