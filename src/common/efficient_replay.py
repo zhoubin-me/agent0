@@ -68,8 +68,7 @@ if __name__ == '__main__':
 
 
     envs = ShmemVecEnv([make_env for _ in range(10)])
-    replay = NPReplay(1000, 10, envs.observation_space.shape[1:], 4)
-    print()
+    replay = NPReplay(1000, 10, (84, 84), 4)
     obs = envs.reset()
     print(obs.shape)
     for _ in range(100):
@@ -78,6 +77,6 @@ if __name__ == '__main__':
         replay.add(obs, actions, reward, done)
 
     for _ in range(10):
-        images, actions, rewards, images_next, terminals = replay.sample_batch(32)
+        images, actions, rewards, terminals = replay.sample_batch(32)
     print(images.shape)
     print(actions.shape)

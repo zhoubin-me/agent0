@@ -68,7 +68,7 @@ class Actor:
         self.state_shape = self.envs.observation_space.shape
 
         self.device = torch.device('cuda:0')
-        self.model = NatureCNN(self.n_stack, self.action_dim, self.dueling).to(self.device)
+        self.model = NatureCNN(self.state_shape[0], self.action_dim, self.dueling).to(self.device)
 
         self.R = np.zeros(self.num_envs)
         self.obs = self.envs.reset()
@@ -120,8 +120,8 @@ class Agent:
         self.state_shape = self.envs.observation_space.shape
 
         self.device = torch.device('cuda:0')
-        self.model = NatureCNN(self.n_stack, self.action_dim, self.dueling).to(self.device)
-        self.model_target = NatureCNN(self.n_stack, self.action_dim, self.dueling).to(self.device)
+        self.model = NatureCNN(self.state_shape[0], self.action_dim, self.dueling).to(self.device)
+        self.model_target = NatureCNN(self.state_shape[0], self.action_dim, self.dueling).to(self.device)
 
         self.optimizer = torch.optim.Adam(self.model.parameters(), self.adam_lr)
         self.update_steps = 0
