@@ -38,6 +38,7 @@ def default_hyperparams():
         discount=0.99,
         replay_size=int(1e6),
         exploration_ratio=0.1,
+        min_epsilon=0.01,
 
         target_update_freq=500,
         agent_train_freq=10,
@@ -187,7 +188,7 @@ class Trainer(tune.Trainable):
         print("input args:\n", json.dumps(kwargs, indent=4, separators=(",", ":")))
 
         self.agent = Agent(**kwargs)
-        self.epsilon_schedule = LinearSchedule(1.0, 0.01, int(self.total_steps * self.exploration_ratio))
+        self.epsilon_schedule = LinearSchedule(1.0, self.min_epsilon, int(self.total_steps * self.exploration_ratio))
         self.epsilon = 1.0
         self.actors = [Actor.remote(rank=rank, **kwargs) for rank in range(self.num_actors + 1)]
         self.tester = self.actors[-1]
@@ -209,6 +210,8 @@ class Trainer(tune.Trainable):
             # Actors
             self.agent.replay = batches
             self.epsilon = self.epsilon_schedule(self.actor_steps * self.num_envs)
+            if self.epsilon == self.min_epsilon:
+                self.epsilon = np.random.choice([0.01, 0.02, 0.05, 0.1], p=[0.7, 0.1, 0.1, 0.1])
 
             self.sample_ops.append(
                 self.actors[rank].sample.remote(self.actor_steps, self.epsilon, self.agent.model.state_dict()))
