@@ -70,11 +70,11 @@ class Actor:
 
         self.device = torch.device('cuda:0')
         self.model = NatureCNN(self.n_stack, self.action_dim, self.dueling).to(self.device)
-        self.replay = NPReplay(self.replay_size // self.num_actors, self.num_envs, self.state_shape[1:], self.n_stack)
+        self.replay = NPReplay(self.replay_size // self.num_actors, self.num_envs, self.state_shape[:-1], self.n_stack)
 
         self.R = np.zeros(self.num_envs)
         self.obs = self.envs.reset()
-        self.st = np.zeros(self.num_envs, self.n_stack, *self.state_shape[1:])
+        self.st = np.zeros((self.num_envs, self.n_stack, *self.state_shape[:-1]))
         for i in range(self.n_stack):
             self.st[:, i, :, :] = self.obs.squeeze()
 
@@ -88,7 +88,7 @@ class Actor:
             action_random = np.random.randint(0, self.action_dim, self.num_envs)
 
             with torch.no_grad():
-                st = self.st.take(np.arange(self.ptr - self.n_stack + 1, self.ptr + 1), axis=0)
+                st = self.st.take(np.arange(self.ptr - self.n_stack + 1, self.ptr + 1), axis=1)
                 st = torch.from_numpy(st).to(self.device).float().div(255.0)
                 qs = self.model(st)
 
@@ -112,7 +112,7 @@ class Actor:
 
         toc = time.time()
         datas = []
-        for _ in range(self.agent_update_freq):
+        for _ in range(self.agent_train_freq):
             data = self.replay.sample_batch(self.batch_size)
             datas.append(data)
         return datas, Rs, Qs, self.rank, (steps * self.num_envs) / (toc - tic)
