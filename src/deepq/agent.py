@@ -90,10 +90,10 @@ class Actor:
             action = [act_greedy if p > epsilon else act_random for p, act_random, act_greedy in
                       zip(np.random.rand(self.num_envs), action_random, action_greedy)]
 
-            frames = np.zeros((self.batch_size, self.state_shape[0] + 1, *self.state_shape[1:]), dtype=np.uint8)
+            obs_next, reward, done, info = self.envs.step(action)
+            frames = np.zeros((self.num_envs, self.state_shape[0] + 1, *self.state_shape[1:]), dtype=np.uint8)
             frames[:, :-1, :, :] = self.obs
             frames[:, -1, :, :] = obs_next[:, -1, :, :]
-            obs_next, reward, done, info = self.envs.step(action)
             for entry in zip(frames, action, reward, done):
                 replay.append(entry)
             self.obs = obs_next
