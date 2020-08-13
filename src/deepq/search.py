@@ -37,8 +37,9 @@ if __name__ == '__main__':
         stop=lambda trial_id, result: result['frames'] > kwargs['total_steps'],
         checkpoint_freq=1000,
         config=dict(
-            # "game": tune.grid_search(['BeamRider', 'Qbert', 'Enduro', 'Riverraid']),
-            game=tune.grid_search(['Breakout', 'Pong', 'SpaceInvaders', 'Seaquest']),
+            # game=tune.grid_search(['BeamRider', 'Qbert', 'Enduro', 'Riverraid']),
+            # game=tune.grid_search(['Breakout', 'Pong', 'SpaceInvaders', 'Seaquest']),
+            game=tune.grid_search(["Enduro"]),
             epoches=kwargs['total_steps'] // int(1e4),
             total_steps=kwargs['total_steps'],
         ),
