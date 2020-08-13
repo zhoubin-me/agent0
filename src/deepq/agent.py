@@ -90,8 +90,11 @@ class Actor:
             action = [act_greedy if p > epsilon else act_random for p, act_random, act_greedy in
                       zip(np.random.rand(self.num_envs), action_random, action_greedy)]
 
+            frames = np.zeros((self.batch_size, self.state_shape[0] + 1, *self.state_shape[1:]), dtype=np.uint8)
+            frames[:, :-1, :, :] = self.obs
+            frames[:, -1, :, :] = obs_next[:, -1, :, :]
             obs_next, reward, done, info = self.envs.step(action)
-            for entry in zip(self.obs, action, reward, obs_next, done):
+            for entry in zip(frames, action, reward, done):
                 replay.append(entry)
             self.obs = obs_next
             self.R += np.array(reward)
@@ -137,9 +140,9 @@ class Agent:
             self.prefetcher = self.get_datafetcher()
             data = self.prefetcher.next()
 
-        states, actions, rewards, next_states, terminals = data
-        states = states.float().div(255.0)
-        next_states = next_states.float().div(255.0)
+        frames, actions, rewards, terminals = data
+        states = frames[:, :-1, :, :].float().div(255.0)
+        next_states = frames[:, 1:, :, :].float().div(255.0)
         actions = actions.long()
         terminals = terminals.float()
         rewards = rewards.float()
