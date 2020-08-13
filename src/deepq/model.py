@@ -79,7 +79,7 @@ class NoisyLinear(nn.Module):
 
 
 class NatureCNN(nn.Module):
-    def __init__(self, in_channels, action_dim, num_atoms=51, noisy=False, noise_std=0.5, dueling=False):
+    def __init__(self, in_channels, action_dim, dueling=False, num_atoms=51, noisy=False, noise_std=0.5):
         super(NatureCNN, self).__init__()
         self.num_atoms = num_atoms
         self.action_dim = action_dim
