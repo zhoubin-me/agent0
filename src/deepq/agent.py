@@ -31,6 +31,10 @@ def default_hyperparams():
         num_envs=16,
         num_data_workers=4,
 
+        v_max=10,
+        v_min=-10,
+        num_atoms=51,
+
         adam_lr=5e-4,
 
         batch_size=512,
@@ -119,6 +123,10 @@ class Agent:
         self.state_shape = self.envs.observation_space.shape
 
         self.device = torch.device('cuda:0')
+        self.batch_indices = torch.arange(self.batch_size).to(self.device)
+        self.atoms = torch.linspace(self.v_min, self.v_max, self.num_atoms).to(self.device)
+        self.delta_atom = (self.v_max - self.v_min) / (self.num_atoms - 1)
+
         self.model = NatureCNN(self.state_shape[0], self.action_dim, self.dueling).to(self.device)
         self.model_target = NatureCNN(self.state_shape[0], self.action_dim, self.dueling).to(self.device)
 
@@ -134,6 +142,60 @@ class Agent:
         return datafetcher
 
     def train_step(self):
+        try:
+            data = self.prefetcher.next()
+        except:
+            self.prefetcher = self.get_datafetcher()
+            data = self.prefetcher.next()
+
+        frames, actions, rewards, terminals = data
+        states = frames[:, :-1, :, :].float().div(255.0)
+        next_states = frames[:, 1:, :, :].float().div(255.0)
+        actions = actions.long()
+        terminals = terminals.float()
+        rewards = rewards.float()
+
+        with torch.no_grad():
+            prob_next, _ = self.model_target(next_states)
+            if self.double_q:
+                prob_next_online, _ = self.model(next_states)
+                actions_next = prob_next_online.mul(self.atoms).sum(dim=-1).argmax(dim=-1)
+            else:
+                actions_next = prob_next.mul(self.atoms).sum(dim=-1).argmax(dim=-1)
+            prob_next = prob_next[self.batch_indices, actions_next, :]
+
+            rewards = rewards.float().unsqueeze(-1)
+            terminals = terminals.float().unsqueeze(-1)
+            atoms_next = rewards + self.discount * (1 - terminals) * self.atoms.view(1, -1)
+
+            atoms_next.clamp_(self.v_min, self.v_max)
+            b = (atoms_next - self.v_min) / self.delta_atom
+
+            l, u = b.floor().long(), b.ceil().long()
+            l[(u > 0) * (l == u)] -= 1
+            u[(l < (self.num_atoms - 1)) * (l == u)] += 1
+
+            target_prob = torch.zeros_like(prob_next)
+            offset = torch.linspace(0, ((self.batch_size - 1) * self.num_atoms), self.batch_size)
+            offset = offset.unsqueeze(1).expand(self.batch_size, self.num_atoms).long().to(self.device)
+
+            target_prob.view(-1).index_add_(0, (l + offset).view(-1), (prob_next * (u.float() - b)).view(-1))
+            target_prob.view(-1).index_add_(0, (u + offset).view(-1), (prob_next * (b - l.float())).view(-1))
+
+        _, log_prob = self.model(states)
+        log_prob = log_prob[self.batch_indices, actions, :]
+        loss = target_prob.mul_(log_prob).sum(dim=-1).neg().mean()
+
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+        self.update_steps += 1
+
+        if self.update_steps % self.target_update_freq == 0:
+            self.model_target.load_state_dict(self.model.state_dict())
+        return loss.detach()
+
+    def train_step_(self):
         try:
             data = self.prefetcher.next()
         except:
