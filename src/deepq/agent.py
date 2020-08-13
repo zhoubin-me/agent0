@@ -71,6 +71,7 @@ class Actor:
         self.state_shape = self.envs.observation_space.shape
 
         self.device = torch.device('cuda:0')
+        self.atoms = torch.linspace(self.v_min, self.v_max, self.num_atoms).to(self.device)
         self.model = NatureCNN(self.state_shape[0], self.action_dim, self.dueling).to(self.device)
 
         self.R = np.zeros(self.num_envs)
@@ -86,7 +87,8 @@ class Actor:
 
             with torch.no_grad():
                 st = torch.from_numpy(np.array(self.obs)).to(self.device).float().div(255.0)
-                qs = self.model(st)
+                qs_prob, _ = self.model(st)
+                qs = qs_prob.mul(self.atoms).sum(dim=-1)
 
             qs_max, qs_argmax = qs.max(dim=-1)
             action_greedy = qs_argmax.tolist()
