@@ -304,11 +304,11 @@ class Agent:
     def train_step(self):
         assert (self.distributional and self.qr) == False
         if self.distributional:
-            self.train_step_c51()
+            return self.train_step_c51()
         elif self.qr:
-            self.train_step_qr()
+            return self.train_step_qr()
         else:
-            self.train_step_dqn()
+            return self.train_step_dqn()
 
     def adjust_lr(self, lr):
         for param_group in self.optimizer.param_groups:
