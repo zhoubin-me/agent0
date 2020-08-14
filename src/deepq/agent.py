@@ -101,8 +101,13 @@ class Actor:
 
             with torch.no_grad():
                 st = torch.from_numpy(np.array(self.obs)).to(self.device).float().div(255.0)
-                qs_prob, _ = self.model(st)
-                qs = qs_prob.mul(self.atoms).sum(dim=-1)
+                if self.distributional:
+                    qs_prob = self.model(st)
+                    qs = qs_prob.mul(self.atoms).sum(dim=-1)
+                elif self.qr:
+                    qs = self.model(st).mean(dim=-1)
+                else:
+                    qs = self.model(st)
 
             qs_max, qs_argmax = qs.max(dim=-1)
             action_greedy = qs_argmax.tolist()
@@ -219,9 +224,9 @@ class Agent:
             self.model_target.reset_noise()
 
         with torch.no_grad():
-            prob_next, _ = self.model_target(next_states)
+            prob_next = self.model_target(next_states)
             if self.double_q:
-                prob_next_online, _ = self.model(next_states)
+                prob_next_online = self.model(next_states)
                 actions_next = prob_next_online.mul(self.atoms).sum(dim=-1).argmax(dim=-1)
             else:
                 actions_next = prob_next.mul(self.atoms).sum(dim=-1).argmax(dim=-1)
@@ -245,7 +250,7 @@ class Agent:
             target_prob.view(-1).index_add_(0, (l + offset).view(-1), (prob_next * (u.float() - b)).view(-1))
             target_prob.view(-1).index_add_(0, (u + offset).view(-1), (prob_next * (b - l.float())).view(-1))
 
-        _, log_prob = self.model(states)
+        log_prob = self.model(states).log()
         log_prob = log_prob[self.batch_indices, actions, :]
         loss = target_prob.mul_(log_prob).sum(dim=-1).neg().mean()
 
