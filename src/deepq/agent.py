@@ -36,6 +36,7 @@ def default_hyperparams():
         num_atoms=51,
 
         adam_lr=5e-4,
+        adam_eps=1.5e-4,
 
         batch_size=512,
         discount=0.99,
@@ -132,7 +133,8 @@ class Agent:
         self.model = NatureCNN(self.state_shape[0], self.action_dim, self.dueling).to(self.device)
         self.model_target = NatureCNN(self.state_shape[0], self.action_dim, self.dueling).to(self.device)
 
-        self.optimizer = torch.optim.Adam(self.model.parameters(), self.adam_lr)
+        # self.optimizer = torch.optim.AdamW(self.model.parameters(), self.adam_lr, eps=self.adam_eps)
+        self.optimizer = torch.optim.AdamW(self.model.parameters(), self.adam_lr) # , eps=self.adam_eps)
         self.update_steps = 0
         self.replay = deque(maxlen=self.replay_size)
 
@@ -274,7 +276,7 @@ class Trainer(tune.Trainable):
             self.epsilon = self.epsilon_schedule(len(local_replay))
 
             # if self.epsilon == 0.01:
-            #     self.epsilon = np.random.choice([0.01, 0.02, 0.05, 0.1], p=[0.7, 0.1, 0.1, 0.1])
+            #    self.epsilon = np.random.choice([0.01, 0.02, 0.05, 0.1], p=[0.7, 0.1, 0.1, 0.1])
 
             self.sample_ops.append(
                 self.actors[rank].sample.remote(self.actor_steps, self.epsilon, self.agent.model.state_dict()))
