@@ -23,6 +23,8 @@ def default_hyperparams():
         prioritize=True,
         distributional=True,
         noisy=True,
+
+        reset_noise_freq=5,
         exp_name='atari_deepq',
         save_prefix="ckpt",
         pin_memory=False,
@@ -73,7 +75,7 @@ class Actor:
 
         self.device = torch.device('cuda:0')
         self.atoms = torch.linspace(self.v_min, self.v_max, self.num_atoms).to(self.device)
-        self.model = NatureCNN(self.state_shape[0], self.action_dim, self.dueling).to(self.device)
+        self.model = NatureCNN(self.state_shape[0], self.action_dim, self.dueling, noisy=self.noisy).to(self.device)
 
         self.R = np.zeros(self.num_envs)
         self.obs = self.envs.reset()
@@ -83,8 +85,11 @@ class Actor:
         replay = deque(maxlen=self.replay_size)
         Rs, Qs = [], []
         tic = time.time()
-        for _ in range(steps):
+        for step in range(steps):
             action_random = np.random.randint(0, self.action_dim, self.num_envs)
+
+            if step % self.reset_noise_freq == 0:
+                self.model.reset_noise()
 
             with torch.no_grad():
                 st = torch.from_numpy(np.array(self.obs)).to(self.device).float().div(255.0)
@@ -130,8 +135,9 @@ class Agent:
         self.atoms = torch.linspace(self.v_min, self.v_max, self.num_atoms).to(self.device)
         self.delta_atom = (self.v_max - self.v_min) / (self.num_atoms - 1)
 
-        self.model = NatureCNN(self.state_shape[0], self.action_dim, self.dueling).to(self.device)
-        self.model_target = NatureCNN(self.state_shape[0], self.action_dim, self.dueling).to(self.device)
+        self.model = NatureCNN(self.state_shape[0], self.action_dim, self.dueling, noisy=self.noisy).to(self.device)
+        self.model_target = NatureCNN(self.state_shape[0], self.action_dim, self.dueling, noisy=self.noisy).to(
+            self.device)
 
         # self.optimizer = torch.optim.AdamW(self.model.parameters(), self.adam_lr, eps=self.adam_eps)
         self.optimizer = torch.optim.AdamW(self.model.parameters(), self.adam_lr) # , eps=self.adam_eps)
@@ -158,6 +164,9 @@ class Agent:
         actions = actions.long()
         terminals = terminals.float()
         rewards = rewards.float()
+
+        self.model.reset_noise()
+        self.model_target.reset_noise()
 
         with torch.no_grad():
             prob_next, _ = self.model_target(next_states)
