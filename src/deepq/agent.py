@@ -88,7 +88,7 @@ class Actor:
         for step in range(steps):
             action_random = np.random.randint(0, self.action_dim, self.num_envs)
 
-            if step % self.reset_noise_freq == 0:
+            if self.noisy and step % self.reset_noise_freq == 0:
                 self.model.reset_noise()
 
             with torch.no_grad():
@@ -165,8 +165,9 @@ class Agent:
         terminals = terminals.float()
         rewards = rewards.float()
 
-        self.model.reset_noise()
-        self.model_target.reset_noise()
+        if self.noisy:
+            self.model.reset_noise()
+            self.model_target.reset_noise()
 
         with torch.no_grad():
             prob_next, _ = self.model_target(next_states)
