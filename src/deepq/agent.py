@@ -284,7 +284,7 @@ class Agent:
             if self.double_q:
                 a_next = self.model(next_states).squeeze(-1).argmax(dim=-1)
             else:
-                a_next = self.model_target(next_states).squeeze(-1).argmax(dim=-1)
+                a_next = q_next.argmax(dim=-1)
             q_next = q_next[self.batch_indices, a_next]
             q_target = rewards + self.discount * (1 - terminals) * q_next
 
