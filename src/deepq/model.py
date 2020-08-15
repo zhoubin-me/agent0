@@ -11,35 +11,45 @@ def init(m, gain=1.0):
 
 
 class NatureCNN_(nn.Module):
-    def __init__(self, in_channels, action_dim, dueling=True):
+    def __init__(self, in_channels, action_dim, dueling=False, num_atoms=1, noisy=False, noise_std=0.5):
         super(NatureCNN_, self).__init__()
+
+        self.num_atoms = num_atoms
+        self.action_dim = action_dim
+        self.noise_std = noise_std
+        FC = NoisyLinear if noisy else nn.Linear
 
         self.convs = nn.Sequential(
             nn.Conv2d(in_channels, 32, 8, stride=4), nn.ReLU(),
             nn.Conv2d(32, 64, 4, stride=2), nn.ReLU(),
             nn.Conv2d(64, 64, 3, stride=1), nn.ReLU(), nn.Flatten(),
-            nn.Linear(64 * 7 * 7, 512), nn.ReLU())
-
+            FC(64 * 7 * 7, 512), nn.ReLU())
 
         self.convs.apply(lambda m: init(m, nn.init.calculate_gain('relu')))
-        self.p = nn.Linear(512, action_dim)
+        self.p = FC(512, action_dim * num_atoms)
         self.p.apply(lambda m: init(m, 0.01))
 
         if dueling:
-            self.v = nn.Linear(512, 1)
+            self.v = FC(512, num_atoms)
             self.v.apply(lambda m: init(m, 1.0))
         else:
             self.v = None
 
     def forward(self, x):
         features = self.convs(x)
-        adv = self.p(features)
+        adv = self.p(features).view(-1, self.action_dim, self.num_atoms)
         if self.v is not None:
-            v = self.v(features)
-            q = v.expand_as(adv) + (adv - adv.mean(dim=-1, keepdim=True).expand_as(adv))
+            v = self.v(features).view(-1, 1, self.num_atoms)
+            q = v.expand_as(adv) + (adv - adv.mean(dim=1, keepdim=True).expand_as(adv))
         else:
             q = adv
         return q
+
+    def reset_noise(self, std=None):
+        if std is None: std = self.noise_std
+        for m in self.modules():
+            if isinstance(m, NoisyLinear):
+                m.reset_noise(std)
 
 
 class NoisyLinear(nn.Module):
