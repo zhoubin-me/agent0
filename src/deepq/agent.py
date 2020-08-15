@@ -25,6 +25,10 @@ def default_hyperparams():
         distributional=False,
         qr=False,
 
+        v_max=10,
+        v_min=-10,
+        num_atoms=1,
+
         reset_noise_freq=5,
         exp_name='atari_deepq',
         save_prefix="ckpt",
@@ -34,9 +38,7 @@ def default_hyperparams():
         num_envs=16,
         num_data_workers=4,
 
-        v_max=10,
-        v_min=-10,
-        num_atoms=51,
+
 
         adam_lr=5e-4,
         adam_eps=1.5e-4,
@@ -101,6 +103,8 @@ class Actor:
                     qs = qs_prob.mul(self.atoms).sum(dim=-1)
                 elif self.qr:
                     qs = self.model(st).mean(dim=-1)
+                else:
+                    qs = self.model(st).squeeze(-1)
 
             qs_max, qs_argmax = qs.max(dim=-1)
             action_greedy = qs_argmax.tolist()
@@ -179,11 +183,9 @@ class Agent:
             if self.double_q:
                 q_next_online = self.model(next_states).mean(dim=-1)
                 a_next = q_next_online.argmax(dim=-1)
-                q_next = q_next[self.batch_indices, a_next, :]
             else:
                 a_next = q_next.mean(dim=-1).argmax(dim=-1)
-                q_next = q_next[self.batch_indices, a_next, :]
-
+            q_next = q_next[self.batch_indices, a_next, :]
             q_target = rewards + self.discount * (1 - terminals) * q_next
 
         q = self.model(states)[self.batch_indices, actions, :]
@@ -191,7 +193,7 @@ class Agent:
         q_target = q_target.view(self.batch_size, -1).unsqueeze(-1)
 
         loss = F.smooth_l1_loss(q, q_target, reduction='none')
-        weights = torch.abs(self.cumulative_density.view(1, 1, -1) - (q - q_target).sign().float())
+        weights = torch.abs(self.cumulative_density.view(1, 1, -1) - (q - q_target).detach().sign().float())
         loss = loss * weights
         loss = loss.sum(-1).mean()
 
@@ -275,16 +277,15 @@ class Agent:
 
         with torch.no_grad():
 
+            q_next = self.model_target(next_states).squeeze(-1)
             if self.double_q:
-                q_next = self.model_target(next_states)
-                q_next_online = self.model(next_states)
-                q_next = q_next.gather(1, q_next_online.argmax(dim=-1, keepdim=True)).squeeze(-1)
+                a_next = self.model(next_states).squeeze(-1).argmax(dim=-1)
             else:
-                q_next = self.model_target(next_states).max(dim=-1)
-
+                a_next = self.model_target(next_states).squeeze(-1).argmax(dim=-1)
+            q_next = q_next[self.batch_indices, a_next]
             q_target = rewards + self.discount * (1 - terminals) * q_next
 
-        q = self.model(states).gather(1, actions.unsqueeze(-1)).squeeze(-1)
+        q = self.model(states).squeeze(dim=-1)[self.batch_indices, actions]
         loss = F.smooth_l1_loss(q, q_target)
 
         self.optimizer.zero_grad()
