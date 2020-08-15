@@ -20,10 +20,10 @@ def default_hyperparams():
         game='Breakout',
         double_q=True,
         dueling=True,
+        noisy=False,
+        # prioritize=True,
         distributional=False,
         qr=False,
-        # noisy=True,
-        # prioritize=True,
 
         reset_noise_freq=5,
         exp_name='atari_deepq',
@@ -95,8 +95,12 @@ class Actor:
 
             with torch.no_grad():
                 st = torch.from_numpy(np.array(self.obs)).to(self.device).float().div(255.0)
-                qs_prob = self.model(st).softmax(dim=-1)
-                qs = qs_prob.mul(self.atoms).sum(dim=-1)
+
+                if self.distributional:
+                    qs_prob = self.model(st).softmax(dim=-1)
+                    qs = qs_prob.mul(self.atoms).sum(dim=-1)
+                elif self.qr:
+                    qs = self.model(st).mean(dim=-1)
 
             qs_max, qs_argmax = qs.max(dim=-1)
             action_greedy = qs_argmax.tolist()
@@ -136,6 +140,8 @@ class Agent:
         self.batch_indices = torch.arange(self.batch_size).to(self.device)
         self.atoms = torch.linspace(self.v_min, self.v_max, self.num_atoms).to(self.device)
         self.delta_atom = (self.v_max - self.v_min) / (self.num_atoms - 1)
+        self.cumulative_density = ((2 * torch.arange(self.num_atoms) + 1) / (2.0 * self.num_atoms)).view(1, -1).to(
+            self.device)
 
         self.model = NatureCNN(self.state_shape[0], self.action_dim, dueling=self.dueling,
                                noisy=self.noisy, num_atoms=self.num_atoms).to(self.device)
@@ -154,7 +160,51 @@ class Agent:
         datafetcher = DataPrefetcher(self.dataloader, self.device)
         return datafetcher
 
-    def train_step(self):
+    def train_step_qr(self):
+        try:
+            data = self.prefetcher.next()
+        except:
+            self.prefetcher = self.get_datafetcher()
+            data = self.prefetcher.next()
+
+        frames, actions, rewards, terminals = data
+        states = frames[:, :-1, :, :].float().div(255.0)
+        next_states = frames[:, 1:, :, :].float().div(255.0)
+        actions = actions.long()
+        terminals = terminals.float().unsqueeze(-1)
+        rewards = rewards.float().unsqueeze(-1)
+
+        with torch.no_grad():
+
+            if self.double_q:
+                q_next = self.model_target(next_states).mean(dim=-1)
+                q_next_online = self.model(next_states).mean(dim=-1)
+                a_next = q_next_online.mean(dim=-1).argmax(dim=-1)
+                q_next = q_next[self.batch_indices, a_next, :]
+            else:
+                q_next = self.model_target(next_states)
+                a_next = q_next.mean(dim=-1).argmax(dim=-1)
+                q_next = q_next[self.batch_indices, a_next, :]
+
+            q_target = rewards + self.discount * (1 - terminals) * q_next
+
+        q = self.model(states)[self.batch_indices, actions, :]
+        q = q.view(self.batch_size, -1)
+        q_target = q_target.view(self.batch_size, -1)
+        loss = F.smooth_l1_loss(q, q_target, reduction='none')
+        loss = loss * (self.cumulative_density - (q - q_target).detach().neg().sign().float()).abs()
+        loss = loss.sum(dim=-1).mean()
+
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+        self.update_steps += 1
+
+        if self.update_steps % self.target_update_freq == 0:
+            self.model_target.load_state_dict(self.model.state_dict())
+        return loss.detach()
+
+    def train_step_c51(self):
         try:
             data = self.prefetcher.next()
         except:
@@ -210,7 +260,7 @@ class Agent:
             self.model_target.load_state_dict(self.model.state_dict())
         return loss.detach()
 
-    def train_step_(self):
+    def train_step_dqn(self):
         try:
             data = self.prefetcher.next()
         except:
@@ -231,7 +281,7 @@ class Agent:
                 q_next_online = self.model(next_states)
                 q_next = q_next.gather(1, q_next_online.argmax(dim=-1, keepdim=True)).squeeze(-1)
             else:
-                q_next, _ = self.model_target(next_states).max(dim=-1)
+                q_next = self.model_target(next_states).max(dim=-1)
 
             q_target = rewards + self.discount * (1 - terminals) * q_next
 
@@ -246,6 +296,16 @@ class Agent:
         if self.update_steps % self.target_update_freq == 0:
             self.model_target.load_state_dict(self.model.state_dict())
         return loss.detach()
+
+    def train_step(self):
+        assert (self.distributional and self.qr) == False
+        if self.distributional:
+            loss = self.train_step_c51()
+        elif self.qr:
+            loss = self.train_step_qr()
+        else:
+            loss = self.train_step_dqn()
+        return loss
 
     def adjust_lr(self, lr):
         for param_group in self.optimizer.param_groups:
