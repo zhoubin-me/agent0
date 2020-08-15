@@ -1,5 +1,4 @@
 import argparse
-import json
 
 import ray
 from ray import tune
@@ -13,7 +12,6 @@ def parse_arguments(params):
     for k, v in params.items():
         parser.add_argument(f"--{k}", type=type(v), default=v)
     args = parser.parse_args()
-    print("input args:\n", json.dumps(vars(args), indent=4, separators=(",", ":")))
     return vars(args)
 
 

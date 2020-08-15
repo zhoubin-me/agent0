@@ -20,14 +20,15 @@ def default_hyperparams():
         game='Breakout',
         double_q=True,
         dueling=True,
-        prioritize=True,
-        distributional=True,
-        noisy=True,
+        distributional=False,
+        qr=False,
+        # noisy=True,
+        # prioritize=True,
 
         reset_noise_freq=5,
         exp_name='atari_deepq',
         save_prefix="ckpt",
-        pin_memory=False,
+        pin_memory=True,
 
         num_actors=8,
         num_envs=16,
@@ -75,7 +76,8 @@ class Actor:
 
         self.device = torch.device('cuda:0')
         self.atoms = torch.linspace(self.v_min, self.v_max, self.num_atoms).to(self.device)
-        self.model = NatureCNN(self.state_shape[0], self.action_dim, self.dueling, noisy=self.noisy).to(self.device)
+        self.model = NatureCNN(self.state_shape[0], self.action_dim,
+                               dueling=self.dueling, noisy=self.noisy, num_atoms=self.num_atoms).to(self.device)
 
         self.R = np.zeros(self.num_envs)
         self.obs = self.envs.reset()
@@ -93,7 +95,7 @@ class Actor:
 
             with torch.no_grad():
                 st = torch.from_numpy(np.array(self.obs)).to(self.device).float().div(255.0)
-                qs_prob, _ = self.model(st)
+                qs_prob = self.model(st).softmax(dim=-1)
                 qs = qs_prob.mul(self.atoms).sum(dim=-1)
 
             qs_max, qs_argmax = qs.max(dim=-1)
@@ -135,9 +137,10 @@ class Agent:
         self.atoms = torch.linspace(self.v_min, self.v_max, self.num_atoms).to(self.device)
         self.delta_atom = (self.v_max - self.v_min) / (self.num_atoms - 1)
 
-        self.model = NatureCNN(self.state_shape[0], self.action_dim, self.dueling, noisy=self.noisy).to(self.device)
-        self.model_target = NatureCNN(self.state_shape[0], self.action_dim, self.dueling, noisy=self.noisy).to(
-            self.device)
+        self.model = NatureCNN(self.state_shape[0], self.action_dim, dueling=self.dueling,
+                               noisy=self.noisy, num_atoms=self.num_atoms).to(self.device)
+        self.model_target = NatureCNN(self.state_shape[0], self.action_dim, dueling=self.dueling,
+                                      noisy=self.noisy, num_atoms=self.num_atoms).to(self.device)
 
         # self.optimizer = torch.optim.AdamW(self.model.parameters(), self.adam_lr, eps=self.adam_eps)
         self.optimizer = torch.optim.AdamW(self.model.parameters(), self.adam_lr)  # , eps=self.adam_eps)
@@ -162,24 +165,22 @@ class Agent:
         states = frames[:, :-1, :, :].float().div(255.0)
         next_states = frames[:, 1:, :, :].float().div(255.0)
         actions = actions.long()
-        terminals = terminals.float()
-        rewards = rewards.float()
+        terminals = terminals.float().unsqueeze(-1)
+        rewards = rewards.float().unsqueeze(-1)
 
         if self.noisy:
             self.model.reset_noise()
             self.model_target.reset_noise()
 
         with torch.no_grad():
-            prob_next, _ = self.model_target(next_states)
+            prob_next = self.model_target(next_states).softmax(dim=-1)
             if self.double_q:
-                prob_next_online, _ = self.model(next_states)
+                prob_next_online = self.model(next_states).softmax(dim=-1)
                 actions_next = prob_next_online.mul(self.atoms).sum(dim=-1).argmax(dim=-1)
             else:
                 actions_next = prob_next.mul(self.atoms).sum(dim=-1).argmax(dim=-1)
             prob_next = prob_next[self.batch_indices, actions_next, :]
 
-            rewards = rewards.float().unsqueeze(-1)
-            terminals = terminals.float().unsqueeze(-1)
             atoms_next = rewards + self.discount * (1 - terminals) * self.atoms.view(1, -1)
 
             atoms_next.clamp_(self.v_min, self.v_max)
@@ -196,9 +197,9 @@ class Agent:
             target_prob.view(-1).index_add_(0, (l + offset).view(-1), (prob_next * (u.float() - b)).view(-1))
             target_prob.view(-1).index_add_(0, (u + offset).view(-1), (prob_next * (b - l.float())).view(-1))
 
-        _, log_prob = self.model(states)
+        log_prob = self.model(states).log_softmax(dim=-1)
         log_prob = log_prob[self.batch_indices, actions, :]
-        loss = target_prob.mul_(log_prob).sum(dim=-1).neg().mean()
+        loss = target_prob.mul(log_prob).sum(dim=-1).neg().mean()
 
         self.optimizer.zero_grad()
         loss.backward()

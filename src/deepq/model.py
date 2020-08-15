@@ -114,9 +114,7 @@ class NatureCNN(nn.Module):
             v = self.fc_v(phi)
             q = v.view(-1, 1, self.num_atoms) + q - q.mean(dim=1, keepdim=True)
 
-        prob = F.softmax(q, dim=-1)
-        log_prob = F.log_softmax(q, dim=-1)
-        return prob, log_prob
+        return q
 
     def reset_noise(self, std=None):
         if std is None: std = self.noise_std
