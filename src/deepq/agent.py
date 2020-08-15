@@ -176,13 +176,12 @@ class Agent:
 
         with torch.no_grad():
 
+            q_next = self.model_target(next_states)
             if self.double_q:
-                q_next = self.model_target(next_states).mean(dim=-1)
                 q_next_online = self.model(next_states).mean(dim=-1)
-                a_next = q_next_online.mean(dim=-1).argmax(dim=-1)
+                a_next = q_next_online.argmax(dim=-1)
                 q_next = q_next[self.batch_indices, a_next, :]
             else:
-                q_next = self.model_target(next_states)
                 a_next = q_next.mean(dim=-1).argmax(dim=-1)
                 q_next = q_next[self.batch_indices, a_next, :]
 

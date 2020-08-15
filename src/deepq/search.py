@@ -38,13 +38,15 @@ if __name__ == '__main__':
             # game=tune.grid_search(['BeamRider', 'Qbert', 'SpaceInvaders']),
             # game=tune.grid_search(['BeamRider', 'Qbert', 'Enduro', 'Riverraid']),
             # game=tune.grid_search(['Breakout', 'Pong', 'SpaceInvaders', 'Seaquest']),
-            game=tune.grid_search(["Pong"]),
+            game=tune.grid_search(["Breakout"]),
             epoches=kwargs['total_steps'] // int(1e4),
             total_steps=kwargs['total_steps'],
             adam_lr=5e-4,
+            qr=True,
+            num_atoms=200,
         ),
         progress_reporter=reporter,
-        resources_per_trial={"gpu": 3},
+        resources_per_trial={"gpu": 2},
     )
 
     print("Best config: ", analysis.get_best_config(metric="ep_reward_test"))
