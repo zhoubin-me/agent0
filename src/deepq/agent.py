@@ -180,8 +180,8 @@ class Agent:
         states = frames[:, :-1, :, :].float().div(255.0)
         next_states = frames[:, 1:, :, :].float().div(255.0)
         actions = actions.long()
-        terminals = terminals.float().unsqueeze(-1)
-        rewards = rewards.float().unsqueeze(-1)
+        terminals = terminals.float()
+        rewards = rewards.float()
 
         with torch.no_grad():
             q_next = self.model_target(next_states)
