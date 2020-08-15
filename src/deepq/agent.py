@@ -24,7 +24,7 @@ def default_hyperparams():
         prioritize=False,
         distributional=False,
         noisy=False,
-        qr=False,
+        qr=True,
 
         v_max=10,
         v_min=-10,
