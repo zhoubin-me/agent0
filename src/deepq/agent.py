@@ -187,13 +187,13 @@ class Agent:
             q_target = rewards + self.discount * (1 - terminals) * q_next
 
         q = self.model(states)[self.batch_indices, actions, :]
-        q = q.view(self.batch_size, -1).unsqueeze(0)
-        q_target = q_target.view(self.batch_size, -1).t().unsqueeze(-1)
+        q = q.view(self.batch_size, -1).unsqueeze(1)
+        q_target = q_target.view(self.batch_size, -1).unsqueeze(-1)
 
         loss = F.smooth_l1_loss(q, q_target, reduction='none')
-        weights = torch.abs(self.cumulative_density.view(1, 1, -1) - (q - q_target).detach().sign().float())
+        weights = torch.abs(self.cumulative_density.view(1, 1, -1) - (q - q_target).sign().float())
         loss = loss * weights
-        loss = loss.transpose(0, 1).mean(1).sum(-1).mean()
+        loss = loss.sum(-1).mean()
 
         self.optimizer.zero_grad()
         loss.backward()
@@ -232,7 +232,6 @@ class Agent:
             prob_next = prob_next[self.batch_indices, actions_next, :]
 
             atoms_next = rewards + self.discount * (1 - terminals) * self.atoms.view(1, -1)
-
             atoms_next.clamp_(self.v_min, self.v_max)
             b = (atoms_next - self.v_min) / self.delta_atom
 
