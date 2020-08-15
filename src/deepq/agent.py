@@ -154,8 +154,7 @@ class Agent:
         self.model_target = NatureCNN(self.state_shape[0], self.action_dim, dueling=self.dueling,
                                       noisy=self.noisy, num_atoms=self.num_atoms).to(self.device)
 
-        # self.optimizer = torch.optim.AdamW(self.model.parameters(), self.adam_lr, eps=self.adam_eps)
-        self.optimizer = torch.optim.AdamW(self.model.parameters(), self.adam_lr)  # , eps=self.adam_eps)
+        self.optimizer = torch.optim.AdamW(self.model.parameters(), self.adam_lr)
         self.update_steps = 0
         self.replay = deque(maxlen=self.replay_size)
 
@@ -166,22 +165,8 @@ class Agent:
         datafetcher = DataPrefetcher(self.dataloader, self.device)
         return datafetcher
 
-    def train_step_qr(self):
-        try:
-            data = self.prefetcher.next()
-        except:
-            self.prefetcher = self.get_datafetcher()
-            data = self.prefetcher.next()
-
-        frames, actions, rewards, terminals = data
-        states = frames[:, :-1, :, :].float().div(255.0)
-        next_states = frames[:, 1:, :, :].float().div(255.0)
-        actions = actions.long()
-        terminals = terminals.float().unsqueeze(-1)
-        rewards = rewards.float().unsqueeze(-1)
-
+    def train_step_qr(self, states, next_states, actions, terminals, rewards):
         with torch.no_grad():
-
             q_next = self.model_target(next_states)
             if self.double_q:
                 q_next_online = self.model(next_states).mean(dim=-1)
@@ -199,34 +184,9 @@ class Agent:
         weights = torch.abs(self.cumulative_density.view(1, 1, -1) - (q - q_target).detach().sign().float())
         loss = loss * weights
         loss = loss.sum(-1).mean()
+        return loss
 
-        self.optimizer.zero_grad()
-        loss.backward()
-        self.optimizer.step()
-        self.update_steps += 1
-
-        if self.update_steps % self.target_update_freq == 0:
-            self.model_target.load_state_dict(self.model.state_dict())
-        return loss.detach()
-
-    def train_step_c51(self):
-        try:
-            data = self.prefetcher.next()
-        except:
-            self.prefetcher = self.get_datafetcher()
-            data = self.prefetcher.next()
-
-        frames, actions, rewards, terminals = data
-        states = frames[:, :-1, :, :].float().div(255.0)
-        next_states = frames[:, 1:, :, :].float().div(255.0)
-        actions = actions.long()
-        terminals = terminals.float().unsqueeze(-1)
-        rewards = rewards.float().unsqueeze(-1)
-
-        if self.noisy:
-            self.model.reset_noise()
-            self.model_target.reset_noise()
-
+    def train_step_c51(self, states, next_states, actions, terminals, rewards):
         with torch.no_grad():
             prob_next = self.model_target(next_states).softmax(dim=-1)
             if self.double_q:
@@ -236,7 +196,7 @@ class Agent:
                 actions_next = prob_next.mul(self.atoms).sum(dim=-1).argmax(dim=-1)
             prob_next = prob_next[self.batch_indices, actions_next, :]
 
-            atoms_next = rewards + self.discount * (1 - terminals) * self.atoms.view(1, -1)
+            atoms_next = rewards.unsqueeze(-1) + self.discount * (1 - terminals.unsqueeze(-1)) * self.atoms.view(1, -1)
             atoms_next.clamp_(self.v_min, self.v_max)
             b = (atoms_next - self.v_min) / self.delta_atom
 
@@ -254,17 +214,26 @@ class Agent:
         log_prob = self.model(states).log_softmax(dim=-1)
         log_prob = log_prob[self.batch_indices, actions, :]
         loss = target_prob.mul(log_prob).sum(dim=-1).neg().mean()
+        return loss
 
-        self.optimizer.zero_grad()
-        loss.backward()
-        self.optimizer.step()
-        self.update_steps += 1
+    def train_step_dqn(self, states, next_states, actions, terminals, rewards):
+        with torch.no_grad():
+            q_next = self.model_target(next_states).squeeze(-1)
+            if self.double_q:
+                a_next = self.model(next_states).squeeze(-1).argmax(dim=-1)
+            else:
+                a_next = q_next.argmax(dim=-1)
+            q_next = q_next[self.batch_indices, a_next]
+            q_target = rewards + self.discount * (1 - terminals) * q_next
 
-        if self.update_steps % self.target_update_freq == 0:
-            self.model_target.load_state_dict(self.model.state_dict())
-        return loss.detach()
+        q = self.model(states).squeeze(dim=-1)[self.batch_indices, actions]
+        loss = F.smooth_l1_loss(q, q_target)
+        return loss
 
-    def train_step_dqn(self):
+
+    def train_step(self):
+        assert (self.distributional and self.qr) == False
+
         try:
             data = self.prefetcher.next()
         except:
@@ -278,18 +247,16 @@ class Agent:
         terminals = terminals.float()
         rewards = rewards.float()
 
-        with torch.no_grad():
+        if self.noisy:
+            self.model.reset_noise()
+            self.model_target.reset_noise()
 
-            q_next = self.model_target(next_states).squeeze(-1)
-            if self.double_q:
-                a_next = self.model(next_states).squeeze(-1).argmax(dim=-1)
-            else:
-                a_next = q_next.argmax(dim=-1)
-            q_next = q_next[self.batch_indices, a_next]
-            q_target = rewards + self.discount * (1 - terminals) * q_next
-
-        q = self.model(states).squeeze(dim=-1)[self.batch_indices, actions]
-        loss = F.smooth_l1_loss(q, q_target)
+        if self.distributional:
+            loss = self.train_step_c51(states, next_states, actions, terminals, rewards)
+        elif self.qr:
+            loss = self.train_step_qr(states, next_states, actions, terminals, rewards)
+        else:
+            loss = self.train_step_dqn(states, next_states, actions, terminals, rewards)
 
         self.optimizer.zero_grad()
         loss.backward()
@@ -300,19 +267,6 @@ class Agent:
             self.model_target.load_state_dict(self.model.state_dict())
         return loss.detach()
 
-    def train_step(self):
-        assert (self.distributional and self.qr) == False
-        if self.distributional:
-            loss = self.train_step_c51()
-        elif self.qr:
-            loss = self.train_step_qr()
-        else:
-            loss = self.train_step_dqn()
-        return loss
-
-    def adjust_lr(self, lr):
-        for param_group in self.optimizer.param_groups:
-            param_group['lr'] = lr
 
 class Trainer(tune.Trainable):
     def _setup(self, config):
