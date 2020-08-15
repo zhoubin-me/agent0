@@ -119,7 +119,8 @@ class NatureCNN(nn.Module):
             return q
         else:
             prob = F.softmax(q, dim=-1)
-            return prob
+            log_prob = F.log_softmax(q, dim=-1)
+            return prob, log_prob
 
     def reset_noise(self, std=None):
         if std is None: std = self.noise_std
