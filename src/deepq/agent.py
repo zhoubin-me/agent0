@@ -77,7 +77,8 @@ class Actor:
         self.state_shape = self.envs.observation_space.shape
 
         self.device = torch.device('cuda:0')
-        self.atoms = torch.linspace(self.v_min, self.v_max, self.num_atoms).to(self.device)
+        if self.distributional:
+            self.atoms = torch.linspace(self.v_min, self.v_max, self.num_atoms).to(self.device)
         self.model = NatureCNN(self.state_shape[0], self.action_dim,
                                dueling=self.dueling, noisy=self.noisy, num_atoms=self.num_atoms).to(self.device)
 
@@ -142,9 +143,11 @@ class Agent:
 
         self.device = torch.device('cuda:0')
         self.batch_indices = torch.arange(self.batch_size).to(self.device)
-        self.atoms = torch.linspace(self.v_min, self.v_max, self.num_atoms).to(self.device)
-        self.delta_atom = (self.v_max - self.v_min) / (self.num_atoms - 1)
-        self.cumulative_density = ((2 * torch.arange(self.num_atoms) + 1) / (2.0 * self.num_atoms)).to(self.device)
+        if self.distributional:
+            self.atoms = torch.linspace(self.v_min, self.v_max, self.num_atoms).to(self.device)
+            self.delta_atom = (self.v_max - self.v_min) / (self.num_atoms - 1)
+        if self.qr:
+            self.cumulative_density = ((2 * torch.arange(self.num_atoms) + 1) / (2.0 * self.num_atoms)).to(self.device)
 
         self.model = NatureCNN(self.state_shape[0], self.action_dim, dueling=self.dueling,
                                noisy=self.noisy, num_atoms=self.num_atoms).to(self.device)
