@@ -10,9 +10,9 @@ def init(m, gain=1.0):
         nn.init.zeros_(m.bias.data)
 
 
-class NatureCNN_(nn.Module):
+class NatureCNN(nn.Module):
     def __init__(self, in_channels, action_dim, dueling=False, num_atoms=1, noisy=False, noise_std=0.5):
-        super(NatureCNN_, self).__init__()
+        super(NatureCNN, self).__init__()
 
         self.num_atoms = num_atoms
         self.action_dim = action_dim
@@ -88,9 +88,9 @@ class NoisyLinear(nn.Module):
         self.noise_b.data.normal_()
 
 
-class NatureCNN(nn.Module):
+class NatureCNN_(nn.Module):
     def __init__(self, in_channels, action_dim, dueling=False, num_atoms=1, noisy=False, noise_std=0.5):
-        super(NatureCNN, self).__init__()
+        super(NatureCNN_, self).__init__()
         self.num_atoms = num_atoms
         self.action_dim = action_dim
         self.noise_std = noise_std
