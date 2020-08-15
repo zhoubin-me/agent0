@@ -140,8 +140,7 @@ class Agent:
         self.batch_indices = torch.arange(self.batch_size).to(self.device)
         self.atoms = torch.linspace(self.v_min, self.v_max, self.num_atoms).to(self.device)
         self.delta_atom = (self.v_max - self.v_min) / (self.num_atoms - 1)
-        self.cumulative_density = ((2 * torch.arange(self.num_atoms) + 1) / (2.0 * self.num_atoms)).view(1, -1).to(
-            self.device)
+        self.cumulative_density = ((2 * torch.arange(self.num_atoms) + 1) / (2.0 * self.num_atoms)).to(self.device)
 
         self.model = NatureCNN(self.state_shape[0], self.action_dim, dueling=self.dueling,
                                noisy=self.noisy, num_atoms=self.num_atoms).to(self.device)
@@ -188,11 +187,13 @@ class Agent:
             q_target = rewards + self.discount * (1 - terminals) * q_next
 
         q = self.model(states)[self.batch_indices, actions, :]
-        q = q.view(self.batch_size, -1)
-        q_target = q_target.view(self.batch_size, -1)
+        q = q.view(self.batch_size, -1).unsqueeze(0)
+        q_target = q_target.view(self.batch_size, -1).t().unsqueeze(-1)
+
         loss = F.smooth_l1_loss(q, q_target, reduction='none')
-        loss = loss * (self.cumulative_density - (q - q_target).detach().neg().sign().float()).abs()
-        loss = loss.sum(dim=-1).mean()
+        weights = torch.abs(self.cumulative_density.view(1, 1, -1) - (q - q_target).detach().sign().float())
+        loss = loss * weights
+        loss = loss.transpose(0, 1).mean(1).sum(-1).mean()
 
         self.optimizer.zero_grad()
         loss.backward()
