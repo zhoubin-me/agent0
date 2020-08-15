@@ -1,4 +1,3 @@
-import copy
 import json
 import os
 import time
@@ -36,8 +35,7 @@ def default_hyperparams():
 
         v_max=10,
         v_min=-10,
-        num_atoms=200,
-        qr=True,
+        num_atoms=51,
 
         adam_lr=5e-4,
         adam_eps=1.5e-4,
@@ -77,13 +75,7 @@ class Actor:
 
         self.device = torch.device('cuda:0')
         self.atoms = torch.linspace(self.v_min, self.v_max, self.num_atoms).to(self.device)
-        self.model = NatureCNN(
-            self.state_shape[0],
-            self.action_dim,
-            dueling=self.dueling,
-            num_atoms=self.num_atoms,
-            noisy=self.noisy,
-            qr=self.qr).to(self.device)
+        self.model = NatureCNN(self.state_shape[0], self.action_dim, self.dueling, noisy=self.noisy).to(self.device)
 
         self.R = np.zeros(self.num_envs)
         self.obs = self.envs.reset()
@@ -142,17 +134,12 @@ class Agent:
         self.batch_indices = torch.arange(self.batch_size).to(self.device)
         self.atoms = torch.linspace(self.v_min, self.v_max, self.num_atoms).to(self.device)
         self.delta_atom = (self.v_max - self.v_min) / (self.num_atoms - 1)
-        self.cumulative_density = ((2 * torch.arange(self.num_atoms) + 1) / (2.0 * self.num_atoms)).view(1, -1)
 
-        self.model = NatureCNN(self.state_shape[0],
-                               self.action_dim,
-                               dueling=self.dueling,
-                               num_atoms=self.num_atoms,
-                               noisy=self.noisy,
-                               qr=self.qr).to(self.device)
+        self.model = NatureCNN(self.state_shape[0], self.action_dim, self.dueling, noisy=self.noisy).to(self.device)
+        self.model_target = NatureCNN(self.state_shape[0], self.action_dim, self.dueling, noisy=self.noisy).to(
+            self.device)
 
-        self.model_target = copy.deepcopy(self.model)
-
+        # self.optimizer = torch.optim.AdamW(self.model.parameters(), self.adam_lr, eps=self.adam_eps)
         self.optimizer = torch.optim.AdamW(self.model.parameters(), self.adam_lr)  # , eps=self.adam_eps)
         self.update_steps = 0
         self.replay = deque(maxlen=self.replay_size)
@@ -165,42 +152,6 @@ class Agent:
         return datafetcher
 
     def train_step(self):
-        try:
-            data = self.prefetcher.next()
-        except:
-            self.prefetcher = self.get_datafetcher()
-            data = self.prefetcher.next()
-
-        frames, actions, rewards, terminals = data
-        states = frames[:, :-1, :, :].float().div(255.0)
-        next_states = frames[:, 1:, :, :].float().div(255.0)
-        actions = actions.long()
-        terminals = terminals.float()
-        rewards = rewards.float()
-
-        with torch.no_grad():
-            q_next = self.model_target(next_states)
-            a_next = q_next.sum(dim=-1).argmax(dim=-1)
-            q_next = q_next[self.batch_indices, a_next, :]
-            q_target = rewards + self.discount * (1 - terminals) * q_next
-
-        q = self.model(states)[self.batch_indices, actions, :]
-        q = q.view(self.batch_size, -1)
-        q_target = q_target.view(self.batch_size, -1)
-        loss = F.smooth_l1_loss(q, q_target, reduction='none')
-        loss = loss * (self.cumulative_density - (q - q_target).detach().neg().sign().float()).abs()
-        loss = loss.sum(dim=-1).mean()
-
-        self.optimizer.zero_grad()
-        loss.backward()
-        self.optimizer.step()
-        self.update_steps += 1
-
-        if self.update_steps % self.target_update_freq == 0:
-            self.model_target.load_state_dict(self.model.state_dict())
-        return loss.detach()
-
-    def train_step_c51(self):
         try:
             data = self.prefetcher.next()
         except:

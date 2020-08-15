@@ -79,12 +79,11 @@ class NoisyLinear(nn.Module):
 
 
 class NatureCNN(nn.Module):
-    def __init__(self, in_channels, action_dim, num_atoms=51, dueling=False, noisy=False, noise_std=0.5, qr=False):
+    def __init__(self, in_channels, action_dim, dueling=False, num_atoms=51, noisy=False, noise_std=0.5):
         super(NatureCNN, self).__init__()
         self.num_atoms = num_atoms
         self.action_dim = action_dim
         self.noise_std = noise_std
-        self.qr = qr
         FC = NoisyLinear if noisy else nn.Linear
 
         self.convs = nn.Sequential(
@@ -115,12 +114,9 @@ class NatureCNN(nn.Module):
             v = self.fc_v(phi)
             q = v.view(-1, 1, self.num_atoms) + q - q.mean(dim=1, keepdim=True)
 
-        if self.qr:
-            return q
-        else:
-            prob = F.softmax(q, dim=-1)
-            log_prob = F.log_softmax(q, dim=-1)
-            return prob, log_prob
+        prob = F.softmax(q, dim=-1)
+        log_prob = F.log_softmax(q, dim=-1)
+        return prob, log_prob
 
     def reset_noise(self, std=None):
         if std is None: std = self.noise_std
