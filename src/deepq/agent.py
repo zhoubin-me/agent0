@@ -19,25 +19,25 @@ from src.deepq.model import NatureCNN
 def default_hyperparams():
     params = dict(
         game='Breakout',
-        double_q=False,
-        dueling=False,
-        prioritize=False,
-        distributional=False,
-        noisy=False,
-        qr=True,
-
-        v_max=10,
-        v_min=-10,
-        num_atoms=200,
+        double_q=True,
+        dueling=True,
+        prioritize=True,
+        distributional=True,
+        noisy=True,
 
         reset_noise_freq=5,
         exp_name='atari_deepq',
         save_prefix="ckpt",
-        pin_memory=True,
+        pin_memory=False,
 
         num_actors=8,
         num_envs=16,
         num_data_workers=4,
+
+        v_max=10,
+        v_min=-10,
+        num_atoms=200,
+        qr=True,
 
         adam_lr=5e-4,
         adam_eps=1.5e-4,
@@ -147,8 +147,7 @@ class Agent:
         self.batch_indices = torch.arange(self.batch_size).to(self.device)
         self.atoms = torch.linspace(self.v_min, self.v_max, self.num_atoms).to(self.device)
         self.delta_atom = (self.v_max - self.v_min) / (self.num_atoms - 1)
-        self.cumulative_density = ((2 * torch.arange(self.num_atoms) + 1) / (2.0 * self.num_atoms)).view(1, -1).to(
-            self.device)
+        self.cumulative_density = ((2 * torch.arange(self.num_atoms) + 1) / (2.0 * self.num_atoms)).view(1, -1)
 
         self.model = NatureCNN(self.state_shape[0],
                                self.action_dim,
@@ -170,7 +169,7 @@ class Agent:
         datafetcher = DataPrefetcher(self.dataloader, self.device)
         return datafetcher
 
-    def train_step_qr(self):
+    def train_step(self):
         try:
             data = self.prefetcher.next()
         except:
@@ -264,7 +263,7 @@ class Agent:
             self.model_target.load_state_dict(self.model.state_dict())
         return loss.detach()
 
-    def train_step_dqn(self):
+    def train_step_(self):
         try:
             data = self.prefetcher.next()
         except:
@@ -300,15 +299,6 @@ class Agent:
         if self.update_steps % self.target_update_freq == 0:
             self.model_target.load_state_dict(self.model.state_dict())
         return loss.detach()
-
-    def train_step(self):
-        assert (self.distributional and self.qr) == False
-        if self.distributional:
-            self.train_step_c51()
-        elif self.qr:
-            self.train_step_qr()
-        else:
-            self.train_step_dqn()
 
     def adjust_lr(self, lr):
         for param_group in self.optimizer.param_groups:
@@ -348,6 +338,9 @@ class Trainer(tune.Trainable):
             # Actors
             self.agent.replay.extend(local_replay)
             self.epsilon = self.epsilon_schedule(len(local_replay))
+
+            # if self.epsilon == 0.01:
+            #    self.epsilon = np.random.choice([0.01, 0.02, 0.05, 0.1], p=[0.7, 0.1, 0.1, 0.1])
 
             self.sample_ops.append(
                 self.actors[rank].sample.remote(self.actor_steps, self.epsilon, self.agent.model.state_dict()))
