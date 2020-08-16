@@ -405,8 +405,8 @@ class Trainer(tune.Trainable):
         return True
 
     def _stop(self):
-        print("Final Testing")
         if self.frame_count > self.total_steps:
+            print("Final Testing")
             local_replay, Rs, Qs, rank, fps = ray.get(self.test_op)
             if len(Rs) > 0 and np.mean(Rs) > self.best:
                 self.best = np.mean(Rs)
