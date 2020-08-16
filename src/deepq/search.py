@@ -34,7 +34,8 @@ if __name__ == '__main__':
         stop=lambda trial_id, result: result['frames'] > kwargs['total_steps'],
         checkpoint_freq=1000,
         config=dict(
-            game=tune.grid_search(['Breakout', 'Enduro', 'Seaquest', 'BeamRider', 'Pong', 'Asterix', 'Qbert']),
+            game=tune.grid_search(
+                ['Breakout', 'Enduro', 'Seaquest', 'BeamRider', 'Pong', 'Asterix', 'Qbert', 'SpaceInvaders']),
             # game=tune.grid_search([kwargs['game']]),
             epoches=kwargs['total_steps'] // int(1e4),
             total_steps=kwargs['total_steps'],
@@ -46,7 +47,3 @@ if __name__ == '__main__':
         progress_reporter=reporter,
         resources_per_trial={"gpu": 0.5, "extra_gpu": 0.5},
     )
-
-    print("Best config: ", analysis.get_best_config(metric="ep_reward_test"))
-    df = analysis.dataframe()
-    df.to_csv('out.csv')
