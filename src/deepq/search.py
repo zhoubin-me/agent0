@@ -34,7 +34,8 @@ if __name__ == '__main__':
         stop=lambda trial_id, result: result['frames'] > kwargs['total_steps'],
         checkpoint_freq=1000,
         config=dict(
-            game=tune.grid_search([kwargs['game']]),
+            game=tune.grid_search(['Breakout', 'Enduro', 'Seaquest', 'BeamRider', 'Pong', 'Asterix', 'Qbert']),
+            # game=tune.grid_search([kwargs['game']]),
             epoches=kwargs['total_steps'] // int(1e4),
             total_steps=kwargs['total_steps'],
             distributional=kwargs['distributional'],
