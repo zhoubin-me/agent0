@@ -21,7 +21,6 @@ def default_hyperparams():
         double_q=True,
         dueling=True,
         noisy=False,
-        # prioritize=True,
         distributional=False,
         qr=False,
 
@@ -38,28 +37,27 @@ def default_hyperparams():
         num_envs=16,
         num_data_workers=4,
 
-
-
         adam_lr=5e-4,
-        adam_eps=1.5e-4,
+        adamw=True,
 
         batch_size=512,
         discount=0.99,
         replay_size=int(1e6),
         exploration_ratio=0.1,
+        min_eps=0.01,
 
         target_update_freq=500,
         agent_train_freq=10,
 
         start_training_step=int(2e4),
-        total_steps=int(1e7),
-        epoches=1000,
+        total_steps=int(2.5e7),
+        epoches=2500,
         random_seed=1234)
 
     return params
 
 
-@ray.remote(num_gpus=0.1)
+@ray.remote(num_gpus=0.05)
 class Actor:
     def __init__(self, **kwargs):
         for k, v in kwargs.items():
@@ -84,6 +82,9 @@ class Actor:
 
         self.R = np.zeros(self.num_envs)
         self.obs = self.envs.reset()
+
+    def get_state_dict(self):
+        return self.model.state_dict()
 
     def sample(self, steps, epsilon, state_dict):
         self.model.load_state_dict(state_dict)
@@ -154,7 +155,10 @@ class Agent:
         self.model_target = NatureCNN(self.state_shape[0], self.action_dim, dueling=self.dueling,
                                       noisy=self.noisy, num_atoms=self.num_atoms).to(self.device)
 
-        self.optimizer = torch.optim.AdamW(self.model.parameters(), self.adam_lr)
+        if self.adamw:
+            self.optimizer = torch.optim.AdamW(self.model.parameters(), self.adam_lr)
+        else:
+            self.optimizer = torch.optim.Adam(self.model.parameters(), self.adam_lr)
         self.update_steps = 0
         self.replay = deque(maxlen=self.replay_size)
 
@@ -174,7 +178,7 @@ class Agent:
             else:
                 a_next = q_next.mean(dim=-1).argmax(dim=-1)
             q_next = q_next[self.batch_indices, a_next, :]
-            q_target = rewards + self.discount * (1 - terminals) * q_next
+            q_target = rewards.unsqueeze(-1) + self.discount * (1 - terminals.unsqueeze(-1)) * q_next
 
         q = self.model(states)[self.batch_indices, actions, :]
         q = q.view(self.batch_size, -1).unsqueeze(1)
@@ -280,7 +284,7 @@ class Trainer(tune.Trainable):
         print("input args:\n", json.dumps(kwargs, indent=4, separators=(",", ":")))
 
         self.agent = Agent(**kwargs)
-        self.epsilon_schedule = LinearSchedule(1.0, 0.01, int(self.total_steps * self.exploration_ratio))
+        self.epsilon_schedule = LinearSchedule(1.0, self.min_eps, int(self.total_steps * self.exploration_ratio))
         self.epsilon = 1.0
         self.actors = [Actor.remote(rank=rank, **kwargs) for rank in range(self.num_actors + 1)]
         self.tester = self.actors[-1]
@@ -293,6 +297,11 @@ class Trainer(tune.Trainable):
         self.frame_count = 0
         self.lr_updated = False
         self.Rs, self.Qs, self.TRs, self.Ls = [], [], [], []
+        self.best = 0
+
+    def test_op(self):
+        return self.tester.sample.remote(self.actor_steps * self.num_actors * 50,
+                                         self.min_eps, self.agent.model.state_dict())
 
     def _train(self):
         done_id, self.sample_ops = ray.wait(self.sample_ops)
@@ -315,13 +324,24 @@ class Trainer(tune.Trainable):
                 self.Ls += loss.tolist()
         else:
             # Tester
-            self.sample_ops.append(self.tester.sample.remote(self.actor_steps, 0.01, self.agent.model.state_dict()))
+            self.sample_ops.append(self.test_op())
+            if len(Rs) > 0 and np.mean(Rs) > self.best:
+                self.best = np.mean(Rs)
+                print(f"Best Test Result: {np.mean(Rs)}\t{np.std(Rs)}\t{np.max(Rs)}\t{len(Rs)}")
+                torch.save({
+                    'model': ray.get(self.tester.get_state_dict.remote()),
+                    'BTRs': Rs,
+                    'Ls': self.Ls,
+                    'Rs': self.Rs,
+                    'Qs': self.Qs,
+                    'TRs': self.TRs
+                }, './best.pth')
             self.TRs += Rs
 
         # Start testing at itr > 100
         if self.iteration == 100:
             print("Testing Started ... ")
-            self.sample_ops.append(self.tester.sample.remote(self.actor_steps, 0.01, self.agent.model.state_dict()))
+            self.sample_ops.append(self.test_op())
 
 
         result = dict(
@@ -387,19 +407,19 @@ class Trainer(tune.Trainable):
     def _stop(self):
         print("Final Testing")
         if self.frame_count > self.total_steps:
-            local_replay, Rs, Qs, rank, fps = ray.get(
-                self.tester.sample.remote(self.actor_steps * self.num_envs * self.num_actors, self.epsilon,
-                                          self.agent.model.state_dict()))
-            print(f"Final Test Result: {np.mean(Rs)}\t{np.std(Rs)}\t{np.max(Rs)}\t{len(Rs)}")
-            torch.save({
-                'model': self.agent.model.state_dict(),
-                'optim': self.agent.optimizer.state_dict(),
-                'FTRs': Rs,
-                'Ls': self.Ls,
-                'Rs': self.Rs,
-                'Qs': self.Qs,
-                'TRs': self.TRs
-            }, './final.pth')
+            local_replay, Rs, Qs, rank, fps = ray.get(self.test_op)
+            if len(Rs) > 0 and np.mean(Rs) > self.best:
+                self.best = np.mean(Rs)
+                print(f"Best Test Result: {np.mean(Rs)}\t{np.std(Rs)}\t{np.max(Rs)}\t{len(Rs)}")
+                torch.save({
+                    'model': ray.get(self.tester.get_state_dict.remote()),
+                    'BTRs': Rs,
+                    'Ls': self.Ls,
+                    'Rs': self.Rs,
+                    'Qs': self.Qs,
+                    'TRs': self.TRs
+                }, './best.pth')
+            self.TRs += Rs
         try:
             ray.get([a.close_envs.remote() for a in self.actors])
             self.agent.dataloader._shutdown_workers()
