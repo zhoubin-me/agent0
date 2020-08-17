@@ -57,7 +57,7 @@ def default_hyperparams():
     return params
 
 
-@ray.remote(num_gpus=0.05)
+@ray.remote(num_gpus=0.1)
 class Actor:
     def __init__(self, **kwargs):
         for k, v in kwargs.items():
@@ -328,6 +328,7 @@ class Trainer(tune.Trainable):
             self.sample_ops.append(self.test_op(self.actor_steps))
             if len(Rs) > 0 and np.mean(Rs) > self.best:
                 self.best = np.mean(Rs)
+                print("Updated Best Ep Reward: ", self.best)
             self.TRs += Rs
 
         # Start testing at itr > 100
@@ -402,16 +403,17 @@ class Trainer(tune.Trainable):
             local_replay, Rs, Qs, rank, fps = ray.get(self.test_op(self.actor_steps * self.num_actors * 50))
             if len(Rs) > 0 and np.mean(Rs) > self.best:
                 self.best = np.mean(Rs)
-                print(f"Best Test Result: {np.mean(Rs)}\t{np.std(Rs)}\t{np.max(Rs)}\t{len(Rs)}")
-                torch.save({
-                    'model': ray.get(self.tester.get_state_dict.remote()),
-                    'BTRs': Rs,
-                    'Ls': self.Ls,
-                    'Rs': self.Rs,
-                    'Qs': self.Qs,
-                    'TRs': self.TRs
-                }, './best.pth')
+
+            print(f"Final Test Result: {np.mean(Rs)}\t{np.std(Rs)}\t{np.max(Rs)}\t{len(Rs)}")
             self.TRs += Rs
+            torch.save({
+                'model': ray.get(self.tester.get_state_dict.remote()),
+                'FTRs': Rs,
+                'Ls': self.Ls,
+                'Rs': self.Rs,
+                'Qs': self.Qs,
+                'TRs': self.TRs
+            }, './final.pth')
         try:
             ray.get([a.close_envs.remote() for a in self.actors])
             self.agent.dataloader._shutdown_workers()
