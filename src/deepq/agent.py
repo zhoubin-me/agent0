@@ -408,7 +408,6 @@ class Trainer(tune.Trainable):
             for _, Rs, Qs, rank, fps in ray.get(sample_ops):
                 FTRs += Rs
             print(f"Final Test Result: {np.mean(FTRs)}\t{np.std(FTRs)}\t{np.max(FTRs)}\t{len(FTRs)}")
-            self.TRs += Rs
             torch.save({
                 'model': self.agent.model.state_dict(),
                 'FTRs': FTRs,
