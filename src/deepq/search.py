@@ -45,5 +45,5 @@ if __name__ == '__main__':
             noisy=kwargs['noisy'],
         ),
         progress_reporter=reporter,
-        resources_per_trial={"gpu": 0.5, "extra_gpu": 0.5},
+        resources_per_trial={"gpu": 1, "extra_gpu": 1},
     )

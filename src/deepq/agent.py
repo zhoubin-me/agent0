@@ -51,7 +51,6 @@ def default_hyperparams():
 
         total_steps=int(2.5e7),
         start_training_step=int(2e4),
-        test_steps=int(5e5),
         epoches=2500,
         random_seed=1234)
 
@@ -299,10 +298,10 @@ class Trainer(tune.Trainable):
         self.frame_count = 0
         self.lr_updated = False
         self.Rs, self.Qs, self.TRs, self.Ls = [], [], [], []
-        self.best = 0
+        self.best = float('-inf')
 
-    def test_op(self):
-        return self.tester.sample.remote(self.test_steps // self.num_envs,
+    def test_op(self, steps):
+        return self.tester.sample.remote(steps,
                                          self.min_eps, self.agent.model.state_dict(), testing=True)
 
     def _train(self):
@@ -326,24 +325,15 @@ class Trainer(tune.Trainable):
                 self.Ls += loss.tolist()
         else:
             # Tester
-            self.sample_ops.append(self.test_op())
+            self.sample_ops.append(self.test_op(self.actor_steps))
             if len(Rs) > 0 and np.mean(Rs) > self.best:
                 self.best = np.mean(Rs)
-                print(f"Best Test Result: {np.mean(Rs)}\t{np.std(Rs)}\t{np.max(Rs)}\t{len(Rs)}")
-                torch.save({
-                    'model': ray.get(self.tester.get_state_dict.remote()),
-                    'BTRs': Rs,
-                    'Ls': self.Ls,
-                    'Rs': self.Rs,
-                    'Qs': self.Qs,
-                    'TRs': self.TRs
-                }, './best.pth')
             self.TRs += Rs
 
         # Start testing at itr > 100
         if self.iteration == 100:
             print("Testing Started ... ")
-            self.sample_ops.append(self.test_op())
+            self.sample_ops.append(self.test_op(self.actor_steps))
 
 
         result = dict(
@@ -354,9 +344,9 @@ class Trainer(tune.Trainable):
             frames=self.frame_count,
             speed=self.frame_count / (self._time_total + 1),
             time_remain=(self.total_steps - self.frame_count) / (self.frame_count / (self._time_total + 1)),
-            loss=np.mean(self.Ls[-100:]) if len(self.Ls) > 0 else 0,
-            ep_reward_test=np.mean(self.TRs[-100:]) if len(self.TRs) > 0 else 0,
-            ep_reward_train=np.mean(self.Rs[-100:]) if len(self.Rs) > 0 else 0,
+            loss=np.mean(self.Ls[-20:]) if len(self.Ls) > 0 else 0,
+            ep_reward_test=np.mean(self.TRs[-20:]) if len(self.TRs) > 0 else 0,
+            ep_reward_train=np.mean(self.Rs[-20:]) if len(self.Rs) > 0 else 0,
             ep_reward_train_max=np.max(self.Rs) if len(self.Rs) > 0 else 0,
             ep_reward_test_max=np.max(self.TRs) if len(self.TRs) > 0 else 0,
             qmax=np.mean(self.Qs[-100:]) if len(self.Qs) > 0 else 0
@@ -409,7 +399,7 @@ class Trainer(tune.Trainable):
     def _stop(self):
         if self.frame_count > self.total_steps:
             print("Final Testing")
-            local_replay, Rs, Qs, rank, fps = ray.get(self.test_op)
+            local_replay, Rs, Qs, rank, fps = ray.get(self.test_op(self.actor_steps * self.num_actors * 50))
             if len(Rs) > 0 and np.mean(Rs) > self.best:
                 self.best = np.mean(Rs)
                 print(f"Best Test Result: {np.mean(Rs)}\t{np.std(Rs)}\t{np.max(Rs)}\t{len(Rs)}")
