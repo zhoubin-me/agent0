@@ -49,8 +49,9 @@ def default_hyperparams():
         target_update_freq=500,
         agent_train_freq=10,
 
-        start_training_step=int(2e4),
         total_steps=int(2.5e7),
+        start_training_step=int(2e4),
+        test_steps=int(5e5),
         epoches=2500,
         random_seed=1234)
 
@@ -86,7 +87,7 @@ class Actor:
     def get_state_dict(self):
         return self.model.state_dict()
 
-    def sample(self, steps, epsilon, state_dict):
+    def sample(self, steps, epsilon, state_dict, testing=False):
         self.model.load_state_dict(state_dict)
         replay = deque(maxlen=self.replay_size)
         Rs, Qs = [], []
@@ -118,8 +119,9 @@ class Actor:
             frames = np.zeros((self.num_envs, self.state_shape[0] + 1, *self.state_shape[1:]), dtype=np.uint8)
             frames[:, :-1, :, :] = self.obs
             frames[:, -1, :, :] = obs_next[:, -1, :, :]
-            for entry in zip(frames, action, reward, done):
-                replay.append(entry)
+            if not testing:
+                for entry in zip(frames, action, reward, done):
+                    replay.append(entry)
             self.obs = obs_next
             self.R += np.array(reward)
             for idx, d in enumerate(done):
@@ -300,8 +302,8 @@ class Trainer(tune.Trainable):
         self.best = 0
 
     def test_op(self):
-        return self.tester.sample.remote(self.actor_steps * self.num_actors * 50,
-                                         self.min_eps, self.agent.model.state_dict())
+        return self.tester.sample.remote(self.test_steps // self.num_envs,
+                                         self.min_eps, self.agent.model.state_dict(), testing=True)
 
     def _train(self):
         done_id, self.sample_ops = ray.wait(self.sample_ops)

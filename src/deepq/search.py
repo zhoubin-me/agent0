@@ -42,7 +42,7 @@ if __name__ == '__main__':
             distributional=kwargs['distributional'],
             num_atoms=kwargs['num_atoms'],
             adamw=kwargs['adamw'],
-            noisy=kwargs['noisy']
+            noisy=kwargs['noisy'],
         ),
         progress_reporter=reporter,
         resources_per_trial={"gpu": 0.5, "extra_gpu": 0.5},
