@@ -328,7 +328,7 @@ class Trainer(tune.Trainable):
             self.sample_ops.append(self.test_op(self.actor_steps))
             if len(Rs) > 0 and np.mean(Rs) > self.best:
                 self.best = np.mean(Rs)
-                print("Updated Best Ep Reward: ", self.best)
+                print(f"{self.game} updated Best Ep Reward: {self.best}")
             self.TRs += Rs
 
         # Start testing at itr > 100
