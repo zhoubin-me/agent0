@@ -83,11 +83,15 @@ class Actor:
         self.R = np.zeros(self.num_envs)
         self.obs = self.envs.reset()
 
-    def get_state_dict(self):
-        return self.model.state_dict()
 
-    def sample(self, steps, epsilon, state_dict, testing=False):
+    def sample(self, steps, epsilon, state_dict, testing=False, reset=False):
         self.model.load_state_dict(state_dict)
+        if reset and testing:
+            self.envs.close()
+            self.envs = ShmemVecEnv([lambda: make_env(self.game, False, False)
+                                     for _ in range(self.num_envs)], context='fork')
+            self.obs = self.envs.reset()
+
         replay = deque(maxlen=self.replay_size)
         Rs, Qs = [], []
         tic = time.time()
@@ -300,10 +304,6 @@ class Trainer(tune.Trainable):
         self.Rs, self.Qs, self.TRs, self.Ls = [], [], [], []
         self.best = float('-inf')
 
-    def test_op(self, steps):
-        return self.tester.sample.remote(steps,
-                                         self.min_eps, self.agent.model.state_dict(), testing=True)
-
     def _train(self):
         done_id, self.sample_ops = ray.wait(self.sample_ops)
         data = ray.get(done_id)
@@ -325,7 +325,8 @@ class Trainer(tune.Trainable):
                 self.Ls += loss.tolist()
         else:
             # Tester
-            self.sample_ops.append(self.test_op(self.actor_steps))
+            self.sample_ops.append(
+                self.tester.sample.remote(self.actor_steps, self.min_eps, self.agent.model.state_dict(), testing=True))
             if len(Rs) > 0 and np.mean(Rs) > self.best:
                 self.best = np.mean(Rs)
                 print(f"{self.game} updated Best Ep Reward: {self.best}")
@@ -334,7 +335,8 @@ class Trainer(tune.Trainable):
         # Start testing at itr > 100
         if self.iteration == 100:
             print("Testing Started ... ")
-            self.sample_ops.append(self.test_op(self.actor_steps))
+            self.sample_ops.append(
+                self.tester.sample.remote(self.actor_steps, self.min_eps, self.agent.model.state_dict(), testing=True))
 
 
         result = dict(
@@ -400,15 +402,16 @@ class Trainer(tune.Trainable):
     def _stop(self):
         if self.frame_count > self.total_steps:
             print("Final Testing")
-            local_replay, Rs, Qs, rank, fps = ray.get(self.test_op(self.actor_steps * self.num_actors * 50))
-            if len(Rs) > 0 and np.mean(Rs) > self.best:
-                self.best = np.mean(Rs)
-
-            print(f"Final Test Result: {np.mean(Rs)}\t{np.std(Rs)}\t{np.max(Rs)}\t{len(Rs)}")
+            sample_ops = [a.sample.remote(self.actor_steps * self.num_actors * 20, self.min_eps,
+                                          self.agent.model.state_dict(), True, True) for a in self.actors]
+            FTRs = []
+            for _, Rs, Qs, rank, fps in ray.get(sample_ops):
+                FTRs += Rs
+            print(f"Final Test Result: {np.mean(FTRs)}\t{np.std(FTRs)}\t{np.max(FTRs)}\t{len(FTRs)}")
             self.TRs += Rs
             torch.save({
-                'model': ray.get(self.tester.get_state_dict.remote()),
-                'FTRs': Rs,
+                'model': self.agent.model.state_dict(),
+                'FTRs': FTRs,
                 'Ls': self.Ls,
                 'Rs': self.Rs,
                 'Qs': self.Qs,
