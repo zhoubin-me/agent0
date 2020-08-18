@@ -278,7 +278,7 @@ class Agent:
 
 
 class Trainer(tune.Trainable):
-    def _setup(self, config):
+    def setup(self, config):
         kwargs = default_hyperparams()
         for k, v in config.items():
             kwargs[k] = v
@@ -340,7 +340,7 @@ class Trainer(tune.Trainable):
         )
         return result
 
-    def _save(self, checkpoint_dir):
+    def save_checkpoint(self, checkpoint_dir):
         output = ray.get([a.sample.remote(self.actor_steps,
                                           self.min_eps,
                                           self.agent.model.state_dict(),
@@ -374,7 +374,7 @@ class Trainer(tune.Trainable):
 
         return data_to_save
 
-    def _restore(self, checkpoint):
+    def load_checkpoint(self, checkpoint):
         self.agent.model.load_state_dict(checkpoint['model'])
         self.agent.model_target.load_state_dict(checkpoint['model_target'])
         self.agent.optimizer.load_state_dict(checkpoint['optim'])
@@ -405,7 +405,7 @@ class Trainer(tune.Trainable):
         self.config = new_config
         return True
 
-    def _stop(self):
+    def cleanup(self):
         try:
             ray.get([a.close_envs.remote() for a in self.actors])
             self.agent.dataloader._shutdown_workers()
