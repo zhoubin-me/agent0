@@ -48,7 +48,7 @@ def default_hyperparams():
 
         total_steps=int(2.5e7),
         epoches=2500,
-        start_training_step=int(2e4),
+        start_training_step=int(1e5),
         target_update_freq=500,
         agent_train_freq=10,
 
