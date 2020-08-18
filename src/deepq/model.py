@@ -52,9 +52,9 @@ class NatureCNN(nn.Module):
                 m.reset_noise(std)
 
 
-class NoisyLinear_(nn.Module):
+class NoisyLinear(nn.Module):
     def __init__(self, in_size, out_size, sigma=0.5):
-        super(NoisyLinear_, self).__init__()
+        super(NoisyLinear, self).__init__()
         self.linear_mu = nn.Linear(in_size, out_size)
         self.linear_sigma = nn.Linear(in_size, out_size)
 
@@ -83,14 +83,14 @@ class NoisyLinear_(nn.Module):
         self.linear_sigma.weight.data.fill_(self.sigma * stdv)
         self.linear_sigma.bias.data.fill_(self.sigma * stdv)
 
-    def reset_noise(self, std=None):
+    def reset_noise(self):
         self.noise_w.data.normal_()
         self.noise_b.data.normal_()
 
 
-class NoisyLinear(nn.Module):
+class NoisyLinear_(nn.Module):
     def __init__(self, in_features, out_features, std_init=0.4):
-        super(NoisyLinear, self).__init__()
+        super(NoisyLinear_, self).__init__()
 
         self.in_features = in_features
         self.out_features = out_features
