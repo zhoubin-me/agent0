@@ -79,7 +79,7 @@ class Actor:
         self.obs = self.envs.reset()
 
 
-    def sample(self, steps, epsilon, state_dict, testing=False, test_episodes=100):
+    def sample(self, steps, epsilon, state_dict, testing=False, test_episodes=10):
         self.model.load_state_dict(state_dict)
         replay = deque(maxlen=self.replay_size)
         Rs, Qs = [], []
@@ -129,8 +129,6 @@ class Actor:
         toc = time.time()
         return replay, Rs, Qs, self.rank, len(replay) / (toc - tic)
 
-    def get_state_dict(self):
-        return self.model.state_dict()
 
     def close_envs(self):
         self.envs.close()
@@ -299,7 +297,7 @@ class Trainer(tune.Trainable):
 
         self.frame_count = 0
         self.lr_updated = False
-        self.Rs, self.Qs, self.TRs, self.Ls = [], [], [], []
+        self.Rs, self.Qs, self.TRs, self.Ls, self.ITRs = [], [], [], [], []
         self.best = float('-inf')
 
     def _train(self):
@@ -330,7 +328,7 @@ class Trainer(tune.Trainable):
             speed=self.frame_count / (self._time_total + 1),
             time_remain=(self.total_steps - self.frame_count) / (self.frame_count / (self._time_total + 1)),
             loss=np.mean(self.Ls[-20:]) if len(self.Ls) > 0 else 0,
-            ep_reward_test=np.mean(self.TRs[-20:]) if len(self.TRs) > 0 else 0,
+            ep_reward_test=np.mean(self.ITRs) if len(self.ITRs) > 0 else 0,
             ep_reward_train=np.mean(self.Rs[-20:]) if len(self.Rs) > 0 else 0,
             ep_reward_train_max=np.max(self.Rs) if len(self.Rs) > 0 else 0,
             ep_reward_test_max=np.max(self.TRs) if len(self.TRs) > 0 else 0,
@@ -345,13 +343,14 @@ class Trainer(tune.Trainable):
                                           testing=True,
                                           test_episodes=10) for a in self.actors])
 
-        FTRs = []
+        ITRs = []
         for _, Rs, Qs, rank, fps in output:
-            FTRs += Rs
+            ITRs += Rs
 
-        self.TRs += FTRs
+        self.ITRs = ITRs
+        self.TRs += ITRs
         print(f"Iteration {self.training_iteration} test Result(mean|std|max|min|len):"
-              f" {np.mean(FTRs)}\t{np.std(FTRs)}\t{np.max(FTRs)}\t{np.min(FTRs)}\t{len(FTRs)}")
+              f" {np.mean(ITRs)}\t{np.std(ITRs)}\t{np.max(ITRs)}\t{np.min(ITRs)}\t{len(ITRs)}")
 
         data_to_save = {
             'model': self.agent.model.state_dict(),
@@ -362,11 +361,11 @@ class Trainer(tune.Trainable):
             'Qs': self.Qs,
             'TRs': self.TRs,
             'frame_count': self.frame_count,
-            'FTRs': FTRs,
+            'ITRs': ITRs,
         }
 
-        if np.mean(FTRs) > self.best:
-            self.best = np.mean(FTRs)
+        if np.mean(ITRs) > self.best:
+            self.best = np.mean(ITRs)
             torch.save(data_to_save, './best.pth')
 
         return data_to_save
