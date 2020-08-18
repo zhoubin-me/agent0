@@ -31,6 +31,7 @@ if __name__ == '__main__':
         verbose=1,
         checkpoint_at_end=True,
         fail_fast=True,
+        restore=kwargs['restore_ckpt'],
         stop=lambda trial_id, result: result['frames'] > kwargs['total_steps'],
         checkpoint_freq=1000,
         config=dict(

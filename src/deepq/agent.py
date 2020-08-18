@@ -46,12 +46,13 @@ def default_hyperparams():
         exploration_ratio=0.1,
         min_eps=0.01,
 
+        total_steps=int(2.5e7),
+        epoches=2500,
+        start_training_step=int(2e4),
         target_update_freq=500,
         agent_train_freq=10,
 
-        total_steps=int(2.5e7),
-        start_training_step=int(2e4),
-        epoches=2500,
+        restore_ckpt=None,
         random_seed=1234)
 
     return params
