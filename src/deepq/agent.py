@@ -83,20 +83,18 @@ class Actor:
         self.obs = self.envs.reset()
 
 
-    def sample(self, steps, epsilon, state_dict, testing=False, reset=False):
+    def sample(self, steps, epsilon, state_dict, testing=False, test_episodes=100):
         self.model.load_state_dict(state_dict)
-        if reset and testing:
-            self.envs.close()
-            self.envs = ShmemVecEnv([lambda: make_env(self.game, False, False)
-                                     for _ in range(self.num_envs)], context='fork')
+        if testing:
             self.obs = self.envs.reset()
 
         replay = deque(maxlen=self.replay_size)
         Rs, Qs = [], []
         tic = time.time()
-        for step in range(steps):
+        step = 0
+        while True:
+            step += 1
             action_random = np.random.randint(0, self.action_dim, self.num_envs)
-
             if self.noisy and step % self.reset_noise_freq == 0:
                 self.model.reset_noise()
 
@@ -130,8 +128,16 @@ class Actor:
                 if 'real_reward' in inf:
                     Rs.append(inf['real_reward'])
 
+            if testing and len(Rs) > test_episodes:
+                break
+            if not testing and step > steps:
+                break
+
         toc = time.time()
         return replay, Rs, Qs, self.rank, len(replay) / (toc - tic)
+
+    def get_state_dict(self):
+        return self.model.state_dict()
 
     def close_envs(self):
         self.envs.close()
@@ -296,8 +302,16 @@ class Trainer(tune.Trainable):
         self.steps_per_epoch = self.total_steps // self.epoches
         self.actor_steps = self.total_steps // (self.epoches * self.num_envs * self.num_actors)
 
-        self.sample_ops = [a.sample.remote(self.actor_steps, 1.0, self.agent.model.state_dict()) for a in
-                           self.actors[:-1]]
+        self.sample_ops = [a.sample.remote(self.actor_steps, 1.0, self.agent.model.state_dict())
+                           for a in self.actors[:-1]]
+
+        self.sample_ops.append(
+            self.tester.sample.remote(
+                self.actor_steps,
+                self.min_eps,
+                self.agent.model.state_dict(),
+                testing=True))
+
         self.frame_count = 0
         self.lr_updated = False
         self.Rs, self.Qs, self.TRs, self.Ls = [], [], [], []
@@ -325,17 +339,26 @@ class Trainer(tune.Trainable):
         else:
             # Tester
             self.sample_ops.append(
-                self.tester.sample.remote(self.actor_steps, self.min_eps, self.agent.model.state_dict(), testing=True))
+                self.tester.sample.remote(
+                    self.actor_steps,
+                    self.min_eps,
+                    self.agent.model.state_dict(),
+                    testing=True))
+
             if len(Rs) > 0 and np.mean(Rs) > self.best:
                 self.best = np.mean(Rs)
                 print(f"{self.game} updated Best Ep Reward: {self.best}")
+                torch.save({
+                    'model': ray.get(self.tester.get_state_dict.remote()),
+                    'Ls': self.Ls,
+                    'Rs': self.Rs,
+                    'Qs': self.Qs,
+                    'TRs': self.TRs
+                }, './best.pth')
+
             self.TRs += Rs
 
-        # Start testing at itr > 100
-        if self.iteration == 100:
-            print("Testing Started ... ")
-            self.sample_ops.append(
-                self.tester.sample.remote(self.actor_steps, self.min_eps, self.agent.model.state_dict(), testing=True))
+
 
 
         result = dict(
@@ -401,11 +424,15 @@ class Trainer(tune.Trainable):
     def _stop(self):
         if self.frame_count > self.total_steps:
             print("Final Testing")
-            sample_ops = [a.sample.remote(self.actor_steps * self.num_actors * 20, self.min_eps,
-                                          self.agent.model.state_dict(), True, True) for a in self.actors]
+            output = ray.get([a.sample.remote(self.actor_steps,
+                                              self.agent.model.state_dict(),
+                                              testing=True,
+                                              test_episodes=10) for a in self.actors])
+
             FTRs = []
-            for _, Rs, Qs, rank, fps in ray.get(sample_ops):
+            for _, Rs, Qs, rank, fps in output:
                 FTRs += Rs
+
             print(f"Final Test Result: {np.mean(FTRs)}\t{np.std(FTRs)}\t{np.max(FTRs)}\t{len(FTRs)}")
             torch.save({
                 'model': self.agent.model.state_dict(),
