@@ -300,7 +300,7 @@ class Trainer(tune.Trainable):
         self.Rs, self.Qs, self.TRs, self.Ls, self.ITRs = [], [], [], [], []
         self.best = float('-inf')
 
-    def _train(self):
+    def step(self):
         done_id, self.sample_ops = ray.wait(self.sample_ops)
         data = ray.get(done_id)
         local_replay, Rs, Qs, rank, fps = data[0]
