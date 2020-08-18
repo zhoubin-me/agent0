@@ -126,9 +126,9 @@ class Actor:
                     replay.append(entry)
             self.obs = obs_next
 
-            for i in info:
-                if 'real_reward' in i:
-                    Rs.append(i['real_reward'])
+            for inf in info:
+                if 'real_reward' in inf:
+                    Rs.append(inf['real_reward'])
 
         toc = time.time()
         return replay, Rs, Qs, self.rank, len(replay) / (toc - tic)
