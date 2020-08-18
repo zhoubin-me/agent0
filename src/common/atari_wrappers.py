@@ -1,10 +1,12 @@
+from collections import deque
 
-import gym
 import cv2
+import gym
 import numpy as np
 from gym import spaces
-from collections import deque
+
 cv2.ocl.setUseOpenCL(False)
+
 
 class TimeLimitMask(gym.Wrapper):
     def step(self, action):
@@ -118,11 +120,13 @@ class MaxAndSkipEnv(gym.Wrapper):
         gym.Wrapper.__init__(self, env)
         # most recent raw observations (for max pooling across time steps)
         self._obs_buffer = np.zeros((2,)+env.observation_space.shape, dtype=np.uint8)
-        self._skip       = skip
+        self._skip = skip
+        self.real_reward = 0
 
     def step(self, action):
         """Repeat action, sum reward, and max over last observations."""
         total_reward = 0.0
+        info = {}
         done = None
         for i in range(self._skip):
             obs, reward, done, info = self.env.step(action)
@@ -134,10 +138,14 @@ class MaxAndSkipEnv(gym.Wrapper):
         # Note that the observation on the done=True frame
         # doesn't matter
         max_frame = self._obs_buffer.max(axis=0)
+        self.real_reward += total_reward
+        if done:
+            info.update(real_reward=self.real_reward)
 
         return max_frame, total_reward, done, info
 
     def reset(self, **kwargs):
+        self.real_reward = 0
         return self.env.reset(**kwargs)
 
 class ClipRewardEnv(gym.RewardWrapper):

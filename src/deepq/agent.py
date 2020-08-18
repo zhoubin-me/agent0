@@ -80,7 +80,6 @@ class Actor:
         self.model = NatureCNN(self.state_shape[0], self.action_dim,
                                dueling=self.dueling, noisy=self.noisy, num_atoms=self.num_atoms).to(self.device)
 
-        self.R = np.zeros(self.num_envs)
         self.obs = self.envs.reset()
 
 
@@ -126,11 +125,11 @@ class Actor:
                 for entry in zip(frames, action, reward, done):
                     replay.append(entry)
             self.obs = obs_next
-            self.R += np.array(reward)
-            for idx, d in enumerate(done):
-                if d:
-                    Rs.append(self.R[idx])
-                    self.R[idx] = 0
+
+            for i in info:
+                if 'real_reward' in i:
+                    Rs.append(i['real_reward'])
+
         toc = time.time()
         return replay, Rs, Qs, self.rank, len(replay) / (toc - tic)
 
