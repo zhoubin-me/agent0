@@ -353,13 +353,11 @@ class Trainer(tune.Trainable):
                     'Ls': self.Ls,
                     'Rs': self.Rs,
                     'Qs': self.Qs,
-                    'TRs': self.TRs
+                    'TRs': self.TRs,
+                    'best': Rs,
                 }, './best.pth')
 
             self.TRs += Rs
-
-
-
 
         result = dict(
             game=self.game,
