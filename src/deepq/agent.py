@@ -424,7 +424,7 @@ class Trainer(tune.Trainable):
         if self.frame_count > self.total_steps:
             print("Final Testing")
             output = ray.get([a.sample.remote(self.actor_steps,
-                                              self.min_epsilon,
+                                              self.min_eps,
                                               self.agent.model.state_dict(),
                                               testing=True,
                                               test_episodes=10) for a in self.actors])
