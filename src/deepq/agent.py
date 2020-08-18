@@ -81,9 +81,6 @@ class Actor:
 
     def sample(self, steps, epsilon, state_dict, testing=False, test_episodes=100):
         self.model.load_state_dict(state_dict)
-        if testing:
-            self.obs = self.envs.reset()
-
         replay = deque(maxlen=self.replay_size)
         Rs, Qs = [], []
         tic = time.time()
