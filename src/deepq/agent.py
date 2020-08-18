@@ -105,8 +105,12 @@ class Actor:
             qs_max, qs_argmax = qs.max(dim=-1)
             action_greedy = qs_argmax.tolist()
             Qs.append(qs_max.mean().item())
-            action = [act_greedy if p > epsilon else act_random for p, act_random, act_greedy in
-                      zip(np.random.rand(self.num_envs), action_random, action_greedy)]
+
+            if self.noisy:
+                action = action_greedy
+            else:
+                action = [act_greedy if p > epsilon else act_random for p, act_random, act_greedy in
+                          zip(np.random.rand(self.num_envs), action_random, action_greedy)]
 
             obs_next, reward, done, info = self.envs.step(action)
             frames = np.zeros((self.num_envs, self.state_shape[0] + 1, *self.state_shape[1:]), dtype=np.uint8)
