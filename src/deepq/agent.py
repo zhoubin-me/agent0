@@ -348,7 +348,8 @@ class Trainer(tune.Trainable):
 
             if len(Rs) > 0 and np.mean(Rs) > self.best:
                 self.best = np.mean(Rs)
-                print(f"Final Test Result: {np.mean(Rs)}\t{np.std(Rs)}\t{np.max(Rs)}\t{np.min(Rs)}\t{len(Rs)}")
+                print(
+                    f"{self.game} update best test ep reward: {np.mean(Rs)}\t{np.std(Rs)}\t{np.max(Rs)}\t{np.min(Rs)}\t{len(Rs)}")
                 torch.save({
                     'model': ray.get(self.tester.get_state_dict.remote()),
                     'Ls': self.Ls,
@@ -357,6 +358,8 @@ class Trainer(tune.Trainable):
                     'TRs': self.TRs,
                     'best': Rs,
                 }, './best.pth')
+            else:
+                print(f"{self.game} test ep reward: {np.mean(Rs)}\t{np.std(Rs)}\t{np.max(Rs)}\t{np.min(Rs)}\t{len(Rs)}")
 
             self.TRs += Rs
 
