@@ -44,7 +44,7 @@ if __name__ == '__main__':
         checkpoint_freq=1000,
         trial_name_creator=tune.function(lambda trial: trial_str_creator(trial, sha)),
         config=dict(
-            game=tune.grid_search(['Breakout', 'Enduro', 'Seaquest', 'BeamRider', 'Pong', 'Asterix', 'Qbert', 'SpaceInvaders']),
+            # game=tune.grid_search(['Breakout', 'Enduro', 'Seaquest', 'BeamRider', 'Pong', 'Asterix', 'Qbert', 'SpaceInvaders']),
             game=cfg.game,
             epochs=cfg.epochs,
             total_steps=cfg.total_steps,
