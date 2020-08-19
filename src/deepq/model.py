@@ -24,13 +24,13 @@ class NatureCNN(nn.Module):
             nn.Conv2d(64, 64, 3, stride=1), nn.ReLU(), nn.Flatten(),
             dense(64 * 7 * 7, 512), nn.ReLU())
 
-        # self.convs.apply(lambda m: init(m, nn.init.calculate_gain('relu')))
+        self.convs.apply(lambda m: init(m, nn.init.calculate_gain('relu')))
         self.p = dense(512, action_dim * num_atoms)
-        # self.p.apply(lambda m: init(m, 0.01))
+        self.p.apply(lambda m: init(m, 0.01))
 
         if dueling:
             self.v = dense(512, num_atoms)
-            # self.v.apply(lambda m: init(m, 1.0))
+            self.v.apply(lambda m: init(m, 1.0))
         else:
             self.v = None
 
