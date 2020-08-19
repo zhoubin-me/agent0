@@ -8,17 +8,6 @@ from gym import spaces
 cv2.ocl.setUseOpenCL(False)
 
 
-class TimeLimitMask(gym.Wrapper):
-    def step(self, action):
-        obs, rew, done, info = self.env.step(action)
-        if done and self.env._max_episode_steps == self.env._elapsed_steps:
-            info['bad_transition'] = True
-
-        return obs, rew, done, info
-
-    def reset(self, **kwargs):
-        return self.env.reset(**kwargs)
-
 class ClipActionsWrapper(gym.Wrapper):
     def step(self, action):
         import numpy as np
@@ -28,6 +17,7 @@ class ClipActionsWrapper(gym.Wrapper):
 
     def reset(self, **kwargs):
         return self.env.reset(**kwargs)
+
 
 class NoopResetEnv(gym.Wrapper):
     def __init__(self, env, noop_max=30):
@@ -46,7 +36,7 @@ class NoopResetEnv(gym.Wrapper):
         if self.override_num_noops is not None:
             noops = self.override_num_noops
         else:
-            noops = self.unwrapped.np_random.randint(1, self.noop_max + 1) #pylint: disable=E1101
+            noops = self.unwrapped.np_random.randint(1, self.noop_max + 1)  # pylint: disable=E1101
         assert noops > 0
         obs = None
         for _ in range(noops):
@@ -57,6 +47,7 @@ class NoopResetEnv(gym.Wrapper):
 
     def step(self, ac):
         return self.env.step(ac)
+
 
 class FireResetEnv(gym.Wrapper):
     def __init__(self, env):
@@ -78,6 +69,7 @@ class FireResetEnv(gym.Wrapper):
     def step(self, ac):
         return self.env.step(ac)
 
+
 class EpisodicLifeEnv(gym.Wrapper):
     def __init__(self, env):
         """Make end-of-life == end-of-episode, but only reset on true game over.
@@ -85,7 +77,7 @@ class EpisodicLifeEnv(gym.Wrapper):
         """
         gym.Wrapper.__init__(self, env)
         self.lives = 0
-        self.was_real_done  = True
+        self.was_real_done = True
 
     def step(self, action):
         obs, reward, done, info = self.env.step(action)
@@ -93,7 +85,7 @@ class EpisodicLifeEnv(gym.Wrapper):
         # check current lives, make loss of life terminal,
         # then update lives to handle bonus lives
         lives = self.env.unwrapped.ale.lives()
-        if lives < self.lives and lives > 0:
+        if self.lives > lives > 0:
             # for Qbert sometimes we stay in lives == 0 condition for a few frames
             # so it's important to keep lives > 0, so that we only reset once
             # the environment advertises done.
@@ -114,12 +106,13 @@ class EpisodicLifeEnv(gym.Wrapper):
         self.lives = self.env.unwrapped.ale.lives()
         return obs
 
+
 class MaxAndSkipEnv(gym.Wrapper):
     def __init__(self, env, skip=4):
         """Return only every `skip`-th frame"""
         gym.Wrapper.__init__(self, env)
         # most recent raw observations (for max pooling across time steps)
-        self._obs_buffer = np.zeros((2,)+env.observation_space.shape, dtype=np.uint8)
+        self._obs_buffer = np.zeros((2,) + env.observation_space.shape, dtype=np.uint8)
         self._skip = skip
         self.real_reward = 0
 
@@ -147,6 +140,7 @@ class MaxAndSkipEnv(gym.Wrapper):
     def reset(self, **kwargs):
         self.real_reward = 0
         return self.env.reset(**kwargs)
+
 
 class ClipRewardEnv(gym.RewardWrapper):
     def __init__(self, env):
@@ -225,7 +219,8 @@ class FrameStack(gym.Wrapper):
         self.k = k
         self.frames = deque([], maxlen=k)
         shp = env.observation_space.shape
-        self.observation_space = gym.spaces.Box(low=0, high=255, shape=((shp[0] * k,) + shp[1:]), dtype=env.observation_space.dtype)
+        self.observation_space = gym.spaces.Box(low=0, high=255, shape=((shp[0] * k,) + shp[1:]),
+                                                dtype=env.observation_space.dtype)
 
     def reset(self):
         ob = self.env.reset()
@@ -241,6 +236,7 @@ class FrameStack(gym.Wrapper):
     def _get_ob(self):
         assert len(self.frames) == self.k
         return LazyFrames(list(self.frames))
+
 
 class ScaledFloatFrame(gym.ObservationWrapper):
     def __init__(self, env):
@@ -265,6 +261,7 @@ class TransposeImage(gym.ObservationWrapper):
 
     def observation(self, observation):
         return observation.transpose(2, 0, 1)
+
 
 class LazyFrames(object):
     def __init__(self, frames):
@@ -337,10 +334,8 @@ class NormalizedEnv(gym.ObservationWrapper):
 
     def observation(self, observation):
         self.num_steps += 1
-        self.state_mean = self.state_mean * self.alpha + \
-            observation.mean() * (1 - self.alpha)
-        self.state_std = self.state_std * self.alpha + \
-            observation.std() * (1 - self.alpha)
+        self.state_mean = self.state_mean * self.alpha + observation.mean() * (1 - self.alpha)
+        self.state_std = self.state_std * self.alpha + observation.std() * (1 - self.alpha)
 
         unbiased_mean = self.state_mean / (1 - pow(self.alpha, self.num_steps))
         unbiased_std = self.state_std / (1 - pow(self.alpha, self.num_steps))
@@ -354,6 +349,7 @@ def make_atari(env_id):
     env = NoopResetEnv(env, noop_max=30)
     env = MaxAndSkipEnv(env, skip=4)
     return env
+
 
 def wrap_deepmind(env, episode_life=False, clip_rewards=False, frame_stack=False, scale=False, transpose_image=True):
     """Configure environment for DeepMind-style Atari.
@@ -372,6 +368,7 @@ def wrap_deepmind(env, episode_life=False, clip_rewards=False, frame_stack=False
     if frame_stack:
         env = FrameStack(env, 4)
     return env
+
 
 if __name__ == '__main__':
     env = make_atari('BreakoutNoFrameskip-v4')
