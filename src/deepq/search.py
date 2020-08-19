@@ -46,7 +46,7 @@ if __name__ == '__main__':
         config=dict(
             game=tune.grid_search(
                 ['Breakout', 'Enduro', 'Seaquest', 'BeamRider', 'Pong', 'Asterix', 'Qbert', 'SpaceInvaders']),
-            # game=tune.grid_search([kwargs['game']]),
+            # game=cfg.game,
             epochs=cfg.epochs,
             total_steps=cfg.total_steps,
             distributional=cfg.distributional,
