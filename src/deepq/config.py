@@ -36,7 +36,7 @@ class Config:
     agent_train_freq: int = 10
 
     restore_ckpt: str = None
-    random_seed: int = 1234
+    random_seed: int = 42
 
     def default_num_atoms(self):
         if self.distributional:
