@@ -8,7 +8,7 @@ import torch
 from ray import tune
 from ray.tune.trial import ExportFormat
 
-from src.common.utils import LinearSchedule
+from src.common.utils import LinearSchedule, set_random_seed
 from src.deepq.actor import Actor
 from src.deepq.agent import Agent
 from src.deepq.config import Config
@@ -30,16 +30,15 @@ class Trainer(tune.Trainable, ABC):
         self.sample_ops = None
         super(Trainer, self).__init__(config, logger_creator)
 
-    def setup(self, kwargs):
-
-        self.cfg = Config(**kwargs)
-
+    def setup(self, config):
+        self.cfg = Config(**config)
+        set_random_seed(self.cfg.random_seed)
         print("input args:\n", json.dumps(vars(self.cfg), indent=4, separators=(",", ":")))
 
-        self.agent = Agent(**kwargs)
+        self.agent = Agent(**config)
         self.epsilon_schedule = LinearSchedule(1.0, self.cfg.min_eps,
                                                int(self.cfg.total_steps * self.cfg.exploration_ratio))
-        self.actors = [Actor.remote(rank=rank, **kwargs) for rank in range(self.cfg.num_actors)]
+        self.actors = [Actor.remote(rank=rank, **config) for rank in range(self.cfg.num_actors)]
 
         self.steps_per_epoch = self.cfg.total_steps // self.cfg.epochs
         self.actor_steps = self.cfg.total_steps // (self.cfg.epochs * self.cfg.num_envs * self.cfg.num_actors)

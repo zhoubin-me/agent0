@@ -1,22 +1,24 @@
+import random
+
 import numpy as np
 import torch
 from prefetch_generator import BackgroundGenerator
 from torch.utils.data import Dataset, DataLoader
 
-from src.common.atari_wrappers import wrap_deepmind, make_atari
-
 
 class DataPrefetcher:
-    def __init__(self, dataloader, device):
-        self.dataloader = iter(dataloader)
+    def __init__(self, data_loader, device):
+        self.data_loader = iter(data_loader)
         self.stream = torch.cuda.Stream()
         self.device = device
+        self.next_data = None
         self.preload()
 
     def preload(self):
         try:
-            self.next_data = next(self.dataloader)
-        except:
+            self.next_data = next(self.data_loader)
+        except Exception as e:
+            print(e)
             raise StopIteration
 
         with torch.cuda.stream(self.stream):
@@ -28,6 +30,7 @@ class DataPrefetcher:
         self.preload()
         return data
 
+
 class ReplayDataset(Dataset):
     def __init__(self, data):
         self.data = data
@@ -38,6 +41,7 @@ class ReplayDataset(Dataset):
     def __getitem__(self, idx):
         S, A, R, T = self.data[idx]
         return np.array(S), A, R, T
+
 
 class DataLoaderX(DataLoader):
     def __iter__(self):
@@ -63,14 +67,9 @@ class LinearSchedule:
         return val
 
 
-def make_env(game, episode_life=True, clip_rewards=True):
-    env = make_atari(f'{game}NoFrameskip-v4')
-    env = wrap_deepmind(env, episode_life=episode_life, clip_rewards=clip_rewards, frame_stack=True, scale=False,
-                        transpose_image=True)
-    return env
-
-
-def pprint(var_name, xs):
-    if len(xs) > 0:
-        print("{0} mean/std/max/min\t {1:12.6f}\t{2:12.6f}\t{3:12.6f}\t{4:12.6}".format(
-            var_name, np.mean(xs), np.std(xs), np.max(xs), np.min(xs)))
+def set_random_seed(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    torch.manual_seed(np.random.randint(int(1e6)))

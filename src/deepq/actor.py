@@ -5,7 +5,7 @@ import numpy as np
 import ray
 import torch
 
-from src.common.utils import make_env
+from src.common.atari_wrappers import make_deepq_env
 from src.common.vec_env import ShmemVecEnv
 from src.deepq.config import Config
 from src.deepq.model import NatureCNN
@@ -18,7 +18,7 @@ class Actor:
         self.rank = rank
         self.cfg = Config(**kwargs)
         # Training
-        self.envs = ShmemVecEnv([lambda: make_env(self.cfg.game, True, True)
+        self.envs = ShmemVecEnv([lambda: make_deepq_env(self.cfg.game, True, True)
                                  for _ in range(self.cfg.num_envs)], context='fork')
         self.action_dim = self.envs.action_space.n
         self.state_shape = self.envs.observation_space.shape

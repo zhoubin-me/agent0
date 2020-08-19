@@ -4,7 +4,8 @@ from collections import deque
 import torch
 import torch.nn.functional as fx
 
-from src.common.utils import make_env, ReplayDataset, DataLoaderX, DataPrefetcher
+from src.common.atari_wrappers import make_deepq_env
+from src.common.utils import ReplayDataset, DataLoaderX, DataPrefetcher
 from src.deepq.config import Config
 from src.deepq.model import NatureCNN
 
@@ -14,7 +15,7 @@ class Agent:
 
         self.cfg = Config(**kwargs)
 
-        env = make_env(self.cfg.game)
+        env = make_deepq_env(self.cfg.game)
         self.action_dim = env.action_space.n
         self.state_shape = env.observation_space.shape
         del env

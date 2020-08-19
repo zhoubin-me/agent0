@@ -52,6 +52,7 @@ if __name__ == '__main__':
             distributional=cfg.distributional,
             noisy=cfg.noisy,
             num_atoms=cfg.default_num_atoms(),
+            random_seed=cfg.random_seed,
         ),
         progress_reporter=reporter,
         resources_per_trial={"gpu": 1, "extra_gpu": 1},

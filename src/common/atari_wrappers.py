@@ -370,6 +370,13 @@ def wrap_deepmind(env, episode_life=False, clip_rewards=False, frame_stack=False
     return env
 
 
+def make_deepq_env(game, episode_life=True, clip_rewards=True):
+    env = make_atari(f'{game}NoFrameskip-v4')
+    env = wrap_deepmind(env, episode_life=episode_life, clip_rewards=clip_rewards, frame_stack=True, scale=False,
+                        transpose_image=True)
+    return env
+
+
 if __name__ == '__main__':
     env = make_atari('BreakoutNoFrameskip-v4')
     env = wrap_deepmind(env, episode_life=True, clip_rewards=True, frame_stack=True)
