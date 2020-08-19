@@ -45,3 +45,5 @@ class Config:
             self.num_atoms = 200
         else:
             self.num_atoms = 1
+
+        return self.num_atoms
