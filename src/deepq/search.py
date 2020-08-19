@@ -31,7 +31,7 @@ if __name__ == '__main__':
                         "ep_reward_train_max", "time_past", "time_remain", "speed", "epsilon", "qmax"])
 
     repo = git.Repo(search_parent_directories=True)
-    sha = repo.git.rev_parse(repo.head.object.hexsha, True)
+    sha = repo.git.rev_parse(repo.head.object.hexsha, short=True)
 
     analysis = tune.run(
         Trainer,
