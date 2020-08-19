@@ -53,36 +53,55 @@ class NatureCNN(nn.Module):
 
 
 class NoisyLinear(nn.Module):
-    def __init__(self, in_size, out_size, sigma=0.5):
+    def __init__(self, in_features, out_features, std_init=0.4, noisy_layer_std=0.1):
         super(NoisyLinear, self).__init__()
-        self.linear_mu = nn.Linear(in_size, out_size)
-        self.linear_sigma = nn.Linear(in_size, out_size)
 
-        self.register_buffer('noise_w', torch.zeros_like(self.linear_mu.weight))
-        self.register_buffer('noise_b', torch.zeros_like(self.linear_mu.bias))
+        self.in_features = in_features
+        self.out_features = out_features
+        self.std_init = std_init
+        self.noisy_layer_std = noisy_layer_std
+        self.weight_mu = nn.Parameter(torch.zeros((out_features, in_features)), requires_grad=True)
+        self.weight_sigma = nn.Parameter(torch.zeros((out_features, in_features)), requires_grad=True)
+        self.register_buffer('weight_epsilon', torch.zeros((out_features, in_features)))
 
-        self.sigma = sigma
+        self.bias_mu = nn.Parameter(torch.zeros(out_features), requires_grad=True)
+        self.bias_sigma = nn.Parameter(torch.zeros(out_features), requires_grad=True)
+        self.register_buffer('bias_epsilon', torch.zeros(out_features))
+
+        self.register_buffer('noise_in', torch.zeros(in_features))
+        self.register_buffer('noise_out_weight', torch.zeros(out_features))
+        self.register_buffer('noise_out_bias', torch.zeros(out_features))
 
         self.reset_parameters()
         self.reset_noise()
 
     def forward(self, x):
         if self.training:
-            x = nn.functional.linear(x,
-                                     self.linear_mu.weight + self.linear_sigma.weight * self.noise_w,
-                                     self.linear_mu.bias + self.linear_sigma.bias * self.noise_b)
+            weight = self.weight_mu + self.weight_sigma.mul(self.weight_epsilon)
+            bias = self.bias_mu + self.bias_sigma.mul(self.bias_epsilon)
         else:
-            x = self.linear_mu(x)
-        return x
+            weight = self.weight_mu
+            bias = self.bias_mu
+
+        return nn.functional.linear(x, weight, bias)
 
     def reset_parameters(self):
-        std = 1. / np.sqrt(self.linear_mu.weight.size(1))
-        self.linear_mu.weight.data.uniform_(-std, std)
-        self.linear_mu.bias.data.uniform_(-std, std)
+        mu_range = 1 / np.sqrt(self.weight_mu.size(1))
 
-        self.linear_sigma.weight.data.fill_(self.sigma * std)
-        self.linear_sigma.bias.data.fill_(self.sigma * std)
+        self.weight_mu.data.uniform_(-mu_range, mu_range)
+        self.weight_sigma.data.fill_(self.std_init / np.sqrt(self.weight_sigma.size(1)))
+
+        self.bias_mu.data.uniform_(-mu_range, mu_range)
+        self.bias_sigma.data.fill_(self.std_init / np.sqrt(self.bias_sigma.size(0)))
 
     def reset_noise(self):
-        self.noise_w.data.normal_()
-        self.noise_b.data.normal_()
+        self.noise_in.normal_(std=self.noisy_layer_std)
+        self.noise_out_weight.normal_(std=self.noisy_layer_std)
+        self.noise_out_bias.normal_(std=self.noisy_layer_std)
+
+        self.weight_epsilon.copy_(self.transform_noise(self.noise_out_weight).ger(
+            self.transform_noise(self.noise_in)))
+        self.bias_epsilon.copy_(self.transform_noise(self.noise_out_bias))
+
+    def transform_noise(self, x):
+        return x.sign().mul(x.abs().sqrt())

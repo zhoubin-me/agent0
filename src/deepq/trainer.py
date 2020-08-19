@@ -34,7 +34,7 @@ class Trainer(tune.Trainable, ABC):
 
         self.cfg = Config(**kwargs)
 
-        print("input args:\n", json.dumps(kwargs, indent=4, separators=(",", ":")))
+        print("input args:\n", json.dumps(vars(self.cfg), indent=4, separators=(",", ":")))
 
         self.agent = Agent(**kwargs)
         self.epsilon_schedule = LinearSchedule(1.0, self.cfg.min_eps,
