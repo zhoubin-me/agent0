@@ -29,7 +29,7 @@ if __name__ == '__main__':
     sha = repo.git.rev_parse(repo.head.object.hexsha, short=True)
 
     reporter = CLIReporter(
-        metric_columns=["game", "frames", "loss", "ep_reward_test", "ep_reward_train", "ep_reward_test_max",
+        metric_columns=["frames", "loss", "ep_reward_test", "ep_reward_train", "ep_reward_test_max",
                         "ep_reward_train_max", "time_past", "time_remain", "speed", "epsilon", "qmax"])
 
     analysis = tune.run(
@@ -43,9 +43,8 @@ if __name__ == '__main__':
         checkpoint_freq=1000,
         trial_name_creator=tune.function(lambda trial: trial_str_creator(trial, sha)),
         config=dict(
-            game=tune.grid_search(
-                ['Breakout', 'Enduro', 'Seaquest', 'BeamRider', 'Pong', 'Asterix', 'Qbert', 'SpaceInvaders']),
-            # game=cfg.game,
+            # game=tune.grid_search(['Breakout', 'Enduro', 'Seaquest', 'BeamRider', 'Pong', 'Asterix', 'Qbert', 'SpaceInvaders']),
+            game=cfg.game,
             epochs=cfg.epochs,
             total_steps=cfg.total_steps,
             distributional=cfg.distributional,
