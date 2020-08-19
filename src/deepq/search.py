@@ -18,7 +18,7 @@ def parse_arguments(config):
 
 
 def trial_str_creator(trial, sha):
-    return "{}_{}_{}".format(trial.trainable_name, sha, trial.trial_id)
+    return "{}_{}_{}_{}".format(trial.trainable_name, trial.config['game'], sha, trial.trial_id)
 
 
 if __name__ == '__main__':
