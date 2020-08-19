@@ -18,7 +18,7 @@ class Actor:
         self.rank = rank
         self.cfg = Config(**kwargs)
         # Training
-        self.envs = ShmemVecEnv([lambda: make_deepq_env(self.cfg.game, True, True)
+        self.envs = ShmemVecEnv([lambda: make_deepq_env(self.cfg.game, True, True, False, False)
                                  for _ in range(self.cfg.num_envs)], context='fork')
         self.action_dim = self.envs.action_space.n
         self.state_shape = self.envs.observation_space.shape
@@ -29,7 +29,9 @@ class Actor:
 
         self.model = NatureCNN(self.state_shape[0], self.action_dim, dueling=self.cfg.dueling,
                                noisy=self.cfg.noisy, num_atoms=self.cfg.num_atoms).to(self.device)
-        self.obs = self.envs.reset()
+        self.obs = deque(maxlen=4)
+        obs = self.envs.reset()
+        for _ in range(4): self.obs.append(obs)
 
     def sample(self, steps, epsilon, state_dict, testing=False, test_episodes=10):
         self.model.load_state_dict(state_dict)
@@ -44,7 +46,8 @@ class Actor:
                 self.model.reset_noise()
 
             with torch.no_grad():
-                st = torch.from_numpy(np.array(self.obs)).to(self.device).float().div(255.0)
+                st = torch.from_numpy(np.array(self.obs)).to(self.device).float().div(255.0).squeeze(-1).permute(1, 0,
+                                                                                                                 2, 3)
                 if self.cfg.distributional:
                     qs_prob = self.model(st).softmax(dim=-1)
                     qs = qs_prob.mul(self.atoms).sum(dim=-1)
