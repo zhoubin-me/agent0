@@ -13,8 +13,9 @@ from src.deepq.model import NatureCNN
 
 @ray.remote(num_gpus=0.1)
 class Actor:
-    def __init__(self, **kwargs):
+    def __init__(self, rank, **kwargs):
 
+        self.rank = rank
         self.cfg = Config(**kwargs)
         # Training
         self.envs = ShmemVecEnv([lambda: make_env(self.cfg.game, True, True)
