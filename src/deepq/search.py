@@ -1,5 +1,6 @@
 import argparse
 
+import git
 import ray
 from ray import tune
 from ray.tune import CLIReporter
@@ -24,7 +25,7 @@ if __name__ == '__main__':
     reporter = CLIReporter(
         metric_columns=["game", "frames", "loss", "ep_reward_test", "ep_reward_train", "ep_reward_test_max",
                         "ep_reward_train_max", "time_past", "time_remain", "speed", "epsilon", "qmax"])
-
+    repo = git.Repo(search_parent_directories=True)
     analysis = tune.run(
         Trainer,
         name=cfg.exp_name,
@@ -42,7 +43,8 @@ if __name__ == '__main__':
             total_steps=cfg.total_steps,
             distributional=cfg.distributional,
             noisy=cfg.noisy,
-            num_atoms=cfg.default_num_atoms()
+            num_atoms=cfg.default_num_atoms(),
+            sha=repo.head.object.hexsha,
         ),
         progress_reporter=reporter,
         resources_per_trial={"gpu": 1, "extra_gpu": 1},

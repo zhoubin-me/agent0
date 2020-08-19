@@ -28,7 +28,6 @@ class Trainer(tune.Trainable, ABC):
         self.Rs, self.Qs, self.TRs, self.Ls, self.ITRs = [], [], [], [], []
         self.best = float('-inf')
         self.sample_ops = None
-
         super(Trainer, self).__init__(config, logger_creator)
 
     def setup(self, kwargs):
