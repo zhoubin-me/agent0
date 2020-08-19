@@ -44,12 +44,10 @@ class NatureCNN(nn.Module):
             q = adv
         return q
 
-    def reset_noise(self, std=None):
-        if std is None:
-            std = self.noise_std
+    def reset_noise(self):
         for m in self.modules():
             if isinstance(m, NoisyLinear):
-                m.reset_noise(std)
+                m.reset_noise()
 
 
 class NoisyLinear(nn.Module):

@@ -117,7 +117,7 @@ class Agent:
         except Exception as e:
             self.data_fetcher = self.get_data_fetcher()
             data = self.data_fetcher.next()
-            print(e)
+            # print(e)
 
         frames, actions, rewards, terminals = data
         states = frames[:, :-1, :, :].float().div(255.0)
