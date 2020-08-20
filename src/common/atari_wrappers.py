@@ -77,11 +77,13 @@ class EpisodicLifeEnv(gym.Wrapper):
         """
         gym.Wrapper.__init__(self, env)
         self.lives = 0
+        self.steps = 0
         self.was_real_done = True
 
     def step(self, action):
         obs, reward, done, info = self.env.step(action)
         self.was_real_done = done
+        self.steps += 1
         # check current lives, make loss of life terminal,
         # then update lives to handle bonus lives
         lives = self.env.unwrapped.ale.lives()
@@ -91,6 +93,9 @@ class EpisodicLifeEnv(gym.Wrapper):
             # the environment advertises done.
             done = True
         self.lives = lives
+        if done:
+            info.update(steps=self.steps)
+            self.steps = 0
         return obs, reward, done, info
 
     def reset(self, **kwargs):

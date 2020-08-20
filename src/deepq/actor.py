@@ -1,6 +1,6 @@
 import copy
 import time
-from collections import deque
+from collections import deque, defaultdict
 
 import numpy as np
 import ray
@@ -30,7 +30,7 @@ class Actor:
 
         self.model = NatureCNN(self.cfg.frame_stack, self.action_dim, dueling=self.cfg.dueling,
                                noisy=self.cfg.noisy, num_atoms=self.cfg.num_atoms).to(self.device)
-        self.episodic_buffer = [[]] * self.cfg.num_envs
+        self.episodic_buffer = defaultdict(list)
         self.obs = self.envs.reset()
         self.st = deque(maxlen=self.cfg.frame_stack)
         for _ in range(self.cfg.frame_stack):
@@ -75,20 +75,25 @@ class Actor:
                 self.episodic_buffer[i].append((self.obs[i], action[i], reward[i], done[i]))
                 if done[i]:
                     if not testing and len(self.episodic_buffer[i]) > self.cfg.frame_stack:
+                        print('lens', self.rank, i, len(self.episodic_buffer[i]))
                         replay.append(
                             dict(transits=copy.deepcopy(self.episodic_buffer[i]),
                                  ep_rew=sum([x[2] for x in self.episodic_buffer[i]]),
                                  ep_len=len(self.episodic_buffer[i]))
                         )
+                        del self.episodic_buffer[i]
 
-                    self.episodic_buffer[i].clear()
+
                     for j in range(self.cfg.frame_stack):
                         self.st[j][i] = self.st[-1][i]
 
-            self.obs = obs_next
-            for inf in info:
+                inf = info[i]
                 if 'real_reward' in inf:
                     rs.append(inf['real_reward'])
+                if 'steps' in inf:
+                    print('steps', self.rank, i, inf['steps'])
+
+            self.obs = obs_next
 
             if testing and len(rs) > test_episodes:
                 break
