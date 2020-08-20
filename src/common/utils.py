@@ -32,9 +32,9 @@ class DataPrefetcher:
 
 
 class ReplayDataset(Dataset):
-    def __init__(self, replay_size, frame_stack=4, nstep=3, discount=0.99):
+    def __init__(self, replay_size, frame_stack=4, n_step=3, discount=0.99):
         self.replay_size = replay_size
-        self.nstep = nstep
+        self.n_step = n_step
         self.frame_stack = frame_stack
         self.discount = discount
         self.data = []
@@ -52,7 +52,7 @@ class ReplayDataset(Dataset):
             transit_idx = idx - self.lens_cumsum[ep_idx - 1]
 
         transit_idx = max(transit_idx, self.frame_stack - 1)
-        transit_idx_next = transit_idx + self.nstep
+        transit_idx_next = transit_idx + self.n_step
         transit_idx_next = min(transit_idx_next, self.lens[ep_idx] - 1)
 
         ep_transitions = self.data[ep_idx]['transits']

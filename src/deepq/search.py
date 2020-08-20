@@ -49,7 +49,7 @@ def main():
         verbose=1,
         checkpoint_at_end=True,
         fail_fast=True,
-        restore=cfg.restore_ckpt,
+        restore=cfg.restore_checkpoint,
         stop=lambda trial_id, result: result['frames'] > cfg.total_steps,
         checkpoint_freq=1000,
         trial_name_creator=tune.function(lambda trial: trial_str_creator(trial, sha)),

@@ -30,13 +30,9 @@ class Agent:
                                noisy=self.cfg.noisy, num_atoms=self.cfg.num_atoms).to(self.device)
         self.model_target = copy.deepcopy(self.model)
         self.optimizer = torch.optim.Adam(self.model.parameters(), self.cfg.adam_lr)
-        # self.models = [NatureCNN(self.state_shape[0], self.action_dim, dueling=self.cfg.dueling,
-        #                          noisy=self.cfg.noisy, num_atoms=self.cfg.num_atoms).to(self.device)]
-        #
-        # self.optimizers = [torch.optim.Adam(model.parameters(), self.cfg.adam_lr) for model in self.models]
 
         self.update_steps = 0
-        self.replay = ReplayDataset(self.cfg.replay_size, frame_stack=self.cfg.frame_stack, nstep=self.cfg.nstep)
+        self.replay = ReplayDataset(self.cfg.replay_size, frame_stack=self.cfg.frame_stack, n_step=self.cfg.n_step)
         self.data_fetcher = None
 
     def get_data_fetcher(self):

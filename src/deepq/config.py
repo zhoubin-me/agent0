@@ -9,13 +9,12 @@ class Config:
     noisy: bool = False
     distributional: bool = False
     qr: bool = False
-    nstep: int = 3
+    n_step: int = 3
 
     adam_lr: float = 5e-4
     v_max: float = 10
     v_min: float = -10
     num_atoms: int = 1
-
 
     num_actors: int = 8
     num_envs: int = 16
@@ -37,7 +36,7 @@ class Config:
     actor_steps: int = 40
 
     pin_memory = True
-    restore_ckpt: str = None
+    restore_checkpoint: str = None
     random_seed: int = 42
     exp_name: str = 'atari_deepq'
     frame_stack: int = 4
