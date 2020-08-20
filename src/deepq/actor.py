@@ -2,6 +2,7 @@ import time
 from collections import deque
 
 import numpy as np
+import copy
 import ray
 import torch
 
@@ -9,6 +10,7 @@ from src.common.atari_wrappers import make_deepq_env
 from src.common.vec_env import ShmemVecEnv
 from src.deepq.config import Config
 from src.deepq.model import NatureCNN
+
 
 
 @ray.remote(num_gpus=0.1)
@@ -73,14 +75,14 @@ class Actor:
             for i in range(self.cfg.num_envs):
                 self.episodic_buffer[i].append((self.obs[i], action[i], reward[i], done[i]))
                 if done[i]:
-                    if not testing:
+                    if not testing and len(self.episodic_buffer[i]) > self.cfg.frame_stack:
                         replay.append(
-                            dict(transits=self.episodic_buffer[i],
+                            dict(transits=copy.deepcopy(self.episodic_buffer[i]),
                                  ep_rew=sum([x[2] for x in self.episodic_buffer[i]]),
-                                 ep_len=len(self.episodic_buffer[i]),
-                                 ))
-                    self.episodic_buffer[i].clear()
+                                 ep_len=len(self.episodic_buffer[i]))
+                        )
 
+                    self.episodic_buffer[i].clear()
                     for j in range(4):
                         self.st[j][i] = self.st[-1][i]
 

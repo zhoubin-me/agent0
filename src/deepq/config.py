@@ -39,6 +39,7 @@ class Config:
 
     restore_ckpt: str = None
     random_seed: int = 42
+    frame_stack: int = 4
 
     def update(self, num_atoms=None, game=None):
         if num_atoms is None:

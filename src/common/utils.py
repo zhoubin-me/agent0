@@ -6,6 +6,7 @@ from prefetch_generator import BackgroundGenerator
 from torch.utils.data import Dataset, DataLoader
 
 
+
 class DataPrefetcher:
     def __init__(self, data_loader, device):
         self.data_loader = iter(data_loader)
@@ -43,15 +44,18 @@ class ReplayDataset(Dataset):
 
     def __getitem__(self, idx):
         ep_idx = np.searchsorted(self.lens_cumsum, idx, side='right')
-        transit_idx = self.lens_cumsum[ep_idx] - idx
-        transit_idx = np.clip(transit_idx, 4, self.lens[ep_idx])
+        if ep_idx == 0:
+            transit_idx = idx
+        else:
+            transit_idx = idx - self.lens_cumsum[ep_idx-1]
 
+        transit_idx = np.clip(transit_idx, 4, self.lens[ep_idx])
         ep_transitions = self.data[ep_idx]['transits']
         obs, action, reward, done = ep_transitions[transit_idx]
         if not done:
             st = [x[0] for x in ep_transitions[transit_idx - 4:transit_idx + 1]]
         else:
-            st = [x[0] for x in ep_transitions[transit_idx - 4:transit_idx]] + np.zeros_like(obs)
+            st = [x[0] for x in ep_transitions[transit_idx - 4:transit_idx]] + [np.zeros_like(obs)]
         st = np.concatenate(st, axis=-1).transpose((2, 0, 1))
 
         return st, action, reward, done
