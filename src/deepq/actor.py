@@ -75,7 +75,7 @@ class Actor:
                 self.episodic_buffer[i].append((self.obs[i], action[i], reward[i], done[i]))
                 if done[i]:
                     if not testing and len(self.episodic_buffer[i]) > self.cfg.frame_stack:
-                        print('lens', self.rank, i, len(self.episodic_buffer[i]))
+                        # print('lens', self.rank, i, len(self.episodic_buffer[i]))
                         replay.append(
                             dict(transits=copy.deepcopy(self.episodic_buffer[i]),
                                  ep_rew=sum([x[2] for x in self.episodic_buffer[i]]),
@@ -91,7 +91,8 @@ class Actor:
                 if 'real_reward' in inf:
                     rs.append(inf['real_reward'])
                 if 'steps' in inf:
-                    print('steps', self.rank, i, inf['steps'])
+                    pass
+                    # print('steps', self.rank, i, inf['steps'])
 
             self.obs = obs_next
 
