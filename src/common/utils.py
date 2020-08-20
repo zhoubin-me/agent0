@@ -57,7 +57,6 @@ class ReplayDataset(Dataset):
             st0 = st[0]
             while len(st) < self.frame_stack + 1:
                 st = [st0] + st
-
         elif done:
             st = [x[0] for x in ep_transitions[transit_idx - 3:transit_idx + 1]]
             st0 = st[0]
