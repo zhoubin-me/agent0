@@ -1,3 +1,4 @@
+import copy
 import time
 from collections import deque
 
@@ -9,7 +10,6 @@ from src.common.atari_wrappers import make_deepq_env
 from src.common.vec_env import ShmemVecEnv
 from src.deepq.config import Config
 from src.deepq.model import NatureCNN
-
 
 
 @ray.remote(num_gpus=0.1)
@@ -82,9 +82,7 @@ class Actor:
                         )
 
                     self.episodic_buffer[i].clear()
-
                     for j in range(self.cfg.frame_stack):
-                    for j in range(4):
                         self.st[j][i] = self.st[-1][i]
 
             self.obs = obs_next
