@@ -46,7 +46,7 @@ class ReplayDataset(Dataset):
         transit_idx = self.lens_cumsum[ep_idx] - idx
         transit_idx = np.clip(transit_idx, 4, self.lens[ep_idx])
 
-        ep_transitions = self.data[ep_idx]
+        ep_transitions = self.data[ep_idx]['transits']
         obs, action, reward, done = ep_transitions[transit_idx]
         if not done:
             st = [x[0] for x in ep_transitions[transit_idx - 4:transit_idx + 1]]
