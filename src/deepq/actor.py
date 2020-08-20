@@ -69,15 +69,16 @@ class Actor:
                           zip(np.random.rand(self.cfg.num_envs), action_random, action_greedy)]
 
             obs_next, reward, done, info = self.envs.step(action)
+
             for i in range(self.num_envs):
                 self.episodic_buffer[i].append((self.obs[i], action[i], reward[i], done[i]))
                 if done[i]:
-                    replay.append(
-                        dict(transits=self.episodic_buffer[i],
-                             ep_rew=sum([x[2] for x in self.episodic_buffer[i]]),
-                             len=self.episodic_buffer[i],
-                             )
-                    )
+                    if not testing:
+                        replay.append(
+                            dict(transits=self.episodic_buffer[i],
+                                 ep_rew=sum([x[2] for x in self.episodic_buffer[i]]),
+                                 len=self.episodic_buffer[i],
+                                 ))
                     self.episodic_buffer[i].clear()
 
             for inf in info:

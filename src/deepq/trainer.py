@@ -111,6 +111,7 @@ class Trainer(tune.Trainable, ABC):
             'TRs': self.TRs,
             'frame_count': self.frame_count,
             'ITRs': ckpt_rs,
+            'best': self.best,
         }
 
         if np.mean(ckpt_rs) > self.best:
@@ -128,6 +129,7 @@ class Trainer(tune.Trainable, ABC):
         self.Rs = checkpoint['Rs']
         self.TRs = checkpoint['TRs']
         self.frame_count = checkpoint['frame_count']
+        self.best = checkpoint['best']
         self.epsilon_schedule(self.frame_count)
 
     def _export_model(self, export_formats, export_dir):

@@ -1,4 +1,3 @@
-import copy
 from collections import deque
 
 import torch
@@ -28,11 +27,14 @@ class Agent:
             self.cumulative_density = ((2 * torch.arange(self.cfg.num_atoms) + 1) /
                                        (2.0 * self.cfg.num_atoms)).to(self.device)
 
-        self.model = NatureCNN(self.state_shape[0], self.action_dim, dueling=self.cfg.dueling,
-                               noisy=self.cfg.noisy, num_atoms=self.cfg.num_atoms).to(self.device)
-        self.model_target = copy.deepcopy(self.model)
+        # self.model = NatureCNN(self.state_shape[0], self.action_dim, dueling=self.cfg.dueling,
+        #                        noisy=self.cfg.noisy, num_atoms=self.cfg.num_atoms).to(self.device)
+        # self.model_target = copy.deepcopy(self.model)
 
-        self.optimizer = torch.optim.Adam(self.model.parameters(), self.cfg.adam_lr)
+        self.models = [NatureCNN(self.state_shape[0], self.action_dim, dueling=self.cfg.dueling,
+                                 noisy=self.cfg.noisy, num_atoms=self.cfg.num_atoms).to(self.device)]
+
+        self.optimizers = [torch.optim.Adam(model.parameters(), self.cfg.adam_lr) for model in self.models]
 
         self.update_steps = 0
         self.replay = deque(maxlen=self.cfg.replay_size)
@@ -136,7 +138,7 @@ class Agent:
         elif self.cfg.qr:
             loss = self.train_step_qr(states, next_states, actions, terminals, rewards)
         else:
-            loss = self.train_step_dqn(states, next_states, actions, terminals, rewards)
+            loss = self.train_step_dqn(states, next_states, actions, terminals, rewards, model_x, model_y)
 
         self.optimizer.zero_grad()
         loss.backward()
