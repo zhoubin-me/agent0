@@ -1,4 +1,3 @@
-import copy
 from collections import deque
 
 import torch
@@ -27,14 +26,14 @@ class Agent:
             self.cumulative_density = ((2 * torch.arange(self.cfg.num_atoms) + 1) /
                                        (2.0 * self.cfg.num_atoms)).to(self.device)
 
-        self.model = NatureCNN(self.state_shape[0], self.action_dim, dueling=self.cfg.dueling,
-                               noisy=self.cfg.noisy, num_atoms=self.cfg.num_atoms).to(self.device)
-        self.model_target = copy.deepcopy(self.model)
+        # self.model = NatureCNN(self.state_shape[0], self.action_dim, dueling=self.cfg.dueling,
+        #                        noisy=self.cfg.noisy, num_atoms=self.cfg.num_atoms).to(self.device)
+        # self.model_target = copy.deepcopy(self.model)
 
-        # self.models = [NatureCNN(self.state_shape[0], self.action_dim, dueling=self.cfg.dueling,
-        #                          noisy=self.cfg.noisy, num_atoms=self.cfg.num_atoms).to(self.device)]
-        #
-        # self.optimizers = [torch.optim.Adam(model.parameters(), self.cfg.adam_lr) for model in self.models]
+        self.models = [NatureCNN(self.state_shape[0], self.action_dim, dueling=self.cfg.dueling,
+                                 noisy=self.cfg.noisy, num_atoms=self.cfg.num_atoms).to(self.device)]
+
+        self.optimizers = [torch.optim.Adam(model.parameters(), self.cfg.adam_lr) for model in self.models]
 
         self.update_steps = 0
         self.replay = deque(maxlen=self.cfg.replay_size)

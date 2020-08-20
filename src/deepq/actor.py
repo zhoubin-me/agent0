@@ -69,7 +69,7 @@ class Actor:
                           zip(np.random.rand(self.cfg.num_envs), action_random, action_greedy)]
 
             obs_next, reward, done, info = self.envs.step(action)
-
+            self.st.append(obs_next)
             for i in range(self.num_envs):
                 self.episodic_buffer[i].append((self.obs[i], action[i], reward[i], done[i]))
                 if done[i]:
@@ -80,6 +80,9 @@ class Actor:
                                  len=self.episodic_buffer[i],
                                  ))
                     self.episodic_buffer[i].clear()
+
+                    for j in range(4):
+                        self.st[j][i] = self.st[-1][i]
 
             for inf in info:
                 if 'real_reward' in inf:
