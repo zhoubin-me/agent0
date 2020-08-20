@@ -29,7 +29,7 @@ class Actor:
 
         self.model = NatureCNN(self.cfg.frame_stack, self.action_dim, dueling=self.cfg.dueling,
                                noisy=self.cfg.noisy, num_atoms=self.cfg.num_atoms).to(self.device)
-        self.episodic_buffer = [[] * self.cfg.num_envs]
+        self.episodic_buffer = [[]] * self.cfg.num_envs
         self.obs = self.envs.reset()
         self.st = deque(maxlen=4)
         for _ in range(4):
@@ -48,7 +48,7 @@ class Actor:
                 self.model.reset_noise()
 
             with torch.no_grad():
-                st = np.concatenate(self.st, dim=0)
+                st = np.concatenate(self.st, axis=-1)
                 st = torch.from_numpy(st).to(self.device).float().div(255.0).permute(0, 3, 1, 2)
                 if self.cfg.distributional:
                     qs_prob = self.model(st).softmax(dim=-1)
@@ -70,7 +70,7 @@ class Actor:
 
             obs_next, reward, done, info = self.envs.step(action)
             self.st.append(obs_next)
-            for i in range(self.num_envs):
+            for i in range(self.cfg.num_envs):
                 self.episodic_buffer[i].append((self.obs[i], action[i], reward[i], done[i]))
                 if done[i]:
                     if not testing:
@@ -84,6 +84,7 @@ class Actor:
                     for j in range(4):
                         self.st[j][i] = self.st[-1][i]
 
+            self.obs = obs_next
             for inf in info:
                 if 'real_reward' in inf:
                     rs.append(inf['real_reward'])
