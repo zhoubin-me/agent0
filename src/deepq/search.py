@@ -8,11 +8,21 @@ from ray.tune import CLIReporter
 from src.deepq.config import Config
 from src.deepq.trainer import Trainer
 
+def str2bool(s: str):
+    if s.lower() == 'true':
+        return True
+    elif s.lower() == 'false':
+        return False
+    else:
+        raise ValueError(f'{s} is not a boolean')
 
 def parse_arguments(config):
     parser = argparse.ArgumentParser()
     for k, v in vars(config).items():
-        parser.add_argument(f"--{k}", type=type(v), default=v)
+        if type(v) == bool:
+            parser.add_argument(f"--{k}", type=str2bool, default=str(v))
+        else:
+            parser.add_argument(f"--{k}", type=type(v), default=v)
     args = parser.parse_args()
     return Config(**vars(args))
 
@@ -21,7 +31,7 @@ def trial_str_creator(trial, sha):
     return "{}_{}_{}_{}".format(trial.trainable_name, trial.config['game'], sha, trial.trial_id)
 
 
-if __name__ == '__main__':
+def main():
     cfg = Config()
     cfg = parse_arguments(cfg)
 
@@ -53,3 +63,6 @@ if __name__ == '__main__':
         progress_reporter=reporter,
         resources_per_trial={"gpu": 1, "extra_gpu": 1},
     )
+
+if __name__ == '__main__':
+    main()
