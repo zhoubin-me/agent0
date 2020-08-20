@@ -31,8 +31,8 @@ class Actor:
                                noisy=self.cfg.noisy, num_atoms=self.cfg.num_atoms).to(self.device)
         self.episodic_buffer = [[]] * self.cfg.num_envs
         self.obs = self.envs.reset()
-        self.st = deque(maxlen=4)
-        for _ in range(4):
+        self.st = deque(maxlen=self.cfg.frame_stack)
+        for _ in range(self.cfg.frame_stack):
             self.st.append(self.obs)
 
     def sample(self, steps, epsilon, state_dict, testing=False, test_episodes=10):
@@ -81,7 +81,7 @@ class Actor:
                                  ))
                     self.episodic_buffer[i].clear()
 
-                    for j in range(4):
+                    for j in range(self.cfg.frame_stack):
                         self.st[j][i] = self.st[-1][i]
 
             self.obs = obs_next
