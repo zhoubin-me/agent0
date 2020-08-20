@@ -59,6 +59,8 @@ def main():
         resources_per_trial={"gpu": 1.0, "extra_gpu": 1.0},
     )
 
+    print(analysis)
+
 
 if __name__ == '__main__':
     main()
