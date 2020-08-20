@@ -17,6 +17,7 @@ def str2bool(s: str):
     else:
         raise ValueError(f'{s} is not a boolean')
 
+
 def parse_arguments(config):
     parser = argparse.ArgumentParser()
     for k, v in vars(config).items():
@@ -64,6 +65,7 @@ def main():
         progress_reporter=reporter,
         resources_per_trial={"gpu": 1.0, "extra_gpu": 1.0},
     )
+
 
 if __name__ == '__main__':
     main()

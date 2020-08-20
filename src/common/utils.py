@@ -6,7 +6,6 @@ from prefetch_generator import BackgroundGenerator
 from torch.utils.data import Dataset, DataLoader
 
 
-
 class DataPrefetcher:
     def __init__(self, data_loader, device):
         self.data_loader = iter(data_loader)
@@ -33,11 +32,12 @@ class DataPrefetcher:
 
 
 class ReplayDataset(Dataset):
-    def __init__(self, replay_size):
+    def __init__(self, replay_size, frame_stack=4):
         self.replay_size = replay_size
         self.data = []
         self.lens_cumsum = None
         self.lens = None
+        self.frame_stack = frame_stack
 
     def __len__(self):
         return sum(self.lens)
@@ -47,15 +47,24 @@ class ReplayDataset(Dataset):
         if ep_idx == 0:
             transit_idx = idx
         else:
-            transit_idx = idx - self.lens_cumsum[ep_idx-1]
+            transit_idx = idx - self.lens_cumsum[ep_idx - 1]
 
-        transit_idx = np.clip(transit_idx, 4, self.lens[ep_idx])
         ep_transitions = self.data[ep_idx]['transits']
         obs, action, reward, done = ep_transitions[transit_idx]
-        if not done:
-            st = [x[0] for x in ep_transitions[transit_idx - 4:transit_idx + 1]]
+
+        if transit_idx < self.frame_stack - 1:
+            st = [x[0] for x in ep_transitions[:transit_idx + 2]]
+            st0 = st[0]
+            while len(st) < self.frame_stack + 1:
+                st = [st0] + st
+
+        elif done:
+            st = [x[0] for x in ep_transitions[transit_idx - 3:transit_idx + 1]]
+            st0 = st[0]
+            st = st + [st0]
         else:
-            st = [x[0] for x in ep_transitions[transit_idx - 4:transit_idx]] + [np.zeros_like(obs)]
+            st = [x[0] for x in ep_transitions[transit_idx - 3:transit_idx + 2]]
+
         st = np.concatenate(st, axis=-1).transpose((2, 0, 1))
 
         return st, action, reward, done
