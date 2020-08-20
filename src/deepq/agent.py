@@ -36,7 +36,7 @@ class Agent:
         # self.optimizers = [torch.optim.Adam(model.parameters(), self.cfg.adam_lr) for model in self.models]
 
         self.update_steps = 0
-        self.replay = ReplayDataset(self.cfg.replay_size)
+        self.replay = ReplayDataset(self.cfg.replay_size, frame_stack=self.cfg.frame_stack, nstep=self.cfg.nstep)
         self.data_fetcher = None
 
     def get_data_fetcher(self):

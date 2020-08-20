@@ -9,7 +9,7 @@ class Config:
     noisy: bool = False
     distributional: bool = False
     qr: bool = False
-    pin_memory = True
+    nstep: int = 3
 
     adam_lr: float = 5e-4
     v_max: float = 10
@@ -36,6 +36,7 @@ class Config:
     agent_train_steps: int = 10
     actor_steps: int = 40
 
+    pin_memory = True
     restore_ckpt: str = None
     random_seed: int = 42
     exp_name: str = 'atari_deepq'

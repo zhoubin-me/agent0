@@ -32,12 +32,14 @@ class DataPrefetcher:
 
 
 class ReplayDataset(Dataset):
-    def __init__(self, replay_size, frame_stack=4):
+    def __init__(self, replay_size, frame_stack=4, nstep=3, discount=0.99):
         self.replay_size = replay_size
+        self.nstep = nstep
+        self.frame_stack = frame_stack
+        self.discount = discount
         self.data = []
         self.lens_cumsum = None
         self.lens = None
-        self.frame_stack = frame_stack
 
     def __len__(self):
         return sum(self.lens)
@@ -49,25 +51,24 @@ class ReplayDataset(Dataset):
         else:
             transit_idx = idx - self.lens_cumsum[ep_idx - 1]
 
+        transit_idx = max(transit_idx, self.frame_stack - 1)
+        transit_idx_next = transit_idx + self.nstep
+        transit_idx_next = min(transit_idx_next, self.lens[ep_idx] - 1)
+
         ep_transitions = self.data[ep_idx]['transits']
         obs, action, reward, done = ep_transitions[transit_idx]
 
-        if transit_idx < self.frame_stack - 1:
-            st = [x[0] for x in ep_transitions[:transit_idx + 2]]
-            st0 = st[0]
-            while len(st) < self.frame_stack + 1:
-                st = [st0] + st
-        elif done:
-            st = [x[0] for x in ep_transitions[transit_idx - 3:transit_idx + 1]]
-            st0 = st[0]
-            st = st + [st0]
-        else:
-            st = [x[0] for x in ep_transitions[transit_idx - 3:transit_idx + 2]]
-
-        assert len(st) == self.frame_stack + 1
+        st = [x[0] for x in ep_transitions[transit_idx - 3:transit_idx + 1]]
+        st_next = [x[0] for x in ep_transitions[transit_idx_next - 3:transit_idx_next + 1]]
+        rs = [x[2] for x in ep_transitions[transit_idx:transit_idx_next]]
+        rx = 0
+        for r in reversed(rs):
+            rx = rx * self.discount + r
+        assert len(st) == self.frame_stack
+        assert len(st) == self.frame_stack
         st = np.concatenate(st, axis=-1).transpose((2, 0, 1))
 
-        return st, action, reward, done
+        return st, action, rx, done
 
     def append(self, transitions):
         self.data.append(transitions)
