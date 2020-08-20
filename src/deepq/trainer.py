@@ -56,6 +56,7 @@ class Trainer(tune.Trainable, ABC):
             self.epsilon = self.epsilon_schedule(ep_transitions['ep_len'])
             self.frame_count += ep_transitions['ep_len']
 
+
         self.sample_ops.append(
             self.actors[rank].sample.remote(self.cfg.actor_steps, self.epsilon, self.agent.model.state_dict()))
         self.Rs += rs

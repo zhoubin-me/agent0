@@ -40,6 +40,7 @@ class Config:
     random_seed: int = 42
     exp_name: str = 'atari_deepq'
     frame_stack: int = 4
+    frame_stack: int = 4
 
     def update(self, num_atoms=None, game=None):
         if num_atoms is None:

@@ -11,6 +11,7 @@ from src.deepq.config import Config
 from src.deepq.model import NatureCNN
 
 
+
 @ray.remote(num_gpus=0.1)
 class Actor:
     def __init__(self, rank, **kwargs):
@@ -73,15 +74,17 @@ class Actor:
             for i in range(self.cfg.num_envs):
                 self.episodic_buffer[i].append((self.obs[i], action[i], reward[i], done[i]))
                 if done[i]:
-                    if not testing:
+                    if not testing and len(self.episodic_buffer[i]) > self.cfg.frame_stack:
                         replay.append(
-                            dict(transits=self.episodic_buffer[i],
+                            dict(transits=copy.deepcopy(self.episodic_buffer[i]),
                                  ep_rew=sum([x[2] for x in self.episodic_buffer[i]]),
-                                 ep_len=len(self.episodic_buffer[i]),
-                                 ))
+                                 ep_len=len(self.episodic_buffer[i]))
+                        )
+
                     self.episodic_buffer[i].clear()
 
                     for j in range(self.cfg.frame_stack):
+                    for j in range(4):
                         self.st[j][i] = self.st[-1][i]
 
             self.obs = obs_next
