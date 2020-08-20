@@ -66,7 +66,9 @@ class ReplayDataset(Dataset):
             rx = rx * self.discount + r
         assert len(st) == self.frame_stack
         assert len(st) == self.frame_stack
+
         st = np.concatenate(st, axis=-1).transpose((2, 0, 1))
+        st_next = np.concatenate(st_next, axis=-1).transpose((2, 0, 1))
 
         return st, action, rx, done, st_next
 
