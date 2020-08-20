@@ -11,7 +11,7 @@ from src.deepq.config import Config
 from src.deepq.model import NatureCNN
 
 
-@ray.remote(num_gpus=0.05)
+@ray.remote(num_gpus=0.1)
 class Actor:
     def __init__(self, rank, **kwargs):
 

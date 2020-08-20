@@ -8,6 +8,7 @@ from ray.tune import CLIReporter
 from src.deepq.config import Config
 from src.deepq.trainer import Trainer
 
+
 def str2bool(s: str):
     if s.lower() == 'true':
         return True
@@ -61,7 +62,7 @@ def main():
         trial_name_creator=tune.function(lambda trial: trial_str_creator(trial, sha)),
         config=vars(cfg),
         progress_reporter=reporter,
-        resources_per_trial={"gpu": 0.5, "extra_gpu": 0.5},
+        resources_per_trial={"gpu": 1.0, "extra_gpu": 1.0},
     )
 
 if __name__ == '__main__':
