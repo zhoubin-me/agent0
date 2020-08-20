@@ -18,7 +18,6 @@ class Agent:
         env = make_deepq_env(self.cfg.game)
         self.action_dim = env.action_space.n
         self.state_shape = env.observation_space.shape
-        del env
         self.device = torch.device('cuda:0')
         self.batch_indices = torch.arange(self.cfg.batch_size).to(self.device)
         if self.cfg.distributional:

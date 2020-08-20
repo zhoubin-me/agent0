@@ -22,8 +22,6 @@ class Trainer(tune.Trainable, ABC):
         self.epsilon = None
         self.epsilon_schedule = None
         self.actors = None
-        self.steps_per_epoch = None
-        self.actor_steps = None
         self.frame_count = None
         self.Rs, self.Qs, self.TRs, self.Ls, self.ITRs = [], [], [], [], []
         self.best = float('-inf')
@@ -40,14 +38,13 @@ class Trainer(tune.Trainable, ABC):
                                                int(self.cfg.total_steps * self.cfg.exploration_ratio))
         self.actors = [Actor.remote(rank=rank, **config) for rank in range(self.cfg.num_actors)]
 
-        self.steps_per_epoch = self.cfg.total_steps // self.cfg.epochs
-        self.actor_steps = self.cfg.total_steps // (self.cfg.epochs * self.cfg.num_envs * self.cfg.num_actors)
         self.frame_count = 0
         self.Rs, self.Qs, self.TRs, self.Ls, self.ITRs = [], [], [], [], []
         self.best = float('-inf')
         self.epsilon = 1.0
 
-        self.sample_ops = [a.sample.remote(self.actor_steps, 1.0, self.agent.model.state_dict()) for a in self.actors]
+        self.sample_ops = [a.sample.remote(self.cfg.actor_steps, 1.0, self.agent.model.state_dict()) for a in
+                           self.actors]
 
     def step(self):
         done_id, self.sample_ops = ray.wait(self.sample_ops)
@@ -58,13 +55,13 @@ class Trainer(tune.Trainable, ABC):
         self.epsilon = self.epsilon_schedule(len(local_replay))
 
         self.sample_ops.append(
-            self.actors[rank].sample.remote(self.actor_steps, self.epsilon, self.agent.model.state_dict()))
+            self.actors[rank].sample.remote(self.cfg.actor_steps, self.epsilon, self.agent.model.state_dict()))
         self.frame_count += len(local_replay)
         self.Rs += rs
         self.Qs += qs
         # Start training at
         if self.frame_count > self.cfg.start_training_step:
-            loss = [self.agent.train_step() for _ in range(self.cfg.agent_train_freq)]
+            loss = [self.agent.train_step() for _ in range(self.cfg.agent_train_steps)]
             loss = torch.stack(loss)
             self.Ls += loss.tolist()
 
@@ -86,7 +83,7 @@ class Trainer(tune.Trainable, ABC):
         return result
 
     def save_checkpoint(self, checkpoint_dir):
-        output = ray.get([a.sample.remote(self.actor_steps,
+        output = ray.get([a.sample.remote(self.cfg.actor_steps,
                                           self.cfg.min_eps,
                                           self.agent.model.state_dict(),
                                           testing=True,
