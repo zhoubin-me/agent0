@@ -68,7 +68,7 @@ class ReplayDataset(Dataset):
         assert len(st) == self.frame_stack
         st = np.concatenate(st, axis=-1).transpose((2, 0, 1))
 
-        return st, action, rx, done
+        return st, action, rx, done, st_next
 
     def append(self, transitions):
         self.data.append(transitions)

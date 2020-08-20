@@ -116,9 +116,9 @@ class Agent:
             data = self.data_fetcher.next()
             # print(e)
 
-        frames, actions, rewards, terminals = data
-        states = frames[:, :-1, :, :].float().div(255.0)
-        next_states = frames[:, 1:, :, :].float().div(255.0)
+        states, actions, rewards, terminals, next_states = data
+        states = states.float().div(255.0)
+        next_states = next_states.float().div(255.0)
         actions = actions.long()
         terminals = terminals.float()
         rewards = rewards.float()
