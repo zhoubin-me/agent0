@@ -27,7 +27,7 @@ class Actor:
         if self.cfg.distributional:
             self.atoms = torch.linspace(self.cfg.v_min, self.cfg.v_max, self.cfg.num_atoms).to(self.device)
 
-        self.model = NatureCNN(4, self.action_dim, dueling=self.cfg.dueling,
+        self.model = NatureCNN(self.cfg.frame_stack, self.action_dim, dueling=self.cfg.dueling,
                                noisy=self.cfg.noisy, num_atoms=self.cfg.num_atoms).to(self.device)
         self.episodic_buffer = [[] * self.cfg.num_envs]
         self.obs = self.envs.reset()

@@ -16,12 +16,11 @@ class Config:
     v_min: float = -10
     num_atoms: int = 1
 
-    reset_noise_freq: int = 5
-    exp_name: str = 'atari_deepq'
 
     num_actors: int = 8
     num_envs: int = 16
     num_data_workers: int = 4
+    reset_noise_freq: int = 5
 
     batch_size: int = 512
     replay_size: int = int(1e6)
@@ -39,6 +38,8 @@ class Config:
 
     restore_ckpt: str = None
     random_seed: int = 42
+    exp_name: str = 'atari_deepq'
+    frame_stack: int = 4
 
     def update(self, num_atoms=None, game=None):
         if num_atoms is None:
