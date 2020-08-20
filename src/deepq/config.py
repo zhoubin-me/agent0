@@ -30,20 +30,29 @@ class Config:
     min_eps: float = 0.01
 
     total_steps: int = int(2.5e7)
+    steps_per_epoch: int = 10000
     epochs: int = 2500
     start_training_step: int = int(1e5)
     target_update_freq: int = 500
-    agent_train_freq: int = 10
+    agent_train_steps: int = 10
+    actor_steps: int = 40
 
     restore_ckpt: str = None
     random_seed: int = 42
 
-    def default_num_atoms(self):
-        if self.distributional:
-            self.num_atoms = 51
-        elif self.qr:
-            self.num_atoms = 200
+    def update(self, num_atoms=None, game=None):
+        if num_atoms is None:
+            if self.distributional:
+                self.num_atoms = 51
+            elif self.qr:
+                self.num_atoms = 200
+            else:
+                self.num_atoms = 1
         else:
-            self.num_atoms = 1
+            self.num_atoms = num_atoms
 
-        return self.num_atoms
+        if game is not None:
+            self.game = game
+
+        self.epochs = self.total_steps // self.steps_per_epoch
+        self.actor_steps = self.steps_per_epoch // (self.num_envs * self.num_actors)
