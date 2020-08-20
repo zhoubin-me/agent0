@@ -19,7 +19,7 @@ class Config:
     num_actors: int = 8
     num_envs: int = 16
     num_data_workers: int = 4
-    reset_noise_freq: int = 5
+    reset_noise_freq: int = 4
 
     batch_size: int = 512
     replay_size: int = int(1e6)
