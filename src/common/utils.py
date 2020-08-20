@@ -32,15 +32,39 @@ class DataPrefetcher:
 
 
 class ReplayDataset(Dataset):
-    def __init__(self, data):
-        self.data = data
+    def __init__(self, replay_size):
+        self.replay_size = replay_size
+        self.data = []
+        self.lens_cumsum = None
+        self.lens = None
 
     def __len__(self):
-        return len(self.data)
+        return sum(self.lens)
 
     def __getitem__(self, idx):
-        S, A, R, T = self.data[idx]
-        return np.array(S), A, R, T
+        ep_idx = np.searchsorted(self.lens_cumsum, idx, side='right')
+        transit_idx = self.lens_cumsum[ep_idx] - idx
+        transit_idx = np.clip(transit_idx, 4, self.lens[ep_idx])
+
+        ep_transitions = self.data[ep_idx]
+        obs, action, reward, done = ep_transitions[transit_idx]
+        if not done:
+            st = [x[0] for x in ep_transitions[transit_idx - 4:transit_idx + 1]]
+        else:
+            st = [x[0] for x in ep_transitions[transit_idx - 4:transit_idx]] + np.zeros_like(obs)
+        st = np.concatenate(st, axis=-1).transpose((2, 0, 1))
+
+        return st, action, reward, done
+
+    def append(self, transitions):
+        self.data.append(transitions)
+        self.lens = [x['ep_len'] for x in self.data]
+
+        while sum(self.lens) > self.replay_size:
+            self.data.pop(0)
+            self.lens.pop(0)
+
+        self.lens_cumsum = np.cumsum(self.lens)
 
 
 class DataLoaderX(DataLoader):

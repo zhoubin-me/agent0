@@ -49,14 +49,15 @@ class Trainer(tune.Trainable, ABC):
     def step(self):
         done_id, self.sample_ops = ray.wait(self.sample_ops)
         data = ray.get(done_id)
-        local_replay, rs, qs, rank, fps = data[0]
+        replay, rs, qs, rank, fps = data[0]
         # Actors
-        self.agent.replay.extend(local_replay)
-        self.epsilon = self.epsilon_schedule(len(local_replay))
+        for ep_transitions in replay:
+            self.agent.replay.append(ep_transitions)
+            self.epsilon = self.epsilon_schedule(ep_transitions['ep_len'])
+            self.frame_count += ep_transitions['ep_len']
 
         self.sample_ops.append(
             self.actors[rank].sample.remote(self.cfg.actor_steps, self.epsilon, self.agent.model.state_dict()))
-        self.frame_count += len(local_replay)
         self.Rs += rs
         self.Qs += qs
         # Start training at

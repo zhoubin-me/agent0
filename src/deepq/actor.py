@@ -48,8 +48,8 @@ class Actor:
                 self.model.reset_noise()
 
             with torch.no_grad():
-                st = torch.from_numpy(np.array(self.st)).to(self.device).float().div(255.0).squeeze(-1).permute(1, 0, 2,
-                                                                                                                3)
+                st = np.concatenate(self.st, dim=0)
+                st = torch.from_numpy(st).to(self.device).float().div(255.0).permute(0, 3, 1, 2)
                 if self.cfg.distributional:
                     qs_prob = self.model(st).softmax(dim=-1)
                     qs = qs_prob.mul(self.atoms).sum(dim=-1)
@@ -77,7 +77,7 @@ class Actor:
                         replay.append(
                             dict(transits=self.episodic_buffer[i],
                                  ep_rew=sum([x[2] for x in self.episodic_buffer[i]]),
-                                 len=self.episodic_buffer[i],
+                                 ep_len=len(self.episodic_buffer[i]),
                                  ))
                     self.episodic_buffer[i].clear()
 
