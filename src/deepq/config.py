@@ -40,7 +40,7 @@ class Config:
     restore_ckpt: str = None
     random_seed: int = 42
 
-    def update(self, num_atoms=None):
+    def update(self, num_atoms=None, game=None):
         if num_atoms is None:
             if self.distributional:
                 self.num_atoms = 51
@@ -50,6 +50,9 @@ class Config:
                 self.num_atoms = 1
         else:
             self.num_atoms = num_atoms
+
+        if game is not None:
+            self.game = game
 
         self.epochs = self.total_steps // self.steps_per_epoch
         self.actor_steps = self.steps_per_epoch // (self.num_envs * self.num_actors)

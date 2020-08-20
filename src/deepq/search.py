@@ -24,7 +24,12 @@ def trial_str_creator(trial, sha):
 if __name__ == '__main__':
     cfg = Config()
     cfg = parse_arguments(cfg)
-    cfg.update(num_atoms=None)
+
+    games = ['Breakout', 'Enduro', 'Seaquest', 'BeamRider', 'Pong', 'Asterix', 'Qbert', 'SpaceInvaders']
+    cfg.update(
+        num_atoms=None,
+        game=tune.grid_search(games)
+    )
 
     ray.init(memory=20 * 2 ** 30, object_store_memory=80 * 2 ** 30)
     reporter = CLIReporter(
