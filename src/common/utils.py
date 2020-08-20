@@ -65,6 +65,7 @@ class ReplayDataset(Dataset):
         else:
             st = [x[0] for x in ep_transitions[transit_idx - 3:transit_idx + 2]]
 
+        assert len(st) == self.frame_stack + 1
         st = np.concatenate(st, axis=-1).transpose((2, 0, 1))
 
         return st, action, reward, done

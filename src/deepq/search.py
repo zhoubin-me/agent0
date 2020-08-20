@@ -4,25 +4,17 @@ import git
 import ray
 from ray import tune
 from ray.tune import CLIReporter
+from str2bool import str2bool
 
 from src.deepq.config import Config
 from src.deepq.trainer import Trainer
-
-
-def str2bool(s: str):
-    if s.lower() == 'true':
-        return True
-    elif s.lower() == 'false':
-        return False
-    else:
-        raise ValueError(f'{s} is not a boolean')
 
 
 def parse_arguments(config):
     parser = argparse.ArgumentParser()
     for k, v in vars(config).items():
         if type(v) == bool:
-            parser.add_argument(f"--{k}", type=str2bool, default=str(v))
+            parser.add_argument(f"--{k}", type=str2bool, default=v)
         else:
             parser.add_argument(f"--{k}", type=type(v), default=v)
     args = parser.parse_args()
