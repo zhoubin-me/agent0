@@ -49,6 +49,7 @@ def main():
         verbose=1,
         checkpoint_at_end=True,
         fail_fast=True,
+        reuse_actors=True,
         restore=cfg.restore_checkpoint,
         stop=lambda trial_id, result: result['frames'] > cfg.total_steps,
         checkpoint_freq=1000,
