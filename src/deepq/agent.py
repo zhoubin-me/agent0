@@ -138,7 +138,7 @@ class Agent:
         elif self.cfg.qr:
             loss = self.train_step_qr(states, next_states, actions, terminals, rewards)
         else:
-            loss = self.train_step_dqn(states, next_states, actions, terminals, rewards, model_x, model_y)
+            loss = self.train_step_dqn(states, next_states, actions, terminals, rewards)
 
         self.optimizer.zero_grad()
         loss.backward()
