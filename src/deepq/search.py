@@ -28,12 +28,7 @@ def trial_str_creator(trial, sha):
 def main():
     cfg = Config()
     cfg = parse_arguments(cfg)
-
-    games = ['Breakout', 'Enduro', 'Seaquest', 'BeamRider', 'Pong', 'Asterix', 'Qbert', 'SpaceInvaders']
-    cfg.update(
-        num_atoms=None,
-        game=tune.grid_search(games)
-    )
+    cfg.update()
 
     ray.init(memory=20 * 2 ** 30, object_store_memory=80 * 2 ** 30)
     reporter = CLIReporter(
@@ -54,9 +49,9 @@ def main():
         stop=lambda trial_id, result: result['frames'] > cfg.total_steps,
         checkpoint_freq=1000,
         trial_name_creator=tune.function(lambda trial: trial_str_creator(trial, sha)),
-        config=vars(cfg),
         progress_reporter=reporter,
         resources_per_trial={"gpu": 1.0, "extra_gpu": 1.0},
+        config=vars(cfg),
     )
 
     print(analysis)
