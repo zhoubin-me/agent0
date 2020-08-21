@@ -57,3 +57,5 @@ class Config:
 
         self.epochs = self.total_steps // self.steps_per_epoch
         self.actor_steps = self.steps_per_epoch // (self.num_envs * self.num_actors)
+
+        assert not (self.distributional and self.qr)

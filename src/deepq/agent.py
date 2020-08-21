@@ -108,7 +108,6 @@ class Agent:
         return loss
 
     def train_step(self):
-        assert not (self.cfg.distributional and self.cfg.qr)
         try:
             data = self.data_fetcher.next()
         except Exception as e:
