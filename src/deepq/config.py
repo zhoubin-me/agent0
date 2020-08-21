@@ -4,12 +4,12 @@ from dataclasses import dataclass
 @dataclass
 class Config:
     game: str = 'Breakout'
-    double_q: bool = True
-    dueling: bool = True
+    double_q: bool = False
+    dueling: bool = False
     noisy: bool = False
+    n_step: int = 3
     distributional: bool = False
     qr: bool = False
-    n_step: int = 3
 
     adam_lr: float = 5e-4
     v_max: float = 10
