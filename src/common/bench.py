@@ -5,9 +5,12 @@ _atari = ["".join(list(map(lambda x: x.capitalize(), game.split('_')))) for game
 _bullet = [x.id[:-12] for x in gym.envs.registry.all() if 'BulletEnv' in x.id]
 
 _atari8 = ['BeamRider', 'Breakout', 'Enduro', 'Pong', 'Qbert', 'Seaquest', 'SpaceInvaders', 'Asterix']
+
 _atariexpl7 = ['Freeway', 'Gravitar', 'MontezumaRevenge', 'Pitfall', 'PrivateEye', 'Solaris', 'Venture']
+
 _atari10 = ['BeamRider', 'Breakout', 'Enduro', 'Pong', 'Qbert', 'Seaquest', 'SpaceInvaders', 'Frostbite', 'MsPacman',
             'KungFuMaster']
+
 _atari50 = [  # actually 47
     'Alien', 'Amidar', 'Assault', 'Asterix', 'Asteroids',
     'Atlantis', 'BankHeist', 'BattleZone', 'BeamRider', 'Bowling',

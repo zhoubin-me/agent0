@@ -5,7 +5,7 @@ from src.common.bench import _atari, _atari8
 
 @dataclass
 class Config:
-    game: str = None
+    game: str = ""
     double_q: bool = False
     dueling: bool = False
     noisy: bool = False
@@ -16,7 +16,7 @@ class Config:
     adam_lr: float = 5e-4
     v_max: float = 10
     v_min: float = -10
-    num_atoms: int = None
+    num_atoms: int = -1
 
     num_actors: int = 8
     num_envs: int = 16
@@ -44,7 +44,7 @@ class Config:
     frame_stack: int = 4
 
     def update(self):
-        if self.num_atoms is None:
+        if self.num_atoms < 0:
             if self.distributional:
                 self.num_atoms = 51
             elif self.qr:
@@ -52,7 +52,7 @@ class Config:
             else:
                 self.num_atoms = 1
 
-        if self.game is None:
+        if self.game == "":
             self.game = "Breakout"
 
         if self.game not in _atari:
