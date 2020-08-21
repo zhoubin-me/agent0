@@ -7,7 +7,7 @@ class Config:
     double_q: bool = False
     dueling: bool = False
     noisy: bool = False
-    n_step: int = 3
+    n_step: int = 1
     distributional: bool = False
     qr: bool = False
 
