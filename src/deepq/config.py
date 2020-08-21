@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from src.common.bench import _atari, _atari8
+from src.common.bench import _atari, _atari8, _atari10, _atariexp7
 
 
 @dataclass
@@ -60,6 +60,12 @@ class Config:
                 self.game = _atari8[:4]
             elif self.game == 'second':
                 self.game = _atari8[-4:]
+            elif self.game == 'atari10':
+                self.game = _atari10
+            elif self.game == 'atariexp7':
+                self.game = _atariexp7
+            elif self.game == 'atari_full':
+                self.game = _atari
             else:
                 raise ValueError("No such atari games")
 
