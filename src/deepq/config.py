@@ -60,6 +60,8 @@ class Config:
                 self.game = _atari8[:4]
             elif self.game == 'second':
                 self.game = _atari8[-4:]
+            elif self.game == 'atari8':
+                self.game = _atari8
             elif self.game == 'atari10':
                 self.game = _atari10
             elif self.game == 'atariexp7':
