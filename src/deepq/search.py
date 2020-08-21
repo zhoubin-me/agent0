@@ -30,6 +30,9 @@ def main():
     cfg = parse_arguments(cfg)
     cfg.update()
 
+    if isinstance(cfg.game, list):
+        cfg.game = tune.grid_search(cfg.game)
+
     ray.init(memory=20 * 2 ** 30, object_store_memory=80 * 2 ** 30)
     reporter = CLIReporter(
         metric_columns=["frames", "loss", "ep_reward_test", "ep_reward_train", "ep_reward_test_max",
