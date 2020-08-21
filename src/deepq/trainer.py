@@ -74,7 +74,7 @@ class Trainer(tune.Trainable, ABC):
             adam_lr=self.cfg.adam_lr,
             frames=self.frame_count,
             speed=self.frame_count / (self._time_total + 1),
-            time_remain=(self.cfg.total_steps - self.frame_count) / (self.frame_count / (self._time_total + 1)),
+            time_remain=(self.cfg.total_steps - self.frame_count) / ((self.frame_count + 1) / (self._time_total + 1)),
             loss=np.mean(self.Ls[-20:]) if len(self.Ls) > 0 else 0,
             ep_reward_test=np.mean(self.ITRs) if len(self.ITRs) > 0 else 0,
             ep_reward_train=np.mean(self.Rs[-20:]) if len(self.Rs) > 0 else 0,
