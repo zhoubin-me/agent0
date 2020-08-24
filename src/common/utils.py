@@ -110,9 +110,9 @@ class ReplayDataset(Dataset, Sampler):
     def __iter__(self):
         batch = []
         for i in self._idx_producer:
-            mass = (random.random() + i % self.cfg.batch_size) * \
-                   self._it_sum.sum(0, len(self) - 1) / self.cfg.batch_size
-            idx = self._it_sum.find_prefixsum_idx(mass)
+            mas = (random.random() + i % self.cfg.batch_size) / self.cfg.batch_size * self._it_sum.sum(0, len(self) - 1)
+            print(mas, self._max_priority ** self._alpha)
+            idx = self._it_sum.find_prefixsum_idx(mas)
             batch.append(idx)
             if len(batch) == self.cfg.batch_size:
                 yield batch
