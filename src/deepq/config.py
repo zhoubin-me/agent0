@@ -2,6 +2,9 @@ from dataclasses import dataclass
 
 from src.common.bench import atari8, atari10, atari47, atari_exp7, atari63
 
+GPU_SIZE = 1.0
+assert GPU_SIZE > 0
+
 
 @dataclass
 class Config:

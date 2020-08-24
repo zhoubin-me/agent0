@@ -8,11 +8,11 @@ import torch
 
 from src.common.atari_wrappers import make_deepq_env
 from src.common.vec_env import ShmemVecEnv
-from src.deepq.config import Config
+from src.deepq.config import Config, GPU_SIZE
 from src.deepq.model import NatureCNN
 
 
-@ray.remote(num_gpus=0.1)
+@ray.remote(num_gpus=0.1 / GPU_SIZE)
 class Actor:
     def __init__(self, rank, **kwargs):
 
