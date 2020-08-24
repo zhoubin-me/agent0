@@ -133,7 +133,7 @@ class ReplayDataset(Dataset, Sampler):
     def update_priorities(self, idxes, priorities):
         assert len(idxes) == len(priorities)
         for idx, priority in zip(idxes, priorities):
-            assert priority > 0
+            priority += 1e-8
             assert 0 <= idx < self.lens_cum_sum[-1]
             self._it_sum[idx] = priority ** self._alpha
             self._it_min[idx] = priority ** self._alpha
