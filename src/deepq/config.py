@@ -37,7 +37,7 @@ class Config:
 
     num_actors: int = 8
     num_envs: int = 16
-    num_data_workers: int = 8
+    num_data_workers: int = 4
     reset_noise_freq: int = 4
 
     pin_memory = True
