@@ -62,6 +62,7 @@ class ReplayDataset(Dataset, Sampler):
 
     def __getitem__(self, idx):
         try:
+            idx = idx % len(self)
             ep_idx = np.searchsorted(self.lens_cum_sum, idx, side='right')
             if ep_idx == 0:
                 transit_idx = idx
@@ -111,6 +112,7 @@ class ReplayDataset(Dataset, Sampler):
         batch = []
         for i in self._idx_producer:
             mas = (random.random() + i % self.cfg.batch_size) / self.cfg.batch_size * self._it_sum.sum(0, len(self) - 1)
+            # print((random.random() + i % self.cfg.batch_size) / self.cfg.batch_size, self._it_sum.sum(0, len(self) - 1))
             idx = self._it_sum.find_prefixsum_idx(mas)
             batch.append(idx)
             if len(batch) == self.cfg.batch_size:
@@ -134,9 +136,10 @@ class ReplayDataset(Dataset, Sampler):
                 self._it_min[idx] = self._it_min[idx + out_frame_count]
                 self._beta = self._beta_schedule()
 
-            for idx in range(len(self) - 1, len(self) - 1 - in_frame_count):
+            for idx in range(len(self) - in_frame_count, len(self)):
                 self._it_sum[idx] = self._max_priority ** self._alpha
                 self._it_min[idx] = self._max_priority ** self._alpha
+            # print(len(self), (random.random() + 100 % self.cfg.batch_size) / self.cfg.batch_size, self._it_sum.sum(0, len(self) - 1))
 
     def update_priorities(self, idxes, priorities):
         assert len(idxes) == len(priorities)
