@@ -131,7 +131,7 @@ class ReplayDataset(Dataset, Sampler):
         self.lens_cum_sum = np.cumsum(self.lens)
 
         if self.cfg.prioritize:
-            for idx in range(len(self) - 1, -1, -1):
+            for idx in range(len(self) - 1 - out_frame_count, -1, -1):
                 self._it_sum[idx + out_frame_count] = self._it_sum[idx]
                 self._it_min[idx + out_frame_count] = self._it_min[idx]
                 self._beta = self._beta_schedule()
