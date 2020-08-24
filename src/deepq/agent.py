@@ -36,8 +36,12 @@ class Agent:
         self.data_fetcher = None
 
     def get_data_fetcher(self):
-        data_loader = DataLoaderX(self.replay, batch_size=self.cfg.batch_size, shuffle=True,
-                                  num_workers=self.cfg.num_data_workers, pin_memory=self.cfg.pin_memory)
+        if self.cfg.prioritize:
+            data_loader = DataLoaderX(self.replay, batch_sampler=self.replay,
+                                      num_workers=self.cfg.num_data_workers, pin_memory=self.cfg.pin_memory)
+        else:
+            data_loader = DataLoaderX(self.replay, batch_size=self.cfg.batch_size, shuffle=True,
+                                      num_workers=self.cfg.num_data_workers, pin_memory=self.cfg.pin_memory)
         data_fetcher = DataPrefetcher(data_loader, self.device)
         return data_fetcher
 
