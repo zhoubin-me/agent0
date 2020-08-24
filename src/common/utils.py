@@ -38,18 +38,18 @@ class ReplayDataset(Dataset):
         self.frame_stack = frame_stack
         self.discount = discount
         self.data = []
-        self.lens_cumsum = None
+        self.lens_cum_sum = None
         self.lens = None
 
     def __len__(self):
         return sum(self.lens)
 
     def __getitem__(self, idx):
-        ep_idx = np.searchsorted(self.lens_cumsum, idx, side='right')
+        ep_idx = np.searchsorted(self.lens_cum_sum, idx, side='right')
         if ep_idx == 0:
             transit_idx = idx
         else:
-            transit_idx = idx - self.lens_cumsum[ep_idx - 1]
+            transit_idx = idx - self.lens_cum_sum[ep_idx - 1]
 
         transit_idx = max(transit_idx, self.frame_stack - 1)
         transit_idx_next = transit_idx + self.n_step
@@ -72,15 +72,15 @@ class ReplayDataset(Dataset):
 
         return st, action, rx, done, st_next
 
-    def append(self, transitions):
-        self.data.append(transitions)
-        self.lens = [x['ep_len'] for x in self.data]
+    def extend(self, transitions):
+        self.data.extend(transitions)
+        self.lens.extend([x['ep_len'] for x in transitions])
 
         while sum(self.lens) > self.replay_size:
             self.data.pop(0)
             self.lens.pop(0)
 
-        self.lens_cumsum = np.cumsum(self.lens)
+        self.lens_cum_sum = np.cumsum(self.lens)
 
 
 class DataLoaderX(DataLoader):
