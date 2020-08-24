@@ -1,17 +1,16 @@
 import atari_py
 import gym
 
-_atari = ["".join(list(map(lambda x: x.capitalize(), game.split('_')))) for game in atari_py.list_games()]
-_bullet = [x.id[:-12] for x in gym.envs.registry.all() if 'BulletEnv' in x.id]
+atari63 = ["".join(list(map(lambda x: x.capitalize(), game.split('_')))) for game in atari_py.list_games()]
 
-_atari8 = ['BeamRider', 'Breakout', 'Enduro', 'Pong', 'Qbert', 'Seaquest', 'SpaceInvaders', 'Asterix']
+atari8 = ['BeamRider', 'Breakout', 'Enduro', 'Pong', 'Qbert', 'Seaquest', 'SpaceInvaders', 'Asterix']
 
-_atariexp7 = ['Freeway', 'Gravitar', 'MontezumaRevenge', 'Pitfall', 'PrivateEye', 'Solaris', 'Venture']
+atari_exp7 = ['Freeway', 'Gravitar', 'MontezumaRevenge', 'Pitfall', 'PrivateEye', 'Solaris', 'Venture']
 
-_atari10 = ['BeamRider', 'Breakout', 'Enduro', 'Pong', 'Qbert', 'Seaquest', 'SpaceInvaders', 'Frostbite', 'MsPacman',
-            'KungFuMaster']
+atari10 = ['BeamRider', 'Breakout', 'Enduro', 'Pong', 'Qbert', 'Seaquest', 'SpaceInvaders', 'Frostbite', 'MsPacman',
+           'KungFuMaster']
 
-_atari50 = [  # actually 47
+atari47 = [  # actually 47
     'Alien', 'Amidar', 'Assault', 'Asterix', 'Asteroids',
     'Atlantis', 'BankHeist', 'BattleZone', 'BeamRider', 'Bowling',
     'Breakout', 'Centipede', 'ChopperCommand', 'CrazyClimber',
@@ -24,6 +23,5 @@ _atari50 = [  # actually 47
     'VideoPinball', 'WizardOfWor', 'Zaxxon',
 ]
 
-_mujoco7 = [
-    'Reacher', 'Hopper', 'HalfCheetah', 'Walker2D', "Ant", "Pusher", "Humanoid"
-]
+mujoco7 = ['Reacher', 'Hopper', 'HalfCheetah', 'Walker2D', "Ant", "Pusher", "Humanoid"]
+bullet = [x.id[:-12] for x in gym.envs.registry.all() if 'BulletEnv' in x.id]

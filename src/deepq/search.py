@@ -4,7 +4,6 @@ import git
 import ray
 from ray import tune
 from ray.tune import CLIReporter
-from str2bool import str2bool
 
 from src.deepq.config import Config
 from src.deepq.trainer import Trainer
@@ -14,7 +13,9 @@ def parse_arguments(config):
     parser = argparse.ArgumentParser()
     for k, v in vars(config).items():
         if type(v) == bool:
-            parser.add_argument(f"--{k}", type=str2bool, default=v)
+            parser.add_argument(f'--{k}', dest=k, action='store_true')
+            parser.add_argument(f'--no_{k}', dest=k, action='store_false')
+            parser.set_defaults(**{k: v})
         else:
             parser.add_argument(f"--{k}", type=type(v), default=v)
     args = parser.parse_args()
@@ -26,7 +27,11 @@ def trial_str_creator(trial, sha):
 
 
 def main():
-    cfg = Config()
+    repo = git.Repo(search_parent_directories=True)
+    sha = repo.git.rev_parse(repo.head.object.hexsha, short=True)
+    sha_long = repo.head.object.hexsha
+
+    cfg = Config(sha=sha_long)
     cfg = parse_arguments(cfg)
     cfg.update()
 
@@ -37,9 +42,6 @@ def main():
     reporter = CLIReporter(
         metric_columns=["frames", "loss", "ep_reward_test", "ep_reward_train", "ep_reward_test_max",
                         "ep_reward_train_max", "time_past", "time_remain", "speed", "epsilon", "qmax"])
-
-    repo = git.Repo(search_parent_directories=True)
-    sha = repo.git.rev_parse(repo.head.object.hexsha, short=True)
 
     analysis = tune.run(
         Trainer,
