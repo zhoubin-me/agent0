@@ -2,10 +2,10 @@ import random
 
 import numpy as np
 import torch
-from baselines.common.segment_tree import SumSegmentTree, MinSegmentTree
 from prefetch_generator import BackgroundGenerator
 from torch.utils.data import Dataset, DataLoader, Sampler, SequentialSampler
 
+from src.common.segment_tree import SumSegmentTree, MinSegmentTree
 from src.common.utils import LinearSchedule
 from src.deepq.config import Config
 
