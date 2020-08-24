@@ -60,7 +60,7 @@ class Trainer(tune.Trainable, ABC):
         self.Rs += rs
         self.Qs += qs
         # Start training at
-        if self.frame_count > self.cfg.start_training_step:
+        if len(self.agent.replay) > self.cfg.start_training_step:
             loss = [self.agent.train_step() for _ in range(self.cfg.agent_train_steps)]
             loss = torch.stack(loss)
             self.Ls += loss.tolist()
