@@ -94,6 +94,14 @@ class Actor:
             if testing and len(rs) > test_episodes:
                 break
             if not testing and step > steps:
+                for i in range(self.cfg.num_envs):
+                    if len(self.episodic_buffer[i]) > self.cfg.frame_stack:
+                        replay.append(
+                            dict(transits=copy.deepcopy(self.episodic_buffer[i]),
+                                 ep_rew=sum([x[2] for x in self.episodic_buffer[i]]),
+                                 ep_len=len(self.episodic_buffer[i]))
+                        )
+                        del self.episodic_buffer[i]
                 break
 
         toc = time.time()
