@@ -2,8 +2,11 @@ import random
 
 import numpy as np
 import torch
+from baselines.common.segment_tree import SumSegmentTree, MinSegmentTree
 from prefetch_generator import BackgroundGenerator
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, Sampler, SequentialSampler
+
+from src.deepq.config import Config
 
 
 class DataPrefetcher:
@@ -31,18 +34,31 @@ class DataPrefetcher:
         return data
 
 
-class ReplayDataset(Dataset):
-    def __init__(self, replay_size, frame_stack=4, n_step=3, discount=0.99):
-        self.replay_size = replay_size
-        self.n_step = n_step
-        self.frame_stack = frame_stack
-        self.discount = discount
+class ReplayDataset(Dataset, Sampler):
+    def __init__(self, **kwargs):
+        self.cfg = Config(**kwargs)
+
         self.data = []
         self.lens = []
-        self.lens_cum_sum = None
+        self.lens_cum_sum = [0]
+
+        if self.cfg.prioritize:
+            assert self.cfg.priority_alpha >= 0
+            self._alpha = self.cfg.priority_alpha
+
+            it_capacity = 1
+            while it_capacity < self.cfg.replay_size:
+                it_capacity *= 2
+
+            self._it_sum = SumSegmentTree(it_capacity)
+            self._it_min = MinSegmentTree(it_capacity)
+            self._max_priority = 1.0
+            self._idx_producer = SequentialSampler(range(self.cfg.total_steps * self.cfg.batch_size))
+            self._beta_schedule = LinearSchedule(self.cfg.priority_beta0, 1.0, self.cfg.total_steps)
+            self._beta = self.cfg.priority_beta0
 
     def __len__(self):
-        return sum(self.lens)
+        return self.lens_cum_sum[-1]
 
     def __getitem__(self, idx):
         ep_idx = np.searchsorted(self.lens_cum_sum, idx, side='right')
@@ -51,8 +67,8 @@ class ReplayDataset(Dataset):
         else:
             transit_idx = idx - self.lens_cum_sum[ep_idx - 1]
 
-        transit_idx = max(transit_idx, self.frame_stack - 1)
-        transit_idx_next = transit_idx + self.n_step
+        transit_idx = max(transit_idx, self.cfg.frame_stack - 1)
+        transit_idx_next = transit_idx + self.cfg.n_step
         transit_idx_next = min(transit_idx_next, self.lens[ep_idx] - 1)
 
         ep_transitions = self.data[ep_idx]['transits']
@@ -63,24 +79,65 @@ class ReplayDataset(Dataset):
         rs = [x[2] for x in ep_transitions[transit_idx:transit_idx_next]]
         rx = 0
         for r in reversed(rs):
-            rx = rx * self.discount + r
-        assert len(st) == self.frame_stack
-        assert len(st) == self.frame_stack
+            rx = rx * self.cfg.discount + r
+        assert len(st) == self.cfg.frame_stack
+        assert len(st) == self.cfg.frame_stack
 
         st = np.concatenate(st, axis=-1).transpose((2, 0, 1))
         st_next = np.concatenate(st_next, axis=-1).transpose((2, 0, 1))
 
-        return st, action, rx, done, st_next
+        if self.cfg.prioritize:
+            p_min = self._it_min.min() / self._it_sum.sum()
+            max_weight = (p_min * len(self)) ** (-self._beta)
+
+            p_sample = self._it_sum[idx] / self._it_sum.sum()
+            weight = (p_sample * len(self)) ** (-self._beta)
+            weight = weight / max_weight
+        else:
+            weight = 1.0
+
+        return st, action, rx, done, st_next, weight, idx
+
+    def __iter__(self):
+        batch = []
+        for idx in self._idx_producer:
+            mass = (random.random() + idx % self.cfg.batch_size) * \
+                   self._it_sum.sum(0, len(self) - 1) / self.cfg.batch_size
+            idx = self._it_sum.find_prefixsum_idx(mass)
+            batch.append(idx)
+            if len(batch) == self.cfg.batch_size:
+                yield batch
+                batch = []
 
     def extend(self, transitions):
         self.data.extend(transitions)
         self.lens.extend([x['ep_len'] for x in transitions])
 
-        while sum(self.lens) > self.replay_size:
+        in_frame_count = sum([x['ep_len'] for x in transitions])
+        out_frame_count = 0
+        while sum(self.lens) > self.cfg.replay_size:
             self.data.pop(0)
-            self.lens.pop(0)
-
+            out_frame_count += self.lens.pop(0)
         self.lens_cum_sum = np.cumsum(self.lens)
+
+        if self.cfg.prioritize:
+            for idx in range(len(self)):
+                self._it_sum[idx] = self._it_sum[idx + out_frame_count]
+                self._it_min[idx] = self._it_min[idx + out_frame_count]
+                self._beta = self._beta_schedule()
+
+            for idx in range(len(self) - 1, len(self) - 1 - in_frame_count):
+                self._it_sum[idx] = self._max_priority ** self._alpha
+                self._it_min[idx] = self._max_priority ** self._alpha
+
+    def update_priorities(self, idxes, priorities):
+        assert len(idxes) == len(priorities)
+        for idx, priority in zip(idxes, priorities):
+            assert priority > 0
+            assert 0 <= idx < self.lens_cum_sum[-1]
+            self._it_sum[idx] = priority ** self._alpha
+            self._it_min[idx] = priority ** self._alpha
+            self._max_priority = max(self._max_priority, priority)
 
 
 class DataLoaderX(DataLoader):

@@ -32,7 +32,7 @@ class Agent:
         self.optimizer = torch.optim.Adam(self.model.parameters(), self.cfg.adam_lr)
 
         self.update_steps = 0
-        self.replay = ReplayDataset(self.cfg.replay_size, frame_stack=self.cfg.frame_stack, n_step=self.cfg.n_step)
+        self.replay = ReplayDataset(**kwargs)
         self.data_fetcher = None
 
     def get_data_fetcher(self):
@@ -59,8 +59,8 @@ class Agent:
         loss = fx.smooth_l1_loss(q, q_target, reduction='none')
         weights = torch.abs(self.cumulative_density.view(1, 1, -1) - (q - q_target).detach().sign().float())
         loss = loss * weights
-        loss = loss.sum(-1).mean()
-        return loss
+        loss = loss.sum(-1).mean(-1)
+        return loss.view(-1)
 
     def train_step_c51(self, states, next_states, actions, terminals, rewards):
         with torch.no_grad():
@@ -90,8 +90,8 @@ class Agent:
 
         log_prob = self.model(states).log_softmax(dim=-1)
         log_prob = log_prob[self.batch_indices, actions, :]
-        loss = target_prob.mul(log_prob).sum(dim=-1).neg().mean()
-        return loss
+        loss = target_prob.mul(log_prob).sum(dim=-1).neg()
+        return loss.view(-1)
 
     def train_step_dqn(self, states, next_states, actions, terminals, rewards):
         with torch.no_grad():
@@ -104,8 +104,8 @@ class Agent:
             q_target = rewards + self.cfg.discount * (1 - terminals) * q_next
 
         q = self.model(states).squeeze(dim=-1)[self.batch_indices, actions]
-        loss = torch.nn.functional.smooth_l1_loss(q, q_target)
-        return loss
+        loss = torch.nn.functional.smooth_l1_loss(q, q_target, reduction='none')
+        return loss.view(-1)
 
     def train_step(self):
         try:
@@ -115,7 +115,7 @@ class Agent:
             data = self.data_fetcher.next()
             # print(e)
 
-        states, actions, rewards, terminals, next_states = data
+        states, actions, rewards, terminals, next_states, weights, indices = data
         states = states.float().div(255.0)
         next_states = next_states.float().div(255.0)
         actions = actions.long()
@@ -132,6 +132,12 @@ class Agent:
             loss = self.train_step_qr(states, next_states, actions, terminals, rewards)
         else:
             loss = self.train_step_dqn(states, next_states, actions, terminals, rewards)
+
+        if self.cfg.prioritize:
+            self.replay.update_priorities(indices.tolist(), loss.tolist())
+            loss = loss.mul(weights).mean()
+        else:
+            loss = loss.mean()
 
         self.optimizer.zero_grad()
         loss.backward()
