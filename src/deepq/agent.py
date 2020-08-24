@@ -4,7 +4,7 @@ import torch
 import torch.nn.functional as fx
 
 from src.common.atari_wrappers import make_deepq_env
-from src.common.utils import ReplayDataset, DataLoaderX, DataPrefetcher
+from src.common.replay_dataset import ReplayDataset, DataLoaderX, DataPrefetcher
 from src.deepq.config import Config
 from src.deepq.model import NatureCNN
 
