@@ -38,8 +38,8 @@ class ReplayDataset(Dataset):
         self.frame_stack = frame_stack
         self.discount = discount
         self.data = []
+        self.lens = []
         self.lens_cum_sum = None
-        self.lens = None
 
     def __len__(self):
         return sum(self.lens)
