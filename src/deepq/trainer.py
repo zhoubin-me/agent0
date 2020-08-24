@@ -53,9 +53,8 @@ class Trainer(tune.Trainable, ABC):
         # Actors
         for ep_transitions in replay:
             self.agent.replay.append(ep_transitions)
-            self.epsilon = self.epsilon_schedule(ep_transitions['ep_len'])
-            self.frame_count += ep_transitions['ep_len']
-
+        self.epsilon = self.epsilon_schedule(self.cfg.actor_steps * self.cfg.num_envs)
+        self.frame_count += self.cfg.actor_steps * self.cfg.num_envs
 
         self.sample_ops.append(
             self.actors[rank].sample.remote(self.cfg.actor_steps, self.epsilon, self.agent.model.state_dict()))
