@@ -61,15 +61,24 @@ class ReplayDataset(Dataset, Sampler):
         return self.lens_cum_sum[-1]
 
     def __getitem__(self, idx):
-        ep_idx = np.searchsorted(self.lens_cum_sum, idx, side='right')
-        if ep_idx == 0:
-            transit_idx = idx
-        else:
-            transit_idx = idx - self.lens_cum_sum[ep_idx - 1]
+        try:
+            ep_idx = np.searchsorted(self.lens_cum_sum, idx, side='right')
+            if ep_idx == 0:
+                transit_idx = idx
+            else:
+                transit_idx = idx - self.lens_cum_sum[ep_idx - 1]
 
-        transit_idx = max(transit_idx, self.cfg.frame_stack - 1)
-        transit_idx_next = transit_idx + self.cfg.n_step
-        transit_idx_next = min(transit_idx_next, self.lens[ep_idx] - 1)
+            transit_idx = max(transit_idx, self.cfg.frame_stack - 1)
+            transit_idx_next = transit_idx + self.cfg.n_step
+            transit_idx_next = min(transit_idx_next, self.lens[ep_idx] - 1)
+        except:
+            print("IDX Produced", idx)
+            print("No. of Transits", len(self))
+            print("EP idx", ep_idx)
+            print("Total EP", len(self.lens))
+            print("Cur EP Len", self.lens[ep_idx])
+            print(transit_idx)
+            print(transit_idx_next)
 
         ep_transitions = self.data[ep_idx]['transits']
         obs, action, reward, done = ep_transitions[transit_idx]
@@ -100,8 +109,8 @@ class ReplayDataset(Dataset, Sampler):
 
     def __iter__(self):
         batch = []
-        for idx in self._idx_producer:
-            mass = (random.random() + idx % self.cfg.batch_size) * \
+        for i in self._idx_producer:
+            mass = (random.random() + i % self.cfg.batch_size) * \
                    self._it_sum.sum(0, len(self) - 1) / self.cfg.batch_size
             idx = self._it_sum.find_prefixsum_idx(mass)
             batch.append(idx)
