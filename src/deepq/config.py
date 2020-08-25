@@ -2,9 +2,9 @@ import argparse
 from dataclasses import dataclass
 
 from src.common.bench import atari8, atari10, atari47, atari_exp7, atari63
+from src.common.gpuinfo import get_gpus
 
-GPU_SIZE = 1.0
-assert GPU_SIZE > 0
+GPU_SIZE = min(get_gpus()[-1].get_memory_details()['free_memory'] // 10240, 2.0)
 
 
 @dataclass
