@@ -18,7 +18,9 @@ class Actor:
         self.rank = rank
         self.cfg = Config(**kwargs)
         # Training
-        self.envs = ShmemVecEnv([lambda: make_deepq_env(self.cfg.game, True, True, True, True)
+        self.envs = ShmemVecEnv([lambda: make_deepq_env(game=self.cfg.game, episode_life=True, clip_rewards=True,
+                                                        frame_stack=4, transpose_image=True, n_step=self.cfg.n_step,
+                                                        discount=self.cfg.discount)
                                  for _ in range(self.cfg.num_envs)], context='fork')
         self.action_dim = self.envs.action_space.n
         self.state_shape = self.envs.observation_space.shape
