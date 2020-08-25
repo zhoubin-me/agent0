@@ -68,11 +68,11 @@ class Actor:
             self.obs = obs_next
 
             if not testing:
-                for info, st_next in zip(info, obs_next):
-                    st = info['prev_obs']
-                    at = info['prev_action']
-                    rt = info['prev_reward']
-                    dt = info['prev_done']
+                for inf, st_next in zip(info, obs_next):
+                    st = inf['prev_obs']
+                    at = inf['prev_action']
+                    rt = inf['prev_reward']
+                    dt = inf['prev_done']
                     data.append((st, at, rt, dt, st_next))
 
             for inf in info:

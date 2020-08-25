@@ -267,6 +267,7 @@ class NStepEnv(gym.Wrapper):
     def step(self, action):
         ob, reward, done, info = self.env.step(action)
         self.tracker.append((self.last_obs, action, reward, done))
+        self.last_obs = ob
 
         r_discounted = 0
         done_discounted = False
@@ -276,14 +277,13 @@ class NStepEnv(gym.Wrapper):
                 done_discounted = True
 
         info.update(
-            prev_obs=self.transits[0][0],
-            prev_action=self.transits[0][1],
+            prev_obs=self.tracker[0][0],
+            prev_action=self.tracker[0][1],
             prev_reward=r_discounted,
             prev_done=done_discounted,
         )
 
-        self.last_obs = ob
-        return obs, reward, done, info
+        return ob, reward, done, info
 
 
 class ScaledFloatFrame(gym.ObservationWrapper):
