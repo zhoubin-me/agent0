@@ -3,6 +3,7 @@ import torch
 from prefetch_generator import BackgroundGenerator
 from torch.utils.data import Dataset, DataLoader, Sampler
 
+from src.common.utils import LinearSchedule
 from src.deepq.config import Config
 
 
@@ -40,7 +41,9 @@ class ReplayDataset(Dataset, Sampler):
         self.lens_cum_sum = [0]
 
         if self.cfg.prioritize:
+            self.beta_schedule = LinearSchedule(self.cfg.priority_beta0, 1.0, self.cfg.total_steps)
             self.weights = torch.ones(self.cfg.replay_size * 2, requires_grad=False)
+            self.beta = self.cfg.priority_beta0
 
     def __len__(self):
         return sum(self.lens)
@@ -71,9 +74,9 @@ class ReplayDataset(Dataset, Sampler):
 
         st = np.concatenate(st, axis=-1).transpose((2, 0, 1))
         st_next = np.concatenate(st_next, axis=-1).transpose((2, 0, 1))
-        weight = self.weights[idx]
+        weight = self.weights[idx].pow(-self.beta)
 
-        return st, action, rx, done, st_next, weight, idx
+        return st, action, rx, done, st_next, 1.0, idx
 
     def __iter__(self):
         while True:
@@ -83,6 +86,7 @@ class ReplayDataset(Dataset, Sampler):
         self.data.extend(transitions)
         self.lens.extend([x['ep_len'] for x in transitions])
 
+        in_frame_count = sum([x['ep_len'] for x in transitions])
         out_frame_count = 0
         while sum(self.lens) > self.cfg.replay_size:
             self.data.pop(0)
@@ -92,9 +96,10 @@ class ReplayDataset(Dataset, Sampler):
         if self.cfg.prioritize:
             self.weights.roll(-out_frame_count, 0)
             self.weights[sum(self.lens):] = 1.0
+            self.beta_schedule(in_frame_count)
 
     def update_priorities(self, idxes, priorities):
-        self.weights[idxes] = priorities.add(1e-8)
+        self.weights[idxes] = priorities.add(1e-8).exp(self.cfg.priority_alpha)
 
 
 class DataLoaderX(DataLoader):
