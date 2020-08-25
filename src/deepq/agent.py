@@ -35,6 +35,12 @@ class Agent:
         self.replay = ReplayDataset(self.device, **kwargs)
         self.data_fetcher = None
 
+        self.algo = {
+            'qr': self.train_step_qr,
+            'c51': self.train_step_c51,
+            'dqn': self.train_step_dqn,
+        }
+
     def get_data_fetcher(self):
         if self.cfg.prioritize:
             data_loader = DataLoaderX(self.replay, batch_sampler=self.replay,
@@ -131,12 +137,7 @@ class Agent:
             self.model.reset_noise()
             self.model_target.reset_noise()
 
-        if self.cfg.distributional:
-            loss = self.train_step_c51(states, next_states, actions, terminals, rewards)
-        elif self.cfg.qr:
-            loss = self.train_step_qr(states, next_states, actions, terminals, rewards)
-        else:
-            loss = self.train_step_dqn(states, next_states, actions, terminals, rewards)
+        loss = self.algo[self.cfg.algo](states, next_states, actions, terminals, rewards)
 
         if self.cfg.prioritize:
             weights /= weights.sum().add(1e-8)

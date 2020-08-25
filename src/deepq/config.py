@@ -12,10 +12,9 @@ class Config:
     double_q: bool = False
     dueling: bool = False
     noisy: bool = False
-    n_step: int = 1
-    distributional: bool = False
-    qr: bool = False
     prioritize: bool = False
+    n_step: int = 1
+    algo: str = 'dqn'
 
     adam_lr: float = 5e-4
     v_max: float = 10
@@ -35,8 +34,9 @@ class Config:
     epochs: int = 2500
     start_training_step: int = int(1e5)
     target_update_freq: int = 500
+
     agent_train_steps: int = 10
-    actor_steps: int = 40
+    actor_steps: int = 80
 
     num_actors: int = 8
     num_envs: int = 16
@@ -52,13 +52,20 @@ class Config:
     sha: str = ""
 
     def update(self):
-        if self.num_atoms < 0:
-            if self.distributional:
-                self.num_atoms = 51
-            elif self.qr:
-                self.num_atoms = 200
-            else:
-                self.num_atoms = 1
+        algo_num_atoms = {
+            'dqn': 1,
+            'c51': 51,
+            'qr': 200,
+        }
+
+        if self.num_atoms < 1:
+            try:
+                self.num_atoms = algo_num_atoms[self.algo]
+            except Exception as e:
+                print(e)
+                raise ValueError(f"Algo {self.algo} not implemented\n"
+                                 f"available algorithms are:\n"
+                                 f"{algo_num_atoms.keys()}")
 
         if self.game == "":
             self.game = "Breakout"
@@ -79,11 +86,8 @@ class Config:
             except Exception as e:
                 print(e)
                 raise ValueError(f"No such atari games as {self.game}\n"
-                                 f"available games[list] are {game_dict} and:\n"
+                                 f"available games[list] are {game_dict.keys()} and:\n"
                                  f"{atari63}")
 
         self.epochs = self.total_steps // self.steps_per_epoch
-        self.actor_steps = self.steps_per_epoch // (self.num_envs * self.num_actors) + 1
-
-        assert not (self.distributional and self.qr)
-        assert self.n_step >= 1
+        assert self.n_step > 0
