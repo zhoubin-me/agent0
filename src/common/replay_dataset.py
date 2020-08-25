@@ -42,8 +42,9 @@ class ReplayDataset(Dataset, Sampler):
 
         if self.cfg.prioritize:
             self.beta_schedule = LinearSchedule(self.cfg.priority_beta0, 1.0, self.cfg.total_steps)
-            self.weights = torch.ones(self.cfg.replay_size * 2, requires_grad=False)
+            self.prob = torch.ones(self.cfg.replay_size * 2, requires_grad=False)
             self.beta = self.cfg.priority_beta0
+            self.max_p = 1.0
 
     def __len__(self):
         return sum(self.lens)
@@ -74,13 +75,13 @@ class ReplayDataset(Dataset, Sampler):
 
         st = np.concatenate(st, axis=-1).transpose((2, 0, 1))
         st_next = np.concatenate(st_next, axis=-1).transpose((2, 0, 1))
-        weight = self.weights[idx].pow(-self.beta)
+        weight = self.prob[idx].pow(-self.beta)
 
         return st, action, rx, done, st_next, 1.0, idx
 
     def __iter__(self):
         while True:
-            yield torch.multinomial(self.weights[:len(self)], self.cfg.batch_size, False).tolist()
+            yield torch.multinomial(self.prob[:len(self)], self.cfg.batch_size, False).tolist()
 
     def extend(self, transitions):
         self.data.extend(transitions)
@@ -94,13 +95,14 @@ class ReplayDataset(Dataset, Sampler):
         self.lens_cum_sum = np.cumsum(self.lens)
 
         if self.cfg.prioritize:
-            self.weights.roll(-out_frame_count, 0)
-            self.weights[sum(self.lens):] = 1.0
-            self.beta_schedule(in_frame_count)
+            self.prob.roll(-out_frame_count, 0)
+            self.prob[sum(self.lens):] = self.max_p ** self.cfg.priority_alpha
+            self.beta = self.beta_schedule(in_frame_count)
 
     def update_priorities(self, idxes, priorities):
-        self.weights[idxes] = priorities.add(1e-8).exp(self.cfg.priority_alpha)
-
+        # self.prob[idxes] = priorities.add(1e-8).exp(self.cfg.priority_alpha)
+        # self.max_p = max(priorities.max().item(), self.max_p)
+        pass
 
 class DataLoaderX(DataLoader):
     def __iter__(self):
