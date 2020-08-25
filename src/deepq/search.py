@@ -25,7 +25,7 @@ def main():
 
     ray.init(memory=20 * 2 ** 30, object_store_memory=80 * 2 ** 30)
     reporter = CLIReporter(
-        metric_columns=["frames", "loss", "ep_reward_test", "ep_reward_train", "ep_reward_test_max",
+        metric_columns=["frames", "loss", "ep_reward_test", "ep_reward_train",
                         "ep_reward_train_max", "time_past", "time_remain", "speed", "velocity", "epsilon", "qmax"])
 
     analysis = tune.run(
