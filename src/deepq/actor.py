@@ -49,13 +49,13 @@ class Actor:
                 self.model.reset_noise()
 
             with torch.no_grad():
-                st = torch.from_numpy(self.obs).to(self.device).float().div(255.0).permute(0, 3, 1, 2)
+                st = torch.from_numpy(self.obs).to(self.device).float().div(255.0)
                 logits = self.model(st)
                 qt = self.step[self.cfg.algo](logits)
 
             qt_max, qt_arg_max = qt.max(dim=-1)
             action_greedy = qt_arg_max.tolist()
-            qt.append(qt_max.mean().item())
+            qs.append(qt_max.mean().item())
 
             if self.cfg.noisy:
                 action = action_greedy
@@ -66,7 +66,7 @@ class Actor:
             obs_next, reward, done, info = self.envs.step(action)
 
             if not testing:
-                data.extend(list(zip(self.obs, action, reward, done, obs_next, info)))
+                data.extend(list(zip(self.obs, action, reward, done, obs_next)))
             for inf in info:
                 if 'real_reward' in inf:
                     rs.append(inf['real_reward'])

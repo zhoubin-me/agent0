@@ -1,4 +1,5 @@
 from collections import deque
+import numpy as np
 
 import torch
 from prefetch_generator import BackgroundGenerator
@@ -42,7 +43,7 @@ class ReplayDataset(Dataset, Sampler):
 
         if self.cfg.prioritize:
             self.beta_schedule = LinearSchedule(self.cfg.priority_beta0, 1.0, self.cfg.total_steps)
-            self.prob = torch.ones(size=(self.cfg.replay_size * 2,), names='weights', requires_grad=False)
+            self.prob = torch.ones(self.cfg.replay_size)
             self.beta = self.cfg.priority_beta0
             self.max_p = 1.0
 
@@ -59,11 +60,11 @@ class ReplayDataset(Dataset, Sampler):
         else:
             weight = 1.0
 
-        return st, at, rt, dt, st_next, weight, idx
+        return np.array(st), at, rt, dt, np.array(st_next), weight, idx
 
     def __iter__(self):
         for _ in range(self.top // self.cfg.batch_size):
-            yield torch.multinomial(self.prob[:len(self)], self.cfg.batch_size, False).tolist()
+            yield torch.multinomial(self.prob[:self.top], self.cfg.batch_size, False).tolist()
 
     def extend(self, transitions):
         self.data.extend(transitions)
