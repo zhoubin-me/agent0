@@ -1,2 +1,1 @@
-python -m src.deepq.search --double_q --dueling --algo c51 --n_step 3 --game atari8 --exp_name atari_deepq19
-python -m src.deepq.search --double_q --dueling --noisy --distributional --algo c51 --n_step 3 --game atari8 --exp_name atari_deepq18
+python -m src.deepq.search --double_q --dueling --prioritize --algo c51 --n_step 3 --game atari8 --exp_name atari_rainbow
