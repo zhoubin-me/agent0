@@ -94,7 +94,7 @@ class Actor:
 
             if testing and len(rs) > test_episodes:
                 for i in range(self.cfg.num_envs):
-                    if len(self.episodic_buffer[i]) > 10000:
+                    if len(self.episodic_buffer[i]) > self.cfg.max_record_ep_len:
                         replay.append(
                             dict(transits=copy.deepcopy(self.episodic_buffer[i]),
                                  ep_rew=sum([x[2] for x in self.episodic_buffer[i]]),

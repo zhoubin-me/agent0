@@ -44,6 +44,7 @@ class Config:
     num_data_workers: int = 4
     reset_noise_freq: int = 4
 
+    max_record_ep_len = 10000
     pin_memory = True
     fast_replay = True
     restore_checkpoint: str = None

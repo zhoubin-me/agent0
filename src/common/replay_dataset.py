@@ -85,7 +85,7 @@ class ReplayDataset(Dataset, Sampler):
         return st, action, rx, done, st_next, weight, idx
 
     def __iter__(self):
-        for _ in range(self.len // self.cfg.batch_size):
+        while True:
             yield torch.multinomial(self.prob[:len(self)], self.cfg.batch_size, False).tolist()
 
     def extend(self, transitions):
