@@ -120,10 +120,9 @@ class Agent:
     def train_step(self):
         try:
             data = self.data_fetcher.next()
-        except Exception as e:
+        except StopIteration:
             self.data_fetcher = self.get_data_fetcher()
             data = self.data_fetcher.next()
-            # print(e)
 
         states, actions, rewards, terminals, next_states, weights, indices = data
         states = states.float().div(255.0)
