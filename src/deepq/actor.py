@@ -74,8 +74,8 @@ class Actor:
                         rt = inf['prev_reward']
                         dt = inf['prev_done']
                         data.append((st, at, rt, dt, st_next))
-                    else:
-                        data.append(list(zip(self.obs, action, reward, done, obs_next)))
+                else:
+                    data.extend(list(zip(self.obs, action, reward, done, obs_next)))
 
             self.obs = obs_next
 
