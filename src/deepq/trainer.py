@@ -40,7 +40,7 @@ class Trainer(tune.Trainable, ABC):
         self.actors = [Actor.remote(rank=rank, **config) for rank in range(self.cfg.num_actors)]
 
         self.frame_count = 0
-        self.Rs, self.Qs, self.TRs, self.Ls, self.ITRs = [], [], [], [], []
+        self.Rs, self.Qs, self.TRs, self.Ls, self.ITRs, self.velocity = [], [], [], [], [], []
         self.best = float('-inf')
         self.epsilon = 1.0
 
@@ -68,13 +68,15 @@ class Trainer(tune.Trainable, ABC):
             loss = torch.stack(loss)
             self.Ls += loss.tolist()
         toc = time.time()
+        self.velocity.append(self.cfg.actor_steps * self.cfg.num_envs / (toc - tic))
+
         result = dict(
             game=self.cfg.game,
             time_past=self._time_total,
             epsilon=self.epsilon,
             adam_lr=self.cfg.adam_lr,
             frames=self.frame_count,
-            velocity=self.cfg.actor_steps * self.cfg.num_envs / (toc - tic),
+            velocity=np.mean(self.velocity[-20:]) if len(self.velocity) > 0 else 0,
             speed=self.frame_count / (self._time_total + 1),
             time_remain=(self.cfg.total_steps - self.frame_count) / ((self.frame_count + 1) / (self._time_total + 1)),
             loss=np.mean(self.Ls[-20:]) if len(self.Ls) > 0 else 0,
