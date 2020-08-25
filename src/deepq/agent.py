@@ -139,7 +139,7 @@ class Agent:
             loss = self.train_step_dqn(states, next_states, actions, terminals, rewards)
 
         if self.cfg.prioritize:
-            weights = weights / (weights.sum() + 1e-8)
+            weights /= weights.sum().add(1e-8)
             self.replay.update_priorities(indices.cpu(), loss.detach().cpu())
             loss = loss.mul(weights).mean()
         else:
