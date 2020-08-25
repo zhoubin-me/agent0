@@ -1,5 +1,6 @@
 import json
 import os
+import time
 from abc import ABC
 
 import numpy as np
@@ -47,6 +48,7 @@ class Trainer(tune.Trainable, ABC):
                            self.actors]
 
     def step(self):
+        tic = time.time()
         done_id, self.sample_ops = ray.wait(self.sample_ops)
         data = ray.get(done_id)
         transitions, rs, qs, rank, fps = data[0]
@@ -65,13 +67,14 @@ class Trainer(tune.Trainable, ABC):
             loss = [self.agent.train_step() for _ in range(self.cfg.agent_train_steps)]
             loss = torch.stack(loss)
             self.Ls += loss.tolist()
-
+        toc = time.time()
         result = dict(
             game=self.cfg.game,
             time_past=self._time_total,
             epsilon=self.epsilon,
             adam_lr=self.cfg.adam_lr,
             frames=self.frame_count,
+            velocity=self.cfg.actor_steps * self.cfg.num_envs / (toc - tic),
             speed=self.frame_count / (self._time_total + 1),
             time_remain=(self.cfg.total_steps - self.frame_count) / ((self.frame_count + 1) / (self._time_total + 1)),
             loss=np.mean(self.Ls[-20:]) if len(self.Ls) > 0 else 0,
