@@ -80,8 +80,8 @@ class ReplayDataset(Dataset, Sampler):
             yield torch.multinomial(self.weights[:len(self)], self.cfg.batch_size, False).tolist()
 
     def extend(self, transitions):
-        self.data = self.data.extend(transitions)
-        self.lens = self.lens.extend([x['ep_len'] for x in transitions])
+        self.data.extend(transitions)
+        self.lens.extend([x['ep_len'] for x in transitions])
 
         out_frame_count = 0
         while sum(self.lens) > self.cfg.replay_size:
