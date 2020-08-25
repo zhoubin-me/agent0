@@ -1,5 +1,3 @@
-import argparse
-import json
 import random
 
 import ray
@@ -7,22 +5,12 @@ from ray import tune
 from ray.tune import CLIReporter
 from ray.tune.schedulers import PopulationBasedTraining
 
-from src.deepq.config import Config
+from src.deepq.config import Config, parse_arguments
 from src.deepq.trainer import Trainer
 
-
-def parse_arguments():
-    cfg = Config()
-    parser = argparse.ArgumentParser()
-    for k, v in vars(cfg).items():
-        parser.add_argument(f"--{k}", type=type(v), default=v)
-    args = parser.parse_args()
-    print("input args:\n", json.dumps(vars(args), indent=4, separators=(",", ":")))
-    return vars(args)
-
-
 if __name__ == '__main__':
-    kwargs = parse_arguments()
+    cfg = Config()
+    kwargs = parse_arguments(cfg)
     cfg = Config(**kwargs)
     ray.init(memory=20 * 2 ** 30, object_store_memory=80 * 2 ** 30)
     reporter = CLIReporter(

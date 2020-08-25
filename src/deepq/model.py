@@ -101,5 +101,6 @@ class NoisyLinear(nn.Module):
             self.transform_noise(self.noise_in)))
         self.bias_epsilon.copy_(self.transform_noise(self.noise_out_bias))
 
-    def transform_noise(self, x):
+    @staticmethod
+    def transform_noise(x):
         return x.sign().mul(x.abs().sqrt())

@@ -1,25 +1,10 @@
-import argparse
-
 import git
 import ray
 from ray import tune
 from ray.tune import CLIReporter
 
-from src.deepq.config import Config, GPU_SIZE
+from src.deepq.config import Config, GPU_SIZE, parse_arguments
 from src.deepq.trainer import Trainer
-
-
-def parse_arguments(config):
-    parser = argparse.ArgumentParser()
-    for k, v in vars(config).items():
-        if type(v) == bool:
-            parser.add_argument(f'--{k}', dest=k, action='store_true')
-            parser.add_argument(f'--no_{k}', dest=k, action='store_false')
-            parser.set_defaults(**{k: v})
-        else:
-            parser.add_argument(f"--{k}", type=type(v), default=v)
-    args = parser.parse_args()
-    return Config(**vars(args))
 
 
 def trial_str_creator(trial, sha):
