@@ -55,8 +55,8 @@ class ReplayDataset(Dataset, Sampler):
         idx = idx % len(self)
 
         st, at, rt, dt, st_next = self.data[idx]
-        st = np.frombuffer(decompress(st), dtype=np.uint8).reshape(1, self.cfg.frame_stack, 84, 84)
-        st_next = np.frombuffer(decompress(st_next), dtype=np.uint8).reshape(1, self.cfg.frame_stack, 84, 84)
+        st = np.frombuffer(decompress(st), dtype=np.uint8).reshape(self.cfg.frame_stack, 84, 84)
+        st_next = np.frombuffer(decompress(st_next), dtype=np.uint8).reshape(self.cfg.frame_stack, 84, 84)
 
         if self.cfg.prioritize:
             weight = self.prob[idx]
