@@ -32,7 +32,7 @@ class DataPrefetcher:
 
 
 class ReplayDataset(Dataset, Sampler):
-    def __init__(self, **kwargs):
+    def __init__(self, device, **kwargs):
         self.cfg = Config(**kwargs)
 
         self.data = []
@@ -40,7 +40,7 @@ class ReplayDataset(Dataset, Sampler):
         self.lens_cum_sum = [0]
 
         if self.cfg.prioritize:
-            self.weights = torch.ones(self.cfg.replay_size * 2)
+            self.weights = torch.ones(self.cfg.replay_size * 2, requires_grad=False).to(device)
 
     def __len__(self):
         return sum(self.lens)
@@ -94,7 +94,7 @@ class ReplayDataset(Dataset, Sampler):
             self.weights[sum(self.lens):] = 1.0
 
     def update_priorities(self, idxes, priorities):
-        self.weights[idxes] = priorities
+        self.weights[idxes] = priorities.detach().add(1e-8)
 
 
 class DataLoaderX(DataLoader):

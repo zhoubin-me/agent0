@@ -32,7 +32,7 @@ class Agent:
         self.optimizer = torch.optim.Adam(self.model.parameters(), self.cfg.adam_lr)
 
         self.update_steps = 0
-        self.replay = ReplayDataset(**kwargs)
+        self.replay = ReplayDataset(self.device, **kwargs)
         self.data_fetcher = None
 
     def get_data_fetcher(self):
@@ -138,7 +138,7 @@ class Agent:
             loss = self.train_step_dqn(states, next_states, actions, terminals, rewards)
 
         if self.cfg.prioritize:
-            self.replay.update_priorities(indices.tolist(), loss.tolist())
+            self.replay.update_priorities(indices, loss)
             loss = loss.mul(weights).mean()
         else:
             loss = loss.mean()
