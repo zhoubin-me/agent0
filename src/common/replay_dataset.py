@@ -90,7 +90,7 @@ class ReplayDataset(Dataset, Sampler):
         self.lens_cum_sum = np.cumsum(self.lens)
 
         if self.cfg.prioritize:
-            self.weights[:-out_frame_count] = self.weights[out_frame_count:]
+            self.weights.roll(-out_frame_count, 0)
             self.weights[sum(self.lens):] = 1.0
 
     def update_priorities(self, idxes, priorities):
