@@ -18,6 +18,7 @@ from src.deepq.config import Config
 class Trainer(tune.Trainable, ABC):
     def __init__(self, config=None, logger_creator=None):
 
+        self.Rs, self.Qs, self.TRs, self.Ls, self.ITRs, self.velocity = [], [], [], [], [], []
         self.cfg = None
         self.agent = None
         self.epsilon = None
@@ -40,7 +41,6 @@ class Trainer(tune.Trainable, ABC):
         self.actors = [Actor.remote(rank=rank, **config) for rank in range(self.cfg.num_actors)]
 
         self.frame_count = 0
-        self.Rs, self.Qs, self.TRs, self.Ls, self.ITRs, self.velocity = [], [], [], [], [], []
         self.best = float('-inf')
         self.epsilon = 1.0
 
