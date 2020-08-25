@@ -65,15 +65,19 @@ class Actor:
                           zip(np.random.rand(self.cfg.num_envs), action_random, action_greedy)]
 
             obs_next, reward, done, info = self.envs.step(action)
-            self.obs = obs_next
 
             if not testing:
-                for inf, st_next in zip(info, obs_next):
-                    st = inf['prev_obs']
-                    at = inf['prev_action']
-                    rt = inf['prev_reward']
-                    dt = inf['prev_done']
-                    data.append((st, at, rt, dt, st_next))
+                if self.cfg.n_step > 1:
+                    for inf, st_next in zip(info, obs_next):
+                        st = inf['prev_obs']
+                        at = inf['prev_action']
+                        rt = inf['prev_reward']
+                        dt = inf['prev_done']
+                        data.append((st, at, rt, dt, st_next))
+                    else:
+                        data.append(list(zip(self.obs, action, reward, done, obs_next)))
+
+            self.obs = obs_next
 
             for inf in info:
                 if 'real_reward' in inf:
