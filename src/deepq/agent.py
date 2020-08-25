@@ -32,7 +32,7 @@ class Agent:
         self.optimizer = torch.optim.Adam(self.model.parameters(), self.cfg.adam_lr)
 
         self.update_steps = 0
-        self.replay = ReplayDataset(self.device, **kwargs)
+        self.replay = ReplayDataset(**kwargs)
         self.data_fetcher = None
 
         self.step = {
@@ -141,7 +141,7 @@ class Agent:
         if self.cfg.prioritize:
             weights /= weights.sum().add(1e-8)
             self.replay.update_priorities(indices.cpu(), loss.detach().cpu())
-            loss = loss.mul(weights).mean()
+            loss = loss.mul(weights).sum()
         else:
             loss = loss.mean()
 

@@ -33,7 +33,7 @@ class DataPrefetcher:
 
 
 class ReplayDataset(Dataset, Sampler):
-    def __init__(self, device, **kwargs):
+    def __init__(self, **kwargs):
         self.cfg = Config(**kwargs)
 
         self.data = []
