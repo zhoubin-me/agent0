@@ -39,6 +39,7 @@ class ReplayDataset(Dataset, Sampler):
         self.data = []
         self.lens = []
         self.lens_cum_sum = [0]
+        self.len = 0
 
         if self.cfg.prioritize:
             self.beta_schedule = LinearSchedule(self.cfg.priority_beta0, 1.0, self.cfg.total_steps)
@@ -47,7 +48,7 @@ class ReplayDataset(Dataset, Sampler):
             self.max_p = 1.0
 
     def __len__(self):
-        return sum(self.lens)
+        return self.len
 
     def __getitem__(self, idx):
         idx = idx % len(self)
@@ -75,7 +76,7 @@ class ReplayDataset(Dataset, Sampler):
 
         st = np.concatenate(st, axis=-1).transpose((2, 0, 1))
         st_next = np.concatenate(st_next, axis=-1).transpose((2, 0, 1))
-        weight = self.prob[idx].pow(-self.beta)
+        weight = self.prob[idx].mul(sum(self.lens)).pow(-self.beta)
 
         return st, action, rx, done, st_next, 1.0, idx
 
@@ -92,7 +93,10 @@ class ReplayDataset(Dataset, Sampler):
         while sum(self.lens) > self.cfg.replay_size:
             self.data.pop(0)
             out_frame_count += self.lens.pop(0)
+
         self.lens_cum_sum = np.cumsum(self.lens)
+        self.len -= out_frame_count
+        self.len += in_frame_count
 
         if self.cfg.prioritize:
             self.prob.roll(-out_frame_count, 0)
