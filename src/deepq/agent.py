@@ -35,7 +35,7 @@ class Agent:
         self.replay = ReplayDataset(self.device, **kwargs)
         self.data_fetcher = None
 
-        self.algo = {
+        self.step = {
             'qr': self.train_step_qr,
             'c51': self.train_step_c51,
             'dqn': self.train_step_dqn,
@@ -137,7 +137,7 @@ class Agent:
             self.model.reset_noise()
             self.model_target.reset_noise()
 
-        loss = self.algo[self.cfg.algo](states, next_states, actions, terminals, rewards)
+        loss = self.step[self.cfg.algo](states, next_states, actions, terminals, rewards)
 
         if self.cfg.prioritize:
             weights /= weights.sum().add(1e-8)
