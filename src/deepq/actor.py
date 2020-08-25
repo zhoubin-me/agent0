@@ -4,6 +4,7 @@ import time
 import numpy as np
 import ray
 import torch
+from lz4.block import compress
 
 from src.common.atari_wrappers import make_deepq_env
 from src.common.vec_env import ShmemVecEnv
@@ -73,9 +74,10 @@ class Actor:
                         at = inf['prev_action']
                         rt = inf['prev_reward']
                         dt = inf['prev_done']
-                        data.append((st, at, rt, dt, st_next))
+                        data.append((compress(st), at, rt, dt, compress(st_next)))
                 else:
-                    data.extend(list(zip(self.obs, action, reward, done, obs_next)))
+                    for st, at, rt, dt, st_next in zip(self.obs, action, reward, done, obs_next):
+                        data.append((compress(st), at, rt, dt, compress(st_next)))
 
             self.obs = obs_next
 
