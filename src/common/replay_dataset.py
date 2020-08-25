@@ -81,7 +81,7 @@ class ReplayDataset(Dataset, Sampler):
 
     def extend(self, transitions):
         self.data = self.data.extend(transitions)
-        self.lens = self.lens([x['ep_len'] for x in transitions])
+        self.lens = self.lens.extend([x['ep_len'] for x in transitions])
 
         out_frame_count = 0
         while sum(self.lens) > self.cfg.replay_size:
