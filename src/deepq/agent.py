@@ -120,7 +120,7 @@ class Agent:
     def train_step(self):
         try:
             data = self.data_fetcher.next()
-        except StopIteration:
+        except (StopIteration, AttributeError):
             self.data_fetcher = self.get_data_fetcher()
             data = self.data_fetcher.next()
 
