@@ -49,8 +49,7 @@ class Actor:
                 self.model.reset_noise()
 
             with torch.no_grad():
-                st = torch.from_numpy(self.obs).to(self.device).float().div(255.0)
-                logits = self.model(st)
+                logits = self.model(torch.from_numpy(self.obs).to(self.device).float().div(255.0))
                 qt = self.step[self.cfg.algo](logits)
 
             qt_max, qt_arg_max = qt.max(dim=-1)
@@ -64,14 +63,19 @@ class Actor:
                           zip(np.random.rand(self.cfg.num_envs), action_random, action_greedy)]
 
             obs_next, reward, done, info = self.envs.step(action)
+            self.obs = obs_next
 
             if not testing:
-                data.extend(list(zip(self.obs, action, reward, done, obs_next)))
+                for info, st_next in zip(info, obs_next):
+                    st = info['prev_obs']
+                    at = info['prev_action']
+                    rt = info['prev_reward']
+                    dt = info['prev_done']
+                    data.append((st, at, rt, dt, st_next))
+
             for inf in info:
                 if 'real_reward' in inf:
                     rs.append(inf['real_reward'])
-
-            self.obs = obs_next
 
             if testing and len(rs) > test_episodes:
                 break

@@ -243,6 +243,49 @@ class FrameStack(gym.Wrapper):
         return np.concatenate(self.frames, axis=0)
 
 
+class NStepEnv(gym.Wrapper):
+    def __init__(self, env, n, discount):
+        """Stack k last frames.
+
+        Returns lazy array, which is much more memory efficient.
+
+        See Also
+        --------
+        baselines.common.atari_wrappers.LazyFrames
+        """
+        gym.Wrapper.__init__(self, env)
+        self.n = n
+        self.discount = discount
+        self.tracker = deque(maxlen=n)
+        self.last_obs = None
+
+    def reset(self):
+        ob = self.env.reset()
+        self.last_obs = ob
+        return ob
+
+    def step(self, action):
+        ob, reward, done, info = self.env.step(action)
+        self.tracker.append((self.last_obs, action, reward, done))
+
+        r_discounted = 0
+        done_discounted = False
+        for _, _, r, d in reversed(self.tracker):
+            r_discounted = r_discounted * self.discount * (1 - d) + r
+            if d:
+                done_discounted = True
+
+        info.update(
+            prev_obs=self.transits[0][0],
+            prev_action=self.transits[0][1],
+            prev_reward=r_discounted,
+            prev_done=done_discounted,
+        )
+
+        self.last_obs = ob
+        return obs, reward, done, info
+
+
 class ScaledFloatFrame(gym.ObservationWrapper):
     def __init__(self, env):
         gym.ObservationWrapper.__init__(self, env)
@@ -266,44 +309,6 @@ class TransposeImage(gym.ObservationWrapper):
 
     def observation(self, observation):
         return observation.transpose(2, 0, 1)
-
-
-class LazyFrames(object):
-    def __init__(self, frames):
-        """This object ensures that common frames between the observations are only stored once.
-        It exists purely to optimize memory usage which can be huge for DQN's 1M frames replay
-        buffers.
-
-        This object should only be converted to numpy array before being passed to the model.
-
-        You'd not believe how complex the previous solution was."""
-        self._frames = frames
-        self._out = None
-
-    def _force(self):
-        if self._out is None:
-            self._out = np.concatenate(self._frames, axis=0)
-            self._frames = None
-        return self._out
-
-    def __array__(self, dtype=None):
-        out = self._force()
-        if dtype is not None:
-            out = out.astype(dtype)
-        return out
-
-    def __len__(self):
-        return len(self._force())
-
-    def __getitem__(self, i):
-        return self._force()[i]
-
-    def count(self):
-        frames = self._force()
-        return frames.shape[frames.ndim - 1]
-
-    def frame(self, i):
-        return self._force()[..., i]
 
 
 def _process_frame42(frame):
@@ -356,7 +361,8 @@ def make_atari(env_id):
     return env
 
 
-def wrap_deepmind(env, episode_life=False, clip_rewards=False, frame_stack=False, scale=False, transpose_image=True):
+def wrap_deepmind(env, episode_life=False, clip_rewards=False, frame_stack=False, scale=False, transpose_image=True,
+                  n_step=1, discount=0.99):
     """Configure environment for DeepMind-style Atari.
     """
     if episode_life:
@@ -372,13 +378,17 @@ def wrap_deepmind(env, episode_life=False, clip_rewards=False, frame_stack=False
         env = ClipRewardEnv(env)
     if frame_stack:
         env = FrameStack(env, 4)
+    if n_step > 1:
+        env = NStepEnv(env, n_step, discount)
     return env
 
 
-def make_deepq_env(game, episode_life=True, clip_rewards=True, frame_stack=True, transpose_image=True):
+def make_deepq_env(game, episode_life=True, clip_rewards=True, frame_stack=True, transpose_image=True,
+                   n_step=1, discount=0.99):
     env = make_atari(f'{game}NoFrameskip-v4')
     env = wrap_deepmind(env, episode_life=episode_life, clip_rewards=clip_rewards, scale=False,
-                        frame_stack=frame_stack, transpose_image=transpose_image)
+                        frame_stack=frame_stack, transpose_image=transpose_image, n_step=n_step, discount=discount)
+
     return env
 
 
