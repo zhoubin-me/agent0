@@ -76,9 +76,13 @@ class ReplayDataset(Dataset, Sampler):
 
         st = np.concatenate(st, axis=-1).transpose((2, 0, 1))
         st_next = np.concatenate(st_next, axis=-1).transpose((2, 0, 1))
-        weight = self.prob[idx].mul(sum(self.lens)).pow(-self.beta)
 
-        return st, action, rx, done, st_next, 1.0, idx
+        if self.cfg.prioritize:
+            weight = self.prob[idx].mul(sum(self.lens)).pow(-self.beta)
+        else:
+            weight = 1.0
+
+        return st, action, rx, done, st_next, weight, idx
 
     def __iter__(self):
         while True:
