@@ -25,8 +25,14 @@ class Actor:
         self.state_shape = self.envs.observation_space.shape
 
         self.device = torch.device('cuda:0')
-        if self.cfg.distributional:
+        if self.cfg.algo == 'c51':
             self.atoms = torch.linspace(self.cfg.v_min, self.cfg.v_max, self.cfg.num_atoms).to(self.device)
+
+        self.step = {
+            'c51': lambda logits: logits.softmax(dim=-1).mul(self.atoms).sum(-1),
+            'qr': lambda logits: logits.mean(-1),
+            'dqn': lambda logits: logits.squeeze(-1)
+        }
 
         self.model = NatureCNN(self.cfg.frame_stack, self.action_dim, dueling=self.cfg.dueling,
                                noisy=self.cfg.noisy, num_atoms=self.cfg.num_atoms).to(self.device)
@@ -51,13 +57,8 @@ class Actor:
             with torch.no_grad():
                 st = np.concatenate(self.st, axis=-1)
                 st = torch.from_numpy(st).to(self.device).float().div(255.0).permute(0, 3, 1, 2)
-                if self.cfg.distributional:
-                    qs_prob = self.model(st).softmax(dim=-1)
-                    qs = qs_prob.mul(self.atoms).sum(dim=-1)
-                elif self.cfg.qr:
-                    qs = self.model(st).mean(dim=-1)
-                else:
-                    qs = self.model(st).squeeze(-1)
+                logits = self.model(st)
+                qs = self.step[self.cfg.algo](logits)
 
             qs_max, qs_argmax = qs.max(dim=-1)
             action_greedy = qs_argmax.tolist()
