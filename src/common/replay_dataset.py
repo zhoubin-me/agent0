@@ -108,7 +108,7 @@ class ReplayDataset(Dataset, Sampler):
             self.beta = self.beta_schedule(in_frame_count)
 
     def update_priorities(self, idxes, priorities):
-        self.prob[idxes] = priorities.add(1e-8).exp(self.cfg.priority_alpha)
+        self.prob[idxes] = priorities.add(1e-8).pow(self.cfg.priority_alpha)
         self.max_p = max(priorities.max().item(), self.max_p)
 
 
