@@ -1,4 +1,3 @@
-import argparse
 from dataclasses import dataclass
 
 from src.common.bench import atari8, atari10, atari47, atari_exp7, atari63
@@ -23,6 +22,9 @@ class Config:
     num_atoms: int = -1
     priority_alpha: float = 0.5
     priority_beta0: float = 0.4
+    mdqn_tau: float = 0.03
+    mdqn_alpha: float = 0.9
+    mdqn_lo: float = -1
 
     batch_size: int = 512
     replay_size: int = int(1e6)

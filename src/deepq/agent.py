@@ -5,9 +5,9 @@ import torch.nn.functional as fx
 
 from src.common.atari_wrappers import make_deepq_env
 from src.common.utils import DataLoaderX, DataPrefetcher
-from src.deepq.replay import ReplayDataset
 from src.deepq.config import Config
 from src.deepq.model import NatureCNN
+from src.deepq.replay import ReplayDataset
 
 
 class Agent:
@@ -42,6 +42,7 @@ class Agent:
             'qr': self.train_step_qr,
             'c51': self.train_step_c51,
             'dqn': self.train_step_dqn,
+            'mdqn': self.train_step_mdqn,
         }
 
         assert self.cfg.algo in self.step
@@ -87,8 +88,9 @@ class Agent:
                 actions_next = prob_next.mul(self.atoms).sum(dim=-1).argmax(dim=-1)
             prob_next = prob_next[self.batch_indices, actions_next, :]
 
-            atoms_next = rewards.unsqueeze(-1) + self.cfg.discount * (1 - terminals.unsqueeze(-1)) * self.atoms.view(1,
-                                                                                                                     -1)
+            atoms_next = rewards.unsqueeze(-1) + \
+                         self.cfg.discount * (1 - terminals.unsqueeze(-1)) * self.atoms.view(1, -1)
+
             atoms_next.clamp_(self.cfg.v_min, self.cfg.v_max)
             base = (atoms_next - self.cfg.v_min) / self.delta_atom
 
@@ -108,18 +110,38 @@ class Agent:
         loss = target_prob.mul(log_prob).sum(dim=-1).neg()
         return loss.view(-1)
 
+    @staticmethod
+    def log_softmax_stable(logits, tau=0.01):
+        logits = logits - logits.max(dim=-1)
+        return logits - tau * torch.logsumexp(logits / tau, dim=-1)
+
+    def train_step_mdqn(self, states, next_states, actions, terminals, rewards):
+        with torch.no_grad():
+            q_next_logits = self.model_target(next_states)
+            q_next = q_next_logits - self.log_softmax_stable(q_next_logits, self.cfg.mdqn_tau)
+            q_next = q_next_logits.softmax(dim=-1).mul(q_next).sum(dim=-1)
+
+            add_on = self.model_target(states)
+            add_on = self.log_softmax_stable(add_on, self.cfg.mdqn_tau).gather(1, actions).clamp(self.cfg.mdqn_lo, 0)
+
+            q_target = rewards + self.cfg.mdqn_alpha * add_on + self.cfg.discount * (1 - terminals) * q_next
+
+        q = self.model(states).gather(1, actions)
+        loss = fx.smooth_l1_loss(q, q_target, reduction='none')
+        return loss.view(-1)
+
     def train_step_dqn(self, states, next_states, actions, terminals, rewards):
         with torch.no_grad():
-            q_next = self.model_target(next_states).squeeze(-1)
+            q_next = self.model_target(next_states)
             if self.cfg.double_q:
-                a_next = self.model(next_states).squeeze(-1).argmax(dim=-1)
+                a_next = self.model(next_states).argmax(dim=-1)
             else:
                 a_next = q_next.argmax(dim=-1)
-            q_next = q_next[self.batch_indices, a_next]
+            q_next = q_next.gather(1, a_next)
             q_target = rewards + self.cfg.discount * (1 - terminals) * q_next
 
-        q = self.model(states).squeeze(dim=-1)[self.batch_indices, actions]
-        loss = torch.nn.functional.smooth_l1_loss(q, q_target, reduction='none')
+        q = self.model(states).gather(1, actions)
+        loss = fx.smooth_l1_loss(q, q_target, reduction='none')
         return loss.view(-1)
 
     def train_step(self):

@@ -44,6 +44,9 @@ class NatureCNN(nn.Module, ABC):
             q = v.expand_as(adv) + (adv - adv.mean(dim=1, keepdim=True).expand_as(adv))
         else:
             q = adv
+
+        if self.num_atoms == 1:
+            q = q.squeeze(-1)
         return q
 
     def reset_noise(self):
