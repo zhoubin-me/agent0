@@ -1,3 +1,5 @@
+from abc import ABC
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -9,7 +11,7 @@ def init(m, gain=1.0):
         nn.init.zeros_(m.bias.data)
 
 
-class NatureCNN(nn.Module):
+class NatureCNN(nn.Module, ABC):
     def __init__(self, in_channels, action_dim, dueling=False, num_atoms=1, noisy=False, noise_std=0.5):
         super(NatureCNN, self).__init__()
 
@@ -50,7 +52,7 @@ class NatureCNN(nn.Module):
                 m.reset_noise()
 
 
-class NoisyLinear(nn.Module):
+class NoisyLinear(nn.Module, ABC):
     def __init__(self, in_features, out_features, std_init=0.4, noisy_layer_std=0.1):
         super(NoisyLinear, self).__init__()
 
@@ -58,16 +60,24 @@ class NoisyLinear(nn.Module):
         self.out_features = out_features
         self.std_init = std_init
         self.noisy_layer_std = noisy_layer_std
+        # noinspection PyArgumentList
         self.weight_mu = nn.Parameter(torch.zeros((out_features, in_features)), requires_grad=True)
+        # noinspection PyArgumentList
         self.weight_sigma = nn.Parameter(torch.zeros((out_features, in_features)), requires_grad=True)
+        # noinspection PyArgumentList
         self.register_buffer('weight_epsilon', torch.zeros((out_features, in_features)))
-
+        # noinspection PyArgumentList
         self.bias_mu = nn.Parameter(torch.zeros(out_features), requires_grad=True)
+        # noinspection PyArgumentList
         self.bias_sigma = nn.Parameter(torch.zeros(out_features), requires_grad=True)
+        # noinspection PyArgumentList
         self.register_buffer('bias_epsilon', torch.zeros(out_features))
 
+        # noinspection PyArgumentList
         self.register_buffer('noise_in', torch.zeros(in_features))
+        # noinspection PyArgumentList
         self.register_buffer('noise_out_weight', torch.zeros(out_features))
+        # noinspection PyArgumentList
         self.register_buffer('noise_out_bias', torch.zeros(out_features))
 
         self.reset_parameters()

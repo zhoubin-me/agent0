@@ -25,10 +25,12 @@ class DataPrefetcher:
             print(e)
             raise StopIteration
 
+        # noinspection PyTypeChecker
         with torch.cuda.stream(self.stream):
             self.next_data = (x.to(self.device, non_blocking=True) for x in self.next_data)
 
     def next(self):
+        # noinspection PyTypeChecker
         torch.cuda.current_stream().wait_stream(self.stream)
         data = self.next_data
         self.preload()
@@ -37,6 +39,7 @@ class DataPrefetcher:
 
 class ReplayDataset(Dataset, Sampler):
     def __init__(self, **kwargs):
+        super().__init__()
         self.cfg = Config(**kwargs)
 
         self.data = deque(maxlen=self.cfg.replay_size)
@@ -44,6 +47,7 @@ class ReplayDataset(Dataset, Sampler):
 
         if self.cfg.prioritize:
             self.beta_schedule = LinearSchedule(self.cfg.priority_beta0, 1.0, self.cfg.total_steps)
+            # noinspection PyArgumentList
             self.prob = torch.ones(self.cfg.replay_size)
             self.beta = self.cfg.priority_beta0
             self.max_p = 1.0

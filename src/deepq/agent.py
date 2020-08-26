@@ -18,11 +18,13 @@ class Agent:
         self.action_dim = env.action_space.n
         self.state_shape = env.observation_space.shape
         self.device = torch.device('cuda:0')
+        # noinspection PyArgumentList
         self.batch_indices = torch.arange(self.cfg.batch_size).to(self.device)
         if self.cfg.algo == 'c51':
             self.atoms = torch.linspace(self.cfg.v_min, self.cfg.v_max, self.cfg.num_atoms).to(self.device)
             self.delta_atom = (self.cfg.v_max - self.cfg.v_min) / (self.cfg.num_atoms - 1)
         elif self.cfg.algo == 'qr':
+            # noinspection PyArgumentList
             self.cumulative_density = ((2 * torch.arange(self.cfg.num_atoms) + 1) /
                                        (2.0 * self.cfg.num_atoms)).to(self.device)
 
