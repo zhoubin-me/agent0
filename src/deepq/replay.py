@@ -3,45 +3,18 @@ from collections import deque
 import numpy as np
 import torch
 from lz4.block import decompress
-from prefetch_generator import BackgroundGenerator
-from torch.utils.data import Dataset, DataLoader, Sampler
+from torch.utils.data import Dataset, Sampler
 
 from src.common.utils import LinearSchedule
 from src.deepq.config import Config
 
 
-class DataPrefetcher:
-    def __init__(self, data_loader, device):
-        self.data_loader = iter(data_loader)
-        self.stream = torch.cuda.Stream()
-        self.device = device
-        self.next_data = None
-        self.preload()
-
-    def preload(self):
-        try:
-            self.next_data = next(self.data_loader)
-        except Exception as e:
-            print(e)
-            raise StopIteration
-
-        # noinspection PyTypeChecker
-        with torch.cuda.stream(self.stream):
-            self.next_data = (x.to(self.device, non_blocking=True) for x in self.next_data)
-
-    def next(self):
-        # noinspection PyTypeChecker
-        torch.cuda.current_stream().wait_stream(self.stream)
-        data = self.next_data
-        self.preload()
-        return data
-
-
 class ReplayDataset(Dataset, Sampler):
-    def __init__(self, **kwargs):
+    def __init__(self, obs_shape, **kwargs):
         super().__init__()
         self.cfg = Config(**kwargs)
 
+        self.obs_shape = obs_shape
         self.data = deque(maxlen=self.cfg.replay_size)
         self.top = 0
 
@@ -59,8 +32,8 @@ class ReplayDataset(Dataset, Sampler):
         idx = idx % len(self)
 
         st, at, rt, dt, st_next = self.data[idx]
-        st = np.frombuffer(decompress(st), dtype=np.uint8).reshape(self.cfg.frame_stack, 84, 84)
-        st_next = np.frombuffer(decompress(st_next), dtype=np.uint8).reshape(self.cfg.frame_stack, 84, 84)
+        st = np.frombuffer(decompress(st), dtype=np.uint8).reshape(self.cfg.frame_stack, *self.obs_shape)
+        st_next = np.frombuffer(decompress(st_next), dtype=np.uint8).reshape(self.cfg.frame_stack, *self.obs_shape)
 
         if self.cfg.prioritize:
             weight = self.prob[idx]
@@ -86,8 +59,3 @@ class ReplayDataset(Dataset, Sampler):
     def update_priorities(self, idxes, priorities):
         self.prob[idxes] = priorities.add(1e-8).pow(self.cfg.priority_alpha)
         self.max_p = max(priorities.max().item(), self.max_p)
-
-
-class DataLoaderX(DataLoader):
-    def __iter__(self):
-        return BackgroundGenerator(super().__iter__(), max_prefetch=3)

@@ -5,8 +5,9 @@ from ray import tune
 from ray.tune import CLIReporter
 from ray.tune.schedulers import PopulationBasedTraining
 
-from src.deepq.config import Config, parse_arguments
+from src.deepq.config import Config
 from src.deepq.trainer import Trainer
+from src.common.utils import parse_arguments
 
 if __name__ == '__main__':
     cfg = Config()
@@ -28,7 +29,7 @@ if __name__ == '__main__':
             "adam_lr": lambda: random.uniform(1e-5, 1e-3),
         })
 
-    analysis = tune.run(
+    tune.run(
         Trainer,
         name='atari_deepq_tune',
         verbose=1,

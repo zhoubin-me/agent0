@@ -3,21 +3,23 @@ import ray
 from ray import tune
 from ray.tune import CLIReporter
 
-from src.deepq.config import Config, GPU_SIZE, parse_arguments
+from src.deepq.config import Config, GPU_SIZE
 from src.deepq.trainer import Trainer
+from src.common.utils import parse_arguments
 
 
 def trial_str_creator(trial, sha):
     return "{}_{}_{}_{}".format(trial.trainable_name, trial.config['game'], sha, trial.trial_id)
 
 
-def main():
+if __name__ == '__main__':
     repo = git.Repo(search_parent_directories=True)
     sha = repo.git.rev_parse(repo.head.object.hexsha, short=True)
     sha_long = repo.head.object.hexsha
 
     cfg = Config(sha=sha_long)
-    cfg = parse_arguments(cfg)
+    args = parse_arguments(cfg)
+    cfg = Config(**vars(args))
     cfg.update()
 
     if isinstance(cfg.game, list):
@@ -28,7 +30,7 @@ def main():
         metric_columns=["frames", "loss", "ep_reward_test", "ep_reward_train",
                         "ep_reward_train_max", "time_past", "time_remain", "speed", "velocity", "epsilon", "qmax"])
 
-    analysis = tune.run(
+    tune.run(
         Trainer,
         name=cfg.exp_name,
         verbose=1,
@@ -43,9 +45,3 @@ def main():
         resources_per_trial={"gpu": 1.0 / GPU_SIZE, "extra_gpu": 1.0 / GPU_SIZE},
         config=vars(cfg),
     )
-
-    print(analysis)
-
-
-if __name__ == '__main__':
-    main()

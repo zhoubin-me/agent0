@@ -93,16 +93,3 @@ class Config:
 
         self.epochs = self.total_steps // self.steps_per_epoch
         assert self.n_step > 0
-
-
-def parse_arguments(config):
-    parser = argparse.ArgumentParser()
-    for k, v in vars(config).items():
-        if type(v) == bool:
-            parser.add_argument(f'--{k}', dest=k, action='store_true')
-            parser.add_argument(f'--no_{k}', dest=k, action='store_false')
-            parser.set_defaults(**{k: v})
-        else:
-            parser.add_argument(f"--{k}", type=type(v), default=v)
-    args = parser.parse_args()
-    return Config(**vars(args))

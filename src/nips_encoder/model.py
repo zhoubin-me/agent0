@@ -1,8 +1,10 @@
+from abc import ABC
+
 import torch.nn as nn
 from torch.utils.data import Dataset
 
 
-class ModelEncoder(nn.Module):
+class ModelEncoder(nn.Module, ABC):
     def __init__(self, action_dim):
         super(ModelEncoder, self).__init__()
         self.encoder = nn.Sequential(

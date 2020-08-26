@@ -4,7 +4,8 @@ import torch
 import torch.nn.functional as fx
 
 from src.common.atari_wrappers import make_deepq_env
-from src.common.replay_dataset import ReplayDataset, DataLoaderX, DataPrefetcher
+from src.common.utils import DataLoaderX, DataPrefetcher
+from src.deepq.replay import ReplayDataset
 from src.deepq.config import Config
 from src.deepq.model import NatureCNN
 
@@ -16,7 +17,7 @@ class Agent:
 
         env = make_deepq_env(self.cfg.game)
         self.action_dim = env.action_space.n
-        self.state_shape = env.observation_space.shape
+        self.obs_shape = (x for x in env.observation_space.shape if x > 3)
         self.device = torch.device('cuda:0')
         # noinspection PyArgumentList
         self.batch_indices = torch.arange(self.cfg.batch_size).to(self.device)
@@ -34,7 +35,7 @@ class Agent:
         self.optimizer = torch.optim.Adam(self.model.parameters(), self.cfg.adam_lr)
 
         self.update_steps = 0
-        self.replay = ReplayDataset(**kwargs)
+        self.replay = ReplayDataset(self.obs_shape, **kwargs)
         self.data_fetcher = None
 
         self.step = {
@@ -42,6 +43,8 @@ class Agent:
             'c51': self.train_step_c51,
             'dqn': self.train_step_dqn,
         }
+
+        assert self.cfg.algo in self.step
 
     def get_data_fetcher(self):
         if self.cfg.prioritize:

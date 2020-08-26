@@ -24,18 +24,17 @@ class Actor:
                                                         discount=self.cfg.discount)
                                  for _ in range(self.cfg.num_envs)], context='fork')
         self.action_dim = self.envs.action_space.n
-        self.state_shape = self.envs.observation_space.shape
-
         self.device = torch.device('cuda:0')
-        if self.cfg.algo == 'c51':
-            self.atoms = torch.linspace(self.cfg.v_min, self.cfg.v_max, self.cfg.num_atoms).to(self.device)
 
         self.step = {
             'c51': lambda logits: logits.softmax(dim=-1).mul(self.atoms).sum(-1),
             'qr': lambda logits: logits.mean(-1),
             'dqn': lambda logits: logits.squeeze(-1)
         }
+        assert self.cfg.algo in self.step
 
+        if self.cfg.algo == 'c51':
+            self.atoms = torch.linspace(self.cfg.v_min, self.cfg.v_max, self.cfg.num_atoms).to(self.device)
         self.model = NatureCNN(self.cfg.frame_stack, self.action_dim, dueling=self.cfg.dueling,
                                noisy=self.cfg.noisy, num_atoms=self.cfg.num_atoms).to(self.device)
         self.obs = self.envs.reset()
