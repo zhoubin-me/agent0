@@ -130,6 +130,19 @@ class Agent:
         loss = fx.smooth_l1_loss(q, q_target, reduction='none')
         return loss.view(-1)
 
+    def train_step_kl_dqn(self, states, next_states, actions, terminals, rewards):
+        with torch.no_grad():
+            q_next_logits = self.model_target(next_states)
+            q_next = q_next_logits - self.log_softmax_stable(q_next_logits, self.cfg.mdqn_tau)
+            q_next = q_next_logits.softmax(dim=-1).mul(q_next).sum(dim=-1)
+
+            add_on = rewards + self.cfg.discount * (1 - terminals) * q_next
+            q_target = self.model_target(states).index_add_(1, actions, add_on).softmax(dim=-1)
+
+        q = self.model(states).softmax(dim=-1)
+        loss = fx.kl_div(q_target.log(), q, reduction='none').sum(dim=-1)
+        return loss.view(-1)
+
     def train_step_dqn(self, states, next_states, actions, terminals, rewards):
         with torch.no_grad():
             q_next = self.model_target(next_states)
