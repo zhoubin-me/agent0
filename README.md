@@ -41,9 +41,9 @@ Hardware Setting:
  - RAM: 32 GB
  - Game: Breakout
  - Algorithm: Rainbow
- - FPS: 900
+ - FPS: 700+
 
-Here FPS (frame per second) means frames collected and saved to replay buffer per second. With 4 frame skip, its FPS is 900X4=3600 in deepmind's word. 
+Here FPS (frame per second) means frames collected and saved to replay buffer per second. With 4 frame skip, its FPS is 700X4=3600 in deepmind's word. 
 Other implementations usually fall below 100 FPS after exploration.
 
 ## Run

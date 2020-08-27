@@ -57,6 +57,7 @@ class Config:
     frame_stack: int = 4
     sha: str = ""
     mem_mult: float = 1.0
+    gpu_mult: float = 1.0
 
     def update_game(self):
         if self.game == "":

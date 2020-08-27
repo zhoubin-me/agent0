@@ -4,7 +4,7 @@ from ray import tune
 from ray.tune import CLIReporter
 
 from src.common.utils import parse_arguments
-from src.deepq.config import Config, GPU_SIZE, NUM_TASKS
+from src.deepq.config import Config
 from src.deepq.trainer import Trainer
 
 
@@ -45,6 +45,6 @@ if __name__ == '__main__':
         checkpoint_freq=1000,
         trial_name_creator=tune.function(lambda trial: trial_str_creator(trial, sha)),
         progress_reporter=reporter,
-        resources_per_trial={"gpu": 0.5 / (GPU_SIZE * NUM_TASKS), "extra_gpu": 0.5 / (GPU_SIZE * NUM_TASKS)},
+        resources_per_trial={"gpu": 0.5 * cfg.gpu_mult, "extra_gpu": 0.1 * cfg.num_actors * cfg.gpu_mult},
         config=vars(cfg),
     )
