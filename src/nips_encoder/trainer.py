@@ -41,7 +41,7 @@ class EncoderDataset(Dataset):
 
     def __getitem__(self, idx):
         st, at, rt, dt, st_next = self.data[idx]
-        st = np.frombuffer(decompress(st), dtype=np.uint8).reshape(self.state_shape)
+        st = np.frombuffer(decompress(st), dtype=np.uint8).reshape(*self.state_shape)
         st_next = decompress(st_next)
         return st, at, rt, dt, st_next
 
