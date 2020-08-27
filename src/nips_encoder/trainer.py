@@ -1,5 +1,6 @@
 from abc import ABC
 from collections import deque
+from dataclasses import dataclass
 
 import gym
 import numpy as np
@@ -13,16 +14,15 @@ from src.common.atari_wrappers import make_atari
 from src.common.utils import DataPrefetcher, DataLoaderX
 from src.common.vec_env import ShmemVecEnv
 from src.nips_encoder.model import ModelEncoder
-from dataclasses import dataclass
 
 
 @dataclass
 class Config:
     game: str = "Breakout"
     epochs: int = 30
-    batch_size: int = 128
+    batch_size: int = 512
     num_envs: int = 32
-    replay_size: int = 100000
+    replay_size: int = 1000000
     adam_lr: float = 1e-4
     num_data_workers: int = 4
     pin_memory: bool = True
