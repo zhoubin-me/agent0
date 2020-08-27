@@ -51,6 +51,24 @@ class EncoderDataset(Dataset):
         st_next = np.frombuffer(decompress(st_next), dtype=np.uint8).reshape(*self.state_shape)
         return st, at, rt, dt, st_next
 
+@ray.remote
+def sample(cfg):
+    envs = ShmemVecEnv([lambda: make_atari(f"{cfg.game}NoFrameskip-v4")
+                        for _ in range(cfg.num_envs)], context='fork')
+    action_dim = envs.action_space.n
+    print("Sampling replay")
+    obs = envs.reset()
+    steps = int(cfg.replay_size) // (cfg.num_envs * cfg.num_actors) + 1
+    replay = []
+    for _ in tqdm(range(steps)):
+        action_random = np.random.randint(0, action_dim, cfg.num_envs)
+        obs_next, reward, done, info = envs.step(action_random)
+        replay.append((obs, action_random, reward, done))
+        for st, at, rt, dt, st_next in zip(obs, action_random, reward, done):
+            replay.append((compress(st), at, rt, dt))
+        obs = obs_next
+    envs.close()
+    return replay
 
 class Trainer(tune.Trainable, ABC):
     def __init__(self, config=None, logger_creator=None):
@@ -81,30 +99,13 @@ class Trainer(tune.Trainable, ABC):
 
         self.optimizer = torch.optim.Adam(self.model.parameters(), self.cfg.adam_lr)
 
-        self.replay = []
-        sample_ops = [self.sample.remote(self.cfg) for _ in range(self.cfg.num_actors)]
-        datas = ray.get(sample_ops)
-        for data in datas:
-            self.replay.extend(data)
-
-    @ray.remote
-    def sample(self, cfg):
-        envs = ShmemVecEnv([lambda: make_atari(f"{cfg.cfg.game}NoFrameskip-v4")
-                            for _ in range(cfg.num_envs)], context='fork')
-        action_dim = envs.action_space.n
-        print("Sampling replay")
-        obs = envs.reset()
-        steps = int(cfg.replay_size) // (cfg.num_envs * cfg.num_actors) + 1
-        replay = []
-        for _ in tqdm(range(steps)):
-            action_random = np.random.randint(0, action_dim, cfg.num_envs)
-            obs_next, reward, done, info = envs.step(action_random)
-            replay.append((obs, action_random, reward, done))
-            for st, at, rt, dt, st_next in zip(obs, action_random, reward, done):
-                replay.append((compress(st), at, rt, dt))
-            obs = obs_next
-        envs.close()
-        return replay
+        if self.cfg.num_actors == 1:
+            self.replay = sample(self.cfg)
+        else:
+            sample_ops = [sample.remote(self.cfg) for _ in range(self.cfg.num_actors)]
+            datas = ray.get(sample_ops)
+            for data in datas:
+                self.replay.extend(data)
 
     def get_data_fetcher(self):
         dataset = EncoderDataset(self.replay, self.obs_shape)
