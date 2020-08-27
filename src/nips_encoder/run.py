@@ -15,7 +15,6 @@ if __name__ == '__main__':
     cfg = Config(sha=sha_long)
     args = parse_arguments(cfg)
     cfg = Config(**vars(args))
-    cfg.adam_lr = tune.grid_search([5e-5, 1e-4, 2e-4, 5e-4])
 
     ray.init(memory=20 * 2 ** 30, object_store_memory=80 * 2 ** 30)
     reporter = CLIReporter(
@@ -30,7 +29,7 @@ if __name__ == '__main__':
         checkpoint_at_end=True,
         progress_reporter=reporter,
         checkpoint_freq=1000,
-        resources_per_trial={"gpu": 3},
+        resources_per_trial={"gpu": 1},
         config=vars(cfg),
         fail_fast=True,
         reuse_actors=True,

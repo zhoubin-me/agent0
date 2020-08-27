@@ -9,6 +9,7 @@ import torch.nn.functional as fx
 from lz4.block import compress, decompress
 from ray import tune
 from torch.utils.data import Dataset
+from tqdm import tqdm
 
 from src.common.atari_wrappers import make_atari
 from src.common.utils import DataPrefetcher, DataLoaderX
@@ -85,7 +86,7 @@ class Trainer(tune.Trainable, ABC):
         obs = self.envs.reset()
         steps = int(self.cfg.replay_size) // self.cfg.num_envs
         replay = []
-        for _ in range(steps):
+        for _ in tqdm(range(steps)):
             action_random = np.random.randint(0, self.action_dim, self.cfg.num_envs)
             obs_next, reward, done, info = self.envs.step(action_random)
             replay.append((obs, action_random, reward, done))
