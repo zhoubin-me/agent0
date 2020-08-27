@@ -45,9 +45,9 @@ class EncoderDataset(Dataset):
         st, at, rt, dt = self.data[idx]
         st = np.frombuffer(decompress(st), dtype=np.uint8).reshape(*self.state_shape)
         if dt:
-            st_next = self.data[idx]
+            st_next = self.data[idx][0]
         else:
-            st_next = self.data[idx + 1]
+            st_next = self.data[idx + 1][0]
         st_next = np.frombuffer(decompress(st_next), dtype=np.uint8).reshape(*self.state_shape)
         return st, at, rt, dt, st_next
 
@@ -63,8 +63,8 @@ def sample(cfg):
     for _ in tqdm(range(steps)):
         action_random = np.random.randint(0, action_dim, cfg.num_envs)
         obs_next, reward, done, info = envs.step(action_random)
-        replay.append((obs, action_random, reward, done))
-        for st, at, rt, dt, st_next in zip(obs, action_random, reward, done):
+        # replay.append((obs, action_random, reward, done))
+        for st, at, rt, dt in zip(obs, action_random, reward, done):
             replay.append((compress(st), at, rt, dt))
         obs = obs_next
     envs.close()
