@@ -61,6 +61,7 @@ class Config:
             'c51': 51,
             'qr': 200,
             'mdqn': 1,
+            'kl': 1,
         }
 
         if self.num_atoms < 1:
