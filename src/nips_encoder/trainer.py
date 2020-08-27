@@ -22,7 +22,7 @@ class Config:
     game: str = "Breakout"
     epochs: int = 30
     batch_size: int = 512
-    num_envs: int = 32
+    num_envs: int = 128
     replay_size: int = 1000000
     adam_lr: float = 1e-4
     num_data_workers: int = 4
