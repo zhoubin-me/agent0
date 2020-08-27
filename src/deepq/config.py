@@ -32,7 +32,7 @@ class Config:
     exploration_ratio: float = 0.1
     min_eps: float = 0.01
 
-    total_steps: int = int(2.5e7)
+    total_steps: int = int(1e7)
     steps_per_epoch: int = 10000
     epochs: int = 2500
     start_training_step: int = int(1e5)
