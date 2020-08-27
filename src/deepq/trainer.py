@@ -32,6 +32,7 @@ class Trainer(tune.Trainable, ABC):
 
     def setup(self, config):
         self.cfg = Config(**config)
+        self.cfg.update_atoms()
         set_random_seed(self.cfg.random_seed)
         print("input args:\n", json.dumps(vars(self.cfg), indent=4, separators=(",", ":")))
 

@@ -56,27 +56,9 @@ class Config:
     frame_stack: int = 4
     sha: str = ""
 
-    def update(self):
-        algo_num_atoms = {
-            'dqn': 1,
-            'c51': 51,
-            'qr': 200,
-            'mdqn': 1,
-            'kl': 1,
-        }
-
-        if self.num_atoms < 1:
-            try:
-                self.num_atoms = algo_num_atoms[self.algo]
-            except Exception as e:
-                print(e)
-                raise ValueError(f"Algo {self.algo} not implemented\n"
-                                 f"available algorithms are:\n"
-                                 f"{algo_num_atoms.keys()}")
-
+    def update_game(self):
         if self.game == "":
             self.game = "Breakout"
-
         if self.game.capitalize() not in atari63:
             game_dict = {
                 'atari6': atari6,
@@ -96,5 +78,20 @@ class Config:
         else:
             self.game = self.game.capitalize()
 
-        self.epochs = self.total_steps // self.steps_per_epoch
-        assert self.n_step > 0
+    def update_atoms(self):
+        algo_num_atoms = {
+            'dqn': 1,
+            'c51': 51,
+            'qr': 200,
+            'mdqn': 1,
+            'kl': 1,
+        }
+
+        if self.num_atoms < 1:
+            try:
+                self.num_atoms = algo_num_atoms[self.algo]
+            except Exception as e:
+                print(e)
+                raise ValueError(f"Algo {self.algo} not implemented\n"
+                                 f"available algorithms are:\n"
+                                 f"{algo_num_atoms.keys()}")

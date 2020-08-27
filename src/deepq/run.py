@@ -3,9 +3,9 @@ import ray
 from ray import tune
 from ray.tune import CLIReporter
 
+from src.common.utils import parse_arguments
 from src.deepq.config import Config, GPU_SIZE
 from src.deepq.trainer import Trainer
-from src.common.utils import parse_arguments
 
 
 def trial_str_creator(trial, sha):
@@ -20,7 +20,9 @@ if __name__ == '__main__':
     cfg = Config(sha=sha_long)
     args = parse_arguments(cfg)
     cfg = Config(**vars(args))
-    cfg.update()
+    cfg.update_game()
+    if cfg.algo == 'all':
+        cfg.algo = tune.grid_search(['dqn', 'mdqn', 'qr', 'c51'])
 
     if isinstance(cfg.game, list):
         cfg.game = tune.grid_search(cfg.game)
