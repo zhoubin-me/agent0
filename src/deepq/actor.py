@@ -8,11 +8,11 @@ from lz4.block import compress
 
 from src.common.atari_wrappers import make_deepq_env
 from src.common.vec_env import ShmemVecEnv
-from src.deepq.config import Config, GPU_SIZE, NUM_TASKS
+from src.deepq.config import Config, PARALLEL_TASKS
 from src.deepq.model import NatureCNN
 
 
-@ray.remote(num_gpus=0.1 / (GPU_SIZE * NUM_TASKS))
+@ray.remote(num_gpus=0.1 / PARALLEL_TASKS)
 class Actor:
     def __init__(self, rank, **kwargs):
 

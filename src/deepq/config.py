@@ -1,10 +1,8 @@
 from dataclasses import dataclass
 
 from src.common.bench import atari6, atari10, atari47, atari_exp7, atari63
-from src.common.gpuinfo import get_gpus
 
-GPU_SIZE = max(1, min(get_gpus()[-1].total_memory // 10000, 2.0))
-NUM_TASKS = 1.0
+PARALLEL_TASKS = 2.0
 
 
 @dataclass
