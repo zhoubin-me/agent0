@@ -16,8 +16,8 @@ class Agent:
         self.cfg = Config(**kwargs)
 
         env = make_deepq_env(self.cfg.game)
+        self.obs_shape = env.observation_space.shape
         self.action_dim = env.action_space.n
-        self.obs_shape = (x for x in env.observation_space.shape if x > 3)
         self.device = torch.device('cuda:0')
         # noinspection PyArgumentList
         self.batch_indices = torch.arange(self.cfg.batch_size).to(self.device)
@@ -112,8 +112,8 @@ class Agent:
 
     @staticmethod
     def log_softmax_stable(logits, tau=0.01):
-        logits = logits - logits.max(dim=-1)
-        return logits - tau * torch.logsumexp(logits / tau, dim=-1)
+        logits = logits - logits.max(dim=-1, keepdim=True)[0]
+        return logits - tau * torch.logsumexp(logits / tau, dim=-1, keepdim=True)
 
     def train_step_mdqn(self, states, next_states, actions, terminals, rewards):
         with torch.no_grad():
@@ -122,11 +122,12 @@ class Agent:
             q_next = q_next_logits.softmax(dim=-1).mul(q_next).sum(dim=-1)
 
             add_on = self.model_target(states)
-            add_on = self.log_softmax_stable(add_on, self.cfg.mdqn_tau).gather(1, actions).clamp(self.cfg.mdqn_lo, 0)
+            add_on = self.log_softmax_stable(add_on,
+                                             self.cfg.mdqn_tau)[self.batch_indices, actions].clamp(self.cfg.mdqn_lo, 0)
 
             q_target = rewards + self.cfg.mdqn_alpha * add_on + self.cfg.discount * (1 - terminals) * q_next
 
-        q = self.model(states).gather(1, actions)
+        q = self.model(states)[self.batch_indices, actions]
         loss = fx.smooth_l1_loss(q, q_target, reduction='none')
         return loss.view(-1)
 
@@ -150,10 +151,10 @@ class Agent:
                 a_next = self.model(next_states).argmax(dim=-1)
             else:
                 a_next = q_next.argmax(dim=-1)
-            q_next = q_next.gather(1, a_next)
+            q_next = q_next[self.batch_indices, a_next]
             q_target = rewards + self.cfg.discount * (1 - terminals) * q_next
 
-        q = self.model(states).gather(1, actions)
+        q = self.model(states)[self.batch_indices, actions]
         loss = fx.smooth_l1_loss(q, q_target, reduction='none')
         return loss.view(-1)
 

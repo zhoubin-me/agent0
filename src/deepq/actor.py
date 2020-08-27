@@ -29,7 +29,8 @@ class Actor:
         self.step = {
             'c51': lambda logits: logits.softmax(dim=-1).mul(self.atoms).sum(-1),
             'qr': lambda logits: logits.mean(-1),
-            'dqn': lambda logits: logits.squeeze(-1)
+            'dqn': lambda logits: logits.squeeze(-1),
+            'mdqn': lambda logits: logits.squeeze(-1),
         }
         assert self.cfg.algo in self.step
 
@@ -39,7 +40,7 @@ class Actor:
                                noisy=self.cfg.noisy, num_atoms=self.cfg.num_atoms).to(self.device)
         self.obs = self.envs.reset()
 
-    def sample(self, steps, epsilon, state_dict, testing=False, test_episodes=10):
+    def sample(self, steps, epsilon, state_dict, testing=False, test_episodes=10, render=False):
         self.model.load_state_dict(state_dict)
         rs, qs, data = [], [], []
         tic = time.time()
@@ -65,6 +66,9 @@ class Actor:
                           zip(np.random.rand(self.cfg.num_envs), action_random, action_greedy)]
 
             obs_next, reward, done, info = self.envs.step(action)
+            if render:
+                self.envs.render()
+                time.sleep(0.05)
 
             if not testing:
                 if self.cfg.n_step > 1:
@@ -83,6 +87,8 @@ class Actor:
             for inf in info:
                 if 'real_reward' in inf:
                     rs.append(inf['real_reward'])
+                    if render:
+                        print(rs[-1], len(rs), np.mean(rs), np.max(rs))
 
             if testing and len(rs) > test_episodes:
                 break

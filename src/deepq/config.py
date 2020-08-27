@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from src.common.bench import atari8, atari10, atari47, atari_exp7, atari63
 from src.common.gpuinfo import get_gpus
 
-GPU_SIZE = min(get_gpus()[-1].total_memory // 10240, 2.0)
+GPU_SIZE = max(1, min(get_gpus()[-1].total_memory // 10240, 2.0))
 
 
 @dataclass
@@ -49,7 +49,7 @@ class Config:
     max_record_ep_len = 10000
     pin_memory = True
     fast_replay = True
-    restore_checkpoint: str = None
+    restore_checkpoint: str = ""
     random_seed: int = 42
     exp_name: str = 'atari_deepq'
     frame_stack: int = 4
@@ -60,6 +60,7 @@ class Config:
             'dqn': 1,
             'c51': 51,
             'qr': 200,
+            'mdqn': 1,
         }
 
         if self.num_atoms < 1:

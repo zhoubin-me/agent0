@@ -57,6 +57,7 @@ class DataLoaderX(DataLoader):
     def __iter__(self):
         return BackgroundGenerator(super().__iter__(), max_prefetch=3)
 
+
 def parse_arguments(config):
     parser = argparse.ArgumentParser()
     for k, v in vars(config).items():

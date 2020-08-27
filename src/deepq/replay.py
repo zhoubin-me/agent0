@@ -29,11 +29,11 @@ class ReplayDataset(Dataset, Sampler):
         return self.top
 
     def __getitem__(self, idx):
-        idx = idx % len(self)
+        idx = idx % self.top
 
         st, at, rt, dt, st_next = self.data[idx]
-        st = np.frombuffer(decompress(st), dtype=np.uint8).reshape(self.cfg.frame_stack, *self.obs_shape)
-        st_next = np.frombuffer(decompress(st_next), dtype=np.uint8).reshape(self.cfg.frame_stack, *self.obs_shape)
+        st = np.frombuffer(decompress(st), dtype=np.uint8).reshape(self.obs_shape)
+        st_next = np.frombuffer(decompress(st_next), dtype=np.uint8).reshape(self.obs_shape)
 
         if self.cfg.prioritize:
             weight = self.prob[idx]
