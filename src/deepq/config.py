@@ -36,7 +36,7 @@ class Config:
 
     total_steps: int = int(1e7)
     steps_per_epoch: int = 10000
-    epochs: int = 2500
+    epochs: int = 1000
     start_training_step: int = int(1e5)
     target_update_freq: int = 500
 

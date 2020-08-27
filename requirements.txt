@@ -1,7 +1,7 @@
 gym[atari]==0.15.7
 prefetch_generator==1.0.1
 ray[tune]==0.8.7
-torch==1.6.0
+torch==1.6.0+cu101
 lz4==3.1.0
 dataclasses==0.7
 GitPython==3.1.7

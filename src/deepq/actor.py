@@ -12,7 +12,7 @@ from src.deepq.config import Config, GPU_SIZE, NUM_TASKS
 from src.deepq.model import NatureCNN
 
 
-@ray.remote(num_gpus=0.5 / (GPU_SIZE * NUM_TASKS))
+@ray.remote(num_gpus=0.1 / (GPU_SIZE * NUM_TASKS))
 class Actor:
     def __init__(self, rank, **kwargs):
 
