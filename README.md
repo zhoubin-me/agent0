@@ -1,5 +1,8 @@
 # AgentZero
-A [Ray, PyTorch] based Fast RL Framework
+
+## Introduction
+
+AgentZero is a Ray & PyTorch based light-weight Distributed Fast Reinforcement Learning Framework.
 
 
 ## Installation
