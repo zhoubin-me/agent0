@@ -43,7 +43,7 @@ class Agent:
             'c51': self.train_step_c51,
             'dqn': self.train_step_dqn,
             'mdqn': self.train_step_mdqn,
-            'kl_dqn': self.train_step_kl_dqn,
+            'kl': self.train_step_kl_dqn,
         }
 
         assert self.cfg.algo in self.step

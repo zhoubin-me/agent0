@@ -31,7 +31,7 @@ class Actor:
             'qr': lambda logits: logits.mean(-1),
             'dqn': lambda logits: logits.squeeze(-1),
             'mdqn': lambda logits: logits.squeeze(-1),
-            'kldqn': lambda logits: logits.squeeze(-1),
+            'kl': lambda logits: logits.squeeze(-1),
         }
         assert self.cfg.algo in self.step
 
