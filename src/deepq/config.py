@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from src.common.bench import atari8, atari10, atari47, atari_exp7, atari63
+from src.common.bench import atari6, atari10, atari47, atari_exp7, atari63
 from src.common.gpuinfo import get_gpus
 
 GPU_SIZE = max(1, min(get_gpus()[-1].total_memory // 10240, 2.0))
@@ -75,11 +75,9 @@ class Config:
         if self.game == "":
             self.game = "Breakout"
 
-        if self.game not in atari63:
+        if self.game.capitalize() not in atari63:
             game_dict = {
-                'atari8': atari8,
-                'first': atari8[:4],
-                'second': atari8[4:],
+                'atari6': atari6,
                 'atari10': atari10,
                 'atari47': atari47,
                 'atari_exp7': atari_exp7,
@@ -93,6 +91,8 @@ class Config:
                 raise ValueError(f"No such atari games as {self.game}\n"
                                  f"available games[list] are {game_dict.keys()} and:\n"
                                  f"{atari63}")
+        else:
+            self.game = self.game.capitalize()
 
         self.epochs = self.total_steps // self.steps_per_epoch
         assert self.n_step > 0
