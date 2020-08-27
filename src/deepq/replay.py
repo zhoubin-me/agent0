@@ -11,7 +11,6 @@ from src.deepq.config import Config
 
 class ReplayDataset(Dataset, Sampler):
     def __init__(self, obs_shape, **kwargs):
-        super().__init__()
         self.cfg = Config(**kwargs)
 
         self.obs_shape = obs_shape
