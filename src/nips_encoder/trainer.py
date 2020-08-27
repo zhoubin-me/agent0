@@ -21,11 +21,11 @@ from src.nips_encoder.model import ModelEncoder
 @dataclass
 class Config:
     game: str = "Breakout"
-    epochs: int = 30
-    batch_size: int = 512
+    epochs: int = 100
+    batch_size: int = 64
     num_envs: int = 32
     num_actors: int = 16
-    replay_size: int = 1000000
+    replay_size: int = 30000
     adam_lr: float = 1e-4
     num_data_workers: int = 4
     pin_memory: bool = True
@@ -91,7 +91,7 @@ class Trainer(tune.Trainable, ABC):
 
         self.device = torch.device('cuda:0')
         self.env = gym.make(f'{self.cfg.game}NoFrameskip-v4')
-        self.obs_shape = self.env.observation_space
+        self.obs_shape = self.env.observation_space.shape
         self.action_dim = self.env.action_space.n
 
         self.model = ModelEncoder(self.action_dim).to(self.device)
@@ -122,7 +122,7 @@ class Trainer(tune.Trainable, ABC):
             self.data_fetcher = self.get_data_fetcher()
             data = self.data_fetcher.next()
 
-        states, actions, next_states = data
+        states, actions, rewards, dones, next_states = data
         states = states.float().div(255.0).permute(0, 3, 1, 2)
         next_states = next_states.float().div(255.0).permute(0, 3, 1, 2)
         actions = actions.long()
