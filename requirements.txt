@@ -1,0 +1,11 @@
+atari_py==0.2.6
+pandas==1.0.3
+gym[atari]==0.15.7
+prefetch_generator==1.0.1
+ray[tune]==0.8.7
+torch==1.6.0
+lz4==3.1.0
+numpy==1.19.1
+cloudpickle==1.2.2
+dataclasses==0.7
+GitPython==3.1.7
