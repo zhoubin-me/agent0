@@ -26,7 +26,6 @@ class Config:
     adam_lr: float = 1e-4
     num_data_workers: int = 4
     pin_memory: bool = True
-    optimizer: str = "adam"
     sha: str = ""
     restore_checkpoint: str = None
 
@@ -73,12 +72,7 @@ class Trainer(tune.Trainable, ABC):
         self.model = ModelEncoder(self.action_dim).to(self.device)
         self.replay = deque(maxlen=self.cfg.replay_size)
 
-        self.optimizer_fn = {
-            "adam": torch.optim.Adam,
-            "adamw": torch.optim.AdamW,
-        }
-
-        self.optimizer = self.optimizer_fn[self.cfg.optimizer](self.model.parameters(), self.cfg.adam_lr)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), self.cfg.adam_lr)
 
         self.replay = []
         self.sample()
