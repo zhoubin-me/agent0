@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 import gym
 import numpy as np
+import ray
 import torch
 import torch.nn.functional as fx
 from lz4.block import compress, decompress
@@ -22,7 +23,8 @@ class Config:
     game: str = "Breakout"
     epochs: int = 30
     batch_size: int = 512
-    num_envs: int = 128
+    num_envs: int = 32
+    num_actors: int = 16
     replay_size: int = 1000000
     adam_lr: float = 1e-4
     num_data_workers: int = 4
@@ -76,24 +78,29 @@ class Trainer(tune.Trainable, ABC):
         self.optimizer = torch.optim.Adam(self.model.parameters(), self.cfg.adam_lr)
 
         self.replay = []
-        self.sample()
+        sample_ops = [self.sample.remote(self.cfg) for _ in range(self.cfg.num_actors)]
+        datas = ray.get(sample_ops)
+        for data in datas:
+            self.replay.extend(data)
 
-    def sample(self):
-        self.envs = ShmemVecEnv([lambda: make_atari(f"{self.cfg.game}NoFrameskip-v4")
-                                 for _ in range(self.cfg.num_envs)], context='fork')
-
+    @ray.remote
+    def sample(self, cfg):
+        envs = ShmemVecEnv([lambda: make_atari(f"{cfg.cfg.game}NoFrameskip-v4")
+                            for _ in range(cfg.num_envs)], context='fork')
+        action_dim = envs.action_space.n
         print("Sampling replay")
-        obs = self.envs.reset()
-        steps = int(self.cfg.replay_size) // self.cfg.num_envs
+        obs = envs.reset()
+        steps = int(cfg.replay_size) // cfg.num_envs
         replay = []
         for _ in tqdm(range(steps)):
-            action_random = np.random.randint(0, self.action_dim, self.cfg.num_envs)
-            obs_next, reward, done, info = self.envs.step(action_random)
+            action_random = np.random.randint(0, action_dim, cfg.num_envs)
+            obs_next, reward, done, info = envs.step(action_random)
             replay.append((obs, action_random, reward, done))
             for st, at, rt, dt, st_next in zip(obs, action_random, reward, done, obs_next):
-                self.replay.append((compress(st), at, rt, dt, compress(st_next)))
+                replay.append((compress(st), at, rt, dt, compress(st_next)))
             obs = obs_next
-        self.envs.close()
+        envs.close()
+        return replay
 
     def get_data_fetcher(self):
         dataset = EncoderDataset(self.replay, self.obs_shape)
