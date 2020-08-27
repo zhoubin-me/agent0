@@ -192,7 +192,7 @@ class Agent:
         self.optimizer.zero_grad()
         loss.backward()
 
-        if self.algo == 'qr' and self.cfg.clip_grad_norm > 0:
+        if self.cfg.algo == 'qr' and self.cfg.clip_grad_norm > 0:
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.cfg.clip_grad_norm)
 
         self.optimizer.step()
