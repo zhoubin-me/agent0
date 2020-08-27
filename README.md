@@ -39,8 +39,12 @@ Hardware Setting:
  - CPU: AMD EPYC 7251 8-Core Processor
  - GPU: RTX 2080 Ti
  - RAM: 32 GB
+ - Game: Breakout
+ - Algorithm: Rainbow
+ - FPS: 900
 
-800FPS
+Here FPS (frame per second) means frames collected and saved to replay buffer per second. With 4 frame skip, its FPS is 900X4=3600 in deepmind's word. 
+Other implementations usually fall below 100 FPS after exploration.
 
 ## Run
 
