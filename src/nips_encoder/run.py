@@ -3,9 +3,8 @@ import ray
 from ray import tune
 from ray.tune import CLIReporter
 
-from src.nips_encoder.trainer import Trainer, Config
 from src.common.utils import parse_arguments
-
+from src.nips_encoder.trainer import Trainer, Config
 
 if __name__ == '__main__':
     repo = git.Repo(search_parent_directories=True)
@@ -28,7 +27,7 @@ if __name__ == '__main__':
         stop=lambda trial_id, result: result['epoch'] > cfg.epochs,
         checkpoint_at_end=True,
         progress_reporter=reporter,
-        checkpoint_freq=1000,
+        checkpoint_freq=cfg.replay_size // cfg.batch_size,
         resources_per_trial={"gpu": 1},
         config=vars(cfg),
         fail_fast=True,

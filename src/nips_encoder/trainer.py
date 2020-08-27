@@ -30,7 +30,7 @@ class Config:
     num_data_workers: int = 4
     pin_memory: bool = True
     sha: str = ""
-    restore_checkpoint: str = None
+    restore_checkpoint: str = ""
 
 
 class EncoderDataset(Dataset):
@@ -69,6 +69,7 @@ def sample(cfg):
         obs = obs_next
     envs.close()
     return replay
+
 
 class Trainer(tune.Trainable, ABC):
     def __init__(self, config=None, logger_creator=None):

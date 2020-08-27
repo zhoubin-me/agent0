@@ -11,6 +11,21 @@ def init(m, gain=1.0):
         nn.init.zeros_(m.bias.data)
 
 
+class ModelPrediction(nn.Module, ABC):
+    def __init__(self, in_channels, action_dim, dueling=False, num_atoms=1, noisy=False, noise_std=0.5):
+        super(ModelPrediction, self).__init__()
+        self.num_atoms = num_atoms
+        self.action_dim = action_dim
+        self.noise_std = noise_std
+        dense = NoisyLinear if noisy else nn.Linear
+
+        self.convs = nn.Sequential(
+            nn.Conv2d(in_channels, 32, 8, stride=4), nn.ReLU(),
+            nn.Conv2d(32, 64, 4, stride=2), nn.ReLU(),
+            nn.Conv2d(64, 64, 3, stride=1), nn.ReLU(), nn.Flatten(),
+            dense(64 * 7 * 7, 512), nn.ReLU())
+
+
 class NatureCNN(nn.Module, ABC):
     def __init__(self, in_channels, action_dim, dueling=False, num_atoms=1, noisy=False, noise_std=0.5):
         super(NatureCNN, self).__init__()
