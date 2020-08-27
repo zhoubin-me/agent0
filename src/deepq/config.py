@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from src.common.bench import atari6, atari10, atari47, atari_exp7, atari63
 from src.common.gpuinfo import get_gpus
 
-GPU_SIZE = max(1, min(get_gpus()[-1].total_memory // 10240, 2.0))
+GPU_SIZE = max(1, min(get_gpus()[-1].total_memory // 10000, 2.0))
 
 
 @dataclass
@@ -40,9 +40,9 @@ class Config:
     target_update_freq: int = 500
 
     agent_train_steps: int = 10
-    actor_steps: int = 80
+    actor_steps: int = 40
 
-    num_actors: int = 8
+    num_actors: int = 5
     num_envs: int = 16
     num_data_workers: int = 4
     reset_noise_freq: int = 4
