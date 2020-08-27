@@ -1,7 +1,6 @@
-python -m src.deepq.run --algo dqn
-python -m src.deepq.run --algo mdqn
-python -m src.deepq.run --algo c51
-python -m src.deepq.run --algo qr
+python -m src.deepq.run --game atari6 --algo dqn --exp_name atari_dqn
+python -m src.deepq.run --game atari6 --algo mdqn --exp_name atari_mdqn
+python -m src.deepq.run --game atari6 --algo qr --exp_name atari
 
 
 
