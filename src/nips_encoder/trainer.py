@@ -39,12 +39,16 @@ class EncoderDataset(Dataset):
         self.state_shape = state_shape
 
     def __len__(self):
-        return len(self.data)
+        return len(self.data) - 1
 
     def __getitem__(self, idx):
-        st, at, rt, dt, st_next = self.data[idx]
+        st, at, rt, dt = self.data[idx]
         st = np.frombuffer(decompress(st), dtype=np.uint8).reshape(*self.state_shape)
-        st_next = decompress(st_next)
+        if dt:
+            st_next = self.data[idx]
+        else:
+            st_next = self.data[idx + 1]
+        st_next = np.frombuffer(decompress(st_next), dtype=np.uint8).reshape(*self.state_shape)
         return st, at, rt, dt, st_next
 
 
@@ -96,8 +100,8 @@ class Trainer(tune.Trainable, ABC):
             action_random = np.random.randint(0, action_dim, cfg.num_envs)
             obs_next, reward, done, info = envs.step(action_random)
             replay.append((obs, action_random, reward, done))
-            for st, at, rt, dt, st_next in zip(obs, action_random, reward, done, obs_next):
-                replay.append((compress(st), at, rt, dt, compress(st_next)))
+            for st, at, rt, dt, st_next in zip(obs, action_random, reward, done):
+                replay.append((compress(st), at, rt, dt))
             obs = obs_next
         envs.close()
         return replay
