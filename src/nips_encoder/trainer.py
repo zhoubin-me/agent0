@@ -90,7 +90,7 @@ class Trainer(tune.Trainable, ABC):
         action_dim = envs.action_space.n
         print("Sampling replay")
         obs = envs.reset()
-        steps = int(cfg.replay_size) // cfg.num_envs
+        steps = int(cfg.replay_size) // (cfg.num_envs * cfg.num_actors) + 1
         replay = []
         for _ in tqdm(range(steps)):
             action_random = np.random.randint(0, action_dim, cfg.num_envs)
