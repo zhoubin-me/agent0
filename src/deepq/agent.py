@@ -122,8 +122,8 @@ class Agent:
             q_next = q_next_logits.softmax(dim=-1).mul(q_next).sum(dim=-1)
 
             add_on = self.model_target(states)
-            add_on = self.log_softmax_stable(add_on,
-                                             self.cfg.mdqn_tau)[self.batch_indices, actions].clamp(self.cfg.mdqn_lo, 0)
+            add_on = self.log_softmax_stable(add_on, self.cfg.mdqn_tau)
+            add_on = add_on[self.batch_indices, actions].clamp(self.cfg.mdqn_lo, 0)
 
             q_target = rewards + self.cfg.mdqn_alpha * add_on + self.cfg.discount * (1 - terminals) * q_next
 
