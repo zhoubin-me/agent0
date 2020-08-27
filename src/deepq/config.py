@@ -25,6 +25,7 @@ class Config:
     mdqn_tau: float = 0.03
     mdqn_alpha: float = 0.9
     mdqn_lo: float = -1
+    clip_grad_norm: float = 5.0
 
     batch_size: int = 512
     replay_size: int = int(1e6)

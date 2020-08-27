@@ -191,6 +191,10 @@ class Agent:
 
         self.optimizer.zero_grad()
         loss.backward()
+
+        if self.cfg.clip_grad_norm > 0:
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.cfg.clip_grad_norm)
+
         self.optimizer.step()
         self.update_steps += 1
 
