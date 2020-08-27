@@ -58,11 +58,10 @@ class Config:
     sha: str = ""
     mem_mult: float = 1.0
     gpu_mult: float = 1.0
-    step_mult: float = 2.0
+    step_mult: int = 2
 
     def update(self):
         self.actor_steps *= self.step_mult
-        self.agent_train_steps *= self.step_mult
         self.update_game()
         self.update_atoms()
 
