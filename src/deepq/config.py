@@ -98,7 +98,8 @@ class Config:
 
         if self.num_atoms < 1:
             try:
-                self.num_atoms = algo_num_atoms[self.algo]
+                if self.algo != 'all':
+                    self.num_atoms = algo_num_atoms[self.algo]
             except Exception as e:
                 print(e)
                 raise ValueError(f"Algo {self.algo} not implemented\n"
