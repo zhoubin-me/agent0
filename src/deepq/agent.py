@@ -14,7 +14,7 @@ class Agent:
     def __init__(self, **kwargs):
 
         self.cfg = Config(**kwargs)
-        self.cfg.update_atoms()
+        self.cfg.update()
 
         env = make_deepq_env(self.cfg.game)
         self.obs_shape = env.observation_space.shape

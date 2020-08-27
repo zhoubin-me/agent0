@@ -20,7 +20,7 @@ if __name__ == '__main__':
     cfg = Config(sha=sha_long)
     args = parse_arguments(cfg)
     cfg = Config(**vars(args))
-    cfg.update_game()
+    cfg.update()
 
     if cfg.algo == 'all':
         cfg.algo = tune.grid_search(['dqn', 'mdqn', 'qr', 'c51'])
