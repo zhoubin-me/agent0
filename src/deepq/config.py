@@ -68,7 +68,7 @@ class Config:
     def update_game(self):
         if self.game == "":
             self.game = "Breakout"
-        if self.game.capitalize() not in atari63:
+        if self.game not in atari63:
             game_dict = {
                 'atari6': atari6,
                 'atari10': atari10,
@@ -84,8 +84,6 @@ class Config:
                 raise ValueError(f"No such atari games as {self.game}\n"
                                  f"available games[list] are {game_dict.keys()} and:\n"
                                  f"{atari63}")
-        else:
-            self.game = self.game.capitalize()
 
     def update_atoms(self):
         algo_num_atoms = {

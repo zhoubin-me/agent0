@@ -23,7 +23,7 @@ if __name__ == '__main__':
     cfg.update()
 
     if cfg.algo == 'all':
-        cfg.algo = tune.grid_search(['dqn', 'mdqn', 'qr', 'c51'])
+        cfg.algo = tune.grid_search(['dqn', 'mdqn', 'c51'])
 
     if isinstance(cfg.game, list):
         cfg.game = tune.grid_search(cfg.game)
