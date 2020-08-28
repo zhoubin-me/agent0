@@ -18,7 +18,7 @@ class Actor:
 
         self.rank = rank
         self.cfg = Config(**kwargs)
-        self.cfg.update()
+        self.cfg.update_atoms()
         # Training
         self.envs = ShmemVecEnv([lambda: make_deepq_env(game=self.cfg.game, episode_life=True, clip_rewards=True,
                                                         frame_stack=4, transpose_image=True, n_step=self.cfg.n_step,
