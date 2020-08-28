@@ -90,7 +90,7 @@ class Trainer(tune.Trainable, ABC):
 
     def save_checkpoint(self, checkpoint_dir):
         output = ray.get([a.sample.remote(self.cfg.actor_steps,
-                                          self.cfg.min_eps,
+                                          self.cfg.test_eps,
                                           self.agent.model.state_dict(),
                                           testing=True,
                                           test_episodes=10) for a in self.actors])

@@ -31,6 +31,7 @@ class Config:
     discount: float = 0.99
     exploration_steps: int = int(1e6)
     min_eps: float = 0.01
+    test_eps: float = 0.001
 
     total_steps: int = int(1e7)
     steps_per_epoch: int = 10000
@@ -46,7 +47,7 @@ class Config:
     num_data_workers: int = 4
     reset_noise_freq: int = 4
 
-    max_record_ep_len = 10000
+    max_record_ep_len = 100000
     pin_memory = True
     fast_replay = True
     restore_checkpoint: str = ""

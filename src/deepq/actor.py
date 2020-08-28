@@ -92,7 +92,7 @@ class Actor:
                     if render:
                         print(rs[-1], len(rs), np.mean(rs), np.max(rs))
 
-            if testing and len(rs) > test_episodes:
+            if testing and (len(rs) > test_episodes or step > self.cfg.max_record_ep_len):
                 break
             if not testing and step > steps:
                 break
