@@ -39,7 +39,7 @@ class Config:
     target_update_freq: int = 500
 
     agent_train_steps: int = 10
-    actor_steps: int = 40
+    actor_steps: int = 80
 
     num_actors: int = 5
     num_envs: int = 16
@@ -56,7 +56,7 @@ class Config:
     sha: str = ""
     mem_mult: float = 1.0
     gpu_mult: float = 1.0
-    step_mult: int = 2
+    step_mult: int = 1
     feature_mult: int = 1
 
     def update(self):
