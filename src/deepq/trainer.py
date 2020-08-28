@@ -37,8 +37,7 @@ class Trainer(tune.Trainable, ABC):
         print("input args:\n", json.dumps(vars(self.cfg), indent=4, separators=(",", ":")))
 
         self.agent = Agent(**config)
-        self.epsilon_schedule = LinearSchedule(1.0, self.cfg.min_eps,
-                                               int(self.cfg.total_steps * self.cfg.exploration_ratio))
+        self.epsilon_schedule = LinearSchedule(1.0, self.cfg.min_eps, self.cfg.exploration_steps)
         self.actors = [Actor.remote(rank=rank, **config) for rank in range(self.cfg.num_actors)]
 
         self.frame_count = 0

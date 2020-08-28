@@ -29,7 +29,7 @@ class Config:
     batch_size: int = 512
     replay_size: int = int(1e6)
     discount: float = 0.99
-    exploration_ratio: float = 0.1
+    exploration_steps: int = int(1e6)
     min_eps: float = 0.01
 
     total_steps: int = int(1e7)
