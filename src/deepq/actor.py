@@ -38,8 +38,8 @@ class Actor:
 
         if self.cfg.algo == 'c51':
             self.atoms = torch.linspace(self.cfg.v_min, self.cfg.v_max, self.cfg.num_atoms).to(self.device)
-        self.model = NatureCNN(self.cfg.frame_stack, self.action_dim, dueling=self.cfg.dueling,
-                               noisy=self.cfg.noisy, num_atoms=self.cfg.num_atoms).to(self.device)
+        self.model = NatureCNN(self.cfg.frame_stack, self.action_dim, dueling=self.cfg.dueling, noisy=self.cfg.noisy,
+                               num_atoms=self.cfg.num_atoms, feature_mult=self.cfg.feature_mult).to(self.device)
         self.obs = self.envs.reset()
 
     def sample(self, steps, epsilon, state_dict, testing=False, test_episodes=10, render=False):
