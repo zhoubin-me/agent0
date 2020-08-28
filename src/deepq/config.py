@@ -57,6 +57,7 @@ class Config:
     mem_mult: float = 1.0
     gpu_mult: float = 1.0
     step_mult: int = 2
+    feature_mult: int = 1
 
     def update(self):
         self.actor_steps *= self.step_mult

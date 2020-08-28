@@ -27,26 +27,27 @@ class ModelPrediction(nn.Module, ABC):
 
 
 class NatureCNN(nn.Module, ABC):
-    def __init__(self, in_channels, action_dim, dueling=False, num_atoms=1, noisy=False, noise_std=0.5):
+    def __init__(self, in_channels, action_dim, dueling=False, num_atoms=1, noisy=False, noise_std=0.5, feature_mult=1):
         super(NatureCNN, self).__init__()
 
         self.num_atoms = num_atoms
         self.action_dim = action_dim
         self.noise_std = noise_std
+        self.feature_mult = feature_mult
         dense = NoisyLinear if noisy else nn.Linear
 
         self.convs = nn.Sequential(
-            nn.Conv2d(in_channels, 32, 8, stride=4), nn.ReLU(),
-            nn.Conv2d(32, 64, 4, stride=2), nn.ReLU(),
-            nn.Conv2d(64, 64, 3, stride=1), nn.ReLU(), nn.Flatten(),
-            dense(64 * 7 * 7, 512), nn.ReLU())
+            nn.Conv2d(in_channels, 32 * feature_mult, 8, stride=4), nn.ReLU(),
+            nn.Conv2d(32 * feature_mult, 64 * feature_mult, 4, stride=2), nn.ReLU(),
+            nn.Conv2d(64 * feature_mult, 64 * feature_mult, 3, stride=1), nn.ReLU(), nn.Flatten(),
+            dense(64 * 7 * 7 * feature_mult, 512 * feature_mult), nn.ReLU())
 
         self.convs.apply(lambda m: init(m, nn.init.calculate_gain('relu')))
-        self.p = dense(512, action_dim * num_atoms)
+        self.p = dense(512 * feature_mult, action_dim * num_atoms)
         self.p.apply(lambda m: init(m, 0.01))
 
         if dueling:
-            self.v = dense(512, num_atoms)
+            self.v = dense(512 * feature_mult, num_atoms)
             self.v.apply(lambda m: init(m, 1.0))
         else:
             self.v = None

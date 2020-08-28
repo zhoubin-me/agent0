@@ -30,8 +30,8 @@ class Agent:
             self.cumulative_density = ((2 * torch.arange(self.cfg.num_atoms) + 1) /
                                        (2.0 * self.cfg.num_atoms)).to(self.device)
 
-        self.model = NatureCNN(self.cfg.frame_stack, self.action_dim, dueling=self.cfg.dueling,
-                               noisy=self.cfg.noisy, num_atoms=self.cfg.num_atoms).to(self.device)
+        self.model = NatureCNN(self.cfg.frame_stack, self.action_dim, dueling=self.cfg.dueling, noisy=self.cfg.noisy,
+                               num_atoms=self.cfg.num_atoms, feature_mult=self.cfg.feature_mult).to(self.device)
         self.model_target = copy.deepcopy(self.model)
         self.optimizer = torch.optim.Adam(self.model.parameters(), self.cfg.adam_lr)
 
