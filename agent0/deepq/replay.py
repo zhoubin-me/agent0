@@ -38,7 +38,7 @@ class ReplayDataset(Dataset, Sampler):
         else:
             weight = 1.0
 
-        return frames, at, rt, dt, weight, idx
+        return np.array(frames), at, rt, dt, weight, idx
 
     def __iter__(self):
         for _ in range(self.top // self.cfg.batch_size):
