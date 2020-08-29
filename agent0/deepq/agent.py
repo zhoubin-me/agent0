@@ -63,10 +63,6 @@ class Agent:
     def train_step_iqr(self, states, next_states, actions, terminals, rewards):
         pass
 
-    @staticmethod
-    def huber(x, k=1.0):
-        return torch.where(x.abs() < k, 0.5 * x.pow(2), k * (x.abs() - 0.5 * k))
-
     def train_step_qr(self, states, next_states, actions, terminals, rewards):
         with torch.no_grad():
             q_next = self.model_target(next_states)
@@ -82,11 +78,10 @@ class Agent:
         q = self.model(states)[self.batch_indices, actions, :]
         q_target = q_target.t().unsqueeze(-1)
 
-        diff = q_target - q
-        loss = self.huber(diff)
-        weights = torch.abs(self.cumulative_density.view(1, -1) + diff.detach().sign().float())
+        loss = fx.smooth_l1_loss(q, q_target, reduction='none')
+        weights = torch.abs(self.cumulative_density.view(1, -1) + (q_target - q).detach().sign().float())
         loss = loss * weights
-        loss = loss.sum(-1).mean(0)
+        loss = loss.sum(-1).mean(1)
         return loss.view(-1)
 
     def train_step_c51(self, states, next_states, actions, terminals, rewards):
