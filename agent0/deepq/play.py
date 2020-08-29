@@ -2,9 +2,9 @@ import pickle
 
 import torch
 
-from src.common.utils import parse_arguments
-from src.deepq.actor import Actor
-from src.deepq.config import Config
+from agent0.common.utils import parse_arguments
+from agent0.deepq.actor import Actor
+from agent0.deepq.config import Config
 
 
 # import ray

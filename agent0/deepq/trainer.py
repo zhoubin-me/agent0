@@ -9,10 +9,10 @@ import torch
 from ray import tune
 from ray.tune.trial import ExportFormat
 
-from src.common.utils import LinearSchedule, set_random_seed
-from src.deepq.actor import Actor
-from src.deepq.agent import Agent
-from src.deepq.config import Config
+from agent0.common.utils import LinearSchedule, set_random_seed
+from agent0.deepq.actor import Actor
+from agent0.deepq.agent import Agent
+from agent0.deepq.config import Config
 
 
 class Trainer(tune.Trainable, ABC):

@@ -3,11 +3,11 @@ import copy
 import torch
 import torch.nn.functional as fx
 
-from src.common.atari_wrappers import make_deepq_env
-from src.common.utils import DataLoaderX, DataPrefetcher
-from src.deepq.config import Config
-from src.deepq.model import NatureCNN
-from src.deepq.replay import ReplayDataset
+from agent0.common.atari_wrappers import make_deepq_env
+from agent0.common.utils import DataLoaderX, DataPrefetcher
+from agent0.deepq.config import Config
+from agent0.deepq.model import NatureCNN
+from agent0.deepq.replay import ReplayDataset
 
 
 class Agent:

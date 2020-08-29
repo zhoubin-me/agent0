@@ -1,6 +1,6 @@
 import os
-from src.common import logger
-from src.common.vec_env import VecEnvWrapper
+from agent0.common import logger
+from agent0.common.vec_env import VecEnvWrapper
 from gym.wrappers.monitoring import video_recorder
 
 

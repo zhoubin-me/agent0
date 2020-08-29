@@ -6,10 +6,10 @@ import ray
 import torch
 from lz4.block import compress
 
-from src.common.atari_wrappers import make_deepq_env
-from src.common.vec_env import ShmemVecEnv
-from src.deepq.config import Config, PARALLEL_TASKS
-from src.deepq.model import NatureCNN
+from agent0.common.atari_wrappers import make_deepq_env
+from agent0.common.vec_env import ShmemVecEnv
+from agent0.deepq.config import Config, PARALLEL_TASKS
+from agent0.deepq.model import NatureCNN
 
 
 @ray.remote(num_gpus=0.1 / PARALLEL_TASKS)

@@ -6,9 +6,9 @@ import torchvision as tv
 from PIL import Image
 from torch.utils.data import Dataset
 
-from src.common.utils import DataPrefetcher, DataLoaderX, parse_arguments
-from src.nips_encoder.model import ModelEncoder
-from src.nips_encoder.trainer import Config
+from agent0.common.utils import DataPrefetcher, DataLoaderX, parse_arguments
+from agent0.nips_encoder.model import ModelEncoder
+from agent0.nips_encoder.trainer import Config
 
 
 class EncoderDataset(Dataset):

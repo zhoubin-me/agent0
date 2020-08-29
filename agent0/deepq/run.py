@@ -3,9 +3,9 @@ import ray
 from ray import tune
 from ray.tune import CLIReporter
 
-from src.common.utils import parse_arguments
-from src.deepq.config import Config
-from src.deepq.trainer import Trainer
+from agent0.common.utils import parse_arguments
+from agent0.deepq.config import Config
+from agent0.deepq.trainer import Trainer
 
 
 def trial_str_creator(trial, sha):

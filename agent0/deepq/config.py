@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from src.common.bench import atari6, atari10, atari47, atari_exp7, atari63
+from agent0.common.bench import atari6, atari10, atari47, atari_exp7, atari63
 
 PARALLEL_TASKS = 2.0
 

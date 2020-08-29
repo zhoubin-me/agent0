@@ -7,7 +7,7 @@ if not (sys.version.startswith('3')):
 
 setup(name='agent0',
       packages=[package for package in find_packages()
-                if package.startswith('src')],
+                if package.startswith('agent0')],
       install_requires=[],
       description="Ray & PyTorch based light-weight Distributed Fast Reinforcement Learning Framework",
       author="Zhou Bin",

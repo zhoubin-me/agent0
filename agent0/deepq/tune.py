@@ -5,9 +5,9 @@ from ray import tune
 from ray.tune import CLIReporter
 from ray.tune.schedulers import PopulationBasedTraining
 
-from src.deepq.config import Config
-from src.deepq.trainer import Trainer
-from src.common.utils import parse_arguments
+from agent0.deepq.config import Config
+from agent0.deepq.trainer import Trainer
+from agent0.common.utils import parse_arguments
 
 if __name__ == '__main__':
     cfg = Config()

@@ -5,8 +5,8 @@ import torch
 from lz4.block import decompress
 from torch.utils.data import Dataset, Sampler
 
-from src.common.utils import LinearSchedule
-from src.deepq.config import Config
+from agent0.common.utils import LinearSchedule
+from agent0.deepq.config import Config
 
 
 class ReplayDataset(Dataset, Sampler):

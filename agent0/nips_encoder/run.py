@@ -3,8 +3,8 @@ import ray
 from ray import tune
 from ray.tune import CLIReporter
 
-from src.common.utils import parse_arguments
-from src.nips_encoder.trainer import Trainer, Config
+from agent0.common.utils import parse_arguments
+from agent0.nips_encoder.trainer import Trainer, Config
 
 if __name__ == '__main__':
     repo = git.Repo(search_parent_directories=True)

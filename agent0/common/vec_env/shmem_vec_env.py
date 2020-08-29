@@ -6,7 +6,7 @@ import multiprocessing as mp
 import numpy as np
 from .vec_env import VecEnv, CloudpickleWrapper, clear_mpi_env_vars
 import ctypes
-from src.common import logger
+from agent0.common import logger
 
 from .util import dict_to_obs, obs_space_info, obs_to_dict
 

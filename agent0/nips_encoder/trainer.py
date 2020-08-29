@@ -12,10 +12,10 @@ from ray import tune
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
-from src.common.atari_wrappers import make_atari
-from src.common.utils import DataPrefetcher, DataLoaderX
-from src.common.vec_env import ShmemVecEnv
-from src.nips_encoder.model import ModelEncoder
+from agent0.common.atari_wrappers import make_atari
+from agent0.common.utils import DataPrefetcher, DataLoaderX
+from agent0.common.vec_env import ShmemVecEnv
+from agent0.nips_encoder.model import ModelEncoder
 
 
 @dataclass
