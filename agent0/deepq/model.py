@@ -11,19 +11,101 @@ def init(m, gain=1.0):
         nn.init.zeros_(m.bias.data)
 
 
-class ModelPrediction(nn.Module, ABC):
-    def __init__(self, in_channels, action_dim, dueling=False, num_atoms=1, noisy=False, noise_std=0.5):
-        super(ModelPrediction, self).__init__()
+class ModelPredictive(nn.Module, ABC):
+    def __init__(self, in_channels, action_dim, dueling=False, num_atoms=1, noisy=False, noise_std=0.5, feature_mult=1,
+                 predictive=False):
+        super(ModelPredictive, self).__init__()
+
         self.num_atoms = num_atoms
         self.action_dim = action_dim
         self.noise_std = noise_std
+        self.feature_mult = feature_mult
         dense = NoisyLinear if noisy else nn.Linear
 
         self.convs = nn.Sequential(
-            nn.Conv2d(in_channels, 32, 8, stride=4), nn.ReLU(),
-            nn.Conv2d(32, 64, 4, stride=2), nn.ReLU(),
-            nn.Conv2d(64, 64, 3, stride=1), nn.ReLU(), nn.Flatten(),
-            dense(64 * 7 * 7, 512), nn.ReLU())
+            nn.Conv2d(in_channels, 32 * feature_mult, 8, stride=4), nn.ReLU(),
+            nn.Conv2d(32 * feature_mult, 64 * feature_mult, 4, stride=2), nn.ReLU(),
+            nn.Conv2d(64 * feature_mult, 64 * feature_mult, 3, stride=1), nn.ReLU(), nn.Flatten())
+        self.first_dense = nn.Sequential(dense(64 * 7 * 7 * feature_mult, 512 * feature_mult), nn.ReLU())
+
+        self.convs.apply(lambda m: init(m, nn.init.calculate_gain('relu')))
+        self.first_dense.apply(lambda m: init(m, nn.init.calculate_gain('relu')))
+
+        self.p = dense(512 * feature_mult, action_dim * num_atoms)
+        self.p.apply(lambda m: init(m, 0.01))
+
+        if dueling:
+            self.v = dense(512 * feature_mult, num_atoms)
+            self.v.apply(lambda m: init(m, 1.0))
+        else:
+            self.v = None
+
+        if predictive:
+            self.second_dense = dense(64 * 7 * 7 * feature_mult, 512 * feature_mult)
+            self.action_embed = nn.Embedding(action_dim, 512 * feature_mult)
+
+            self.s_next_predictor = nn.Sequential(
+                dense(512 * feature_mult, 512 * feature_mult),
+                nn.ReLU(),
+                dense(512 * feature_mult, 512 * action_dim),
+            )
+
+            self.r_next_predictor = nn.Sequential(
+                dense(512 * feature_mult, 512 * feature_mult),
+                nn.ReLU(),
+                dense(512 * feature_mult, 1),
+            )
+
+            self.d_next_predictor = nn.Sequential(
+                dense(512 * feature_mult, 512 * feature_mult),
+                nn.ReLU(),
+                dense(512 * feature_mult, 1),
+            )
+
+    def forward_dynamics(self, states):
+        st_phi = self.convs(states)
+        st_feature = self.first_dense(st_phi)
+        adv = self.p(st_feature).view(-1, self.action_dim, self.num_atoms)
+        if self.v is not None:
+            v = self.v(st_feature).view(-1, 1, self.num_atoms)
+            q = v.expand_as(adv) + (adv - adv.mean(dim=1, keepdim=True).expand_as(adv))
+        else:
+            q = adv
+
+        if self.num_atoms == 1:
+            q = q.squeeze(-1)
+
+        batch_size = states.size(0)
+        st_feature_ = self.second_dense(st_phi)
+        st_feature_ = st_feature_.repeat(4, 1)
+        # noinspection PyArgumentList
+        actions = torch.arange(self.action_dim).repeat(batch_size).to(st_feature.device)
+        at_encoded = self.action_embed(actions)
+        phi_sa = st_feature_ * at_encoded
+
+        st_pred = self.s_next_predictor(phi_sa)
+        rt_pred = self.r_next_predictor(phi_sa)
+        dt_pred = self.d_next_predictor(phi_sa)
+
+        return q, st_pred, rt_pred, dt_pred
+
+    def forward(self, x):
+        features = self.first_dense(self.convs(x))
+        adv = self.p(features).view(-1, self.action_dim, self.num_atoms)
+        if self.v is not None:
+            v = self.v(features).view(-1, 1, self.num_atoms)
+            q = v.expand_as(adv) + (adv - adv.mean(dim=1, keepdim=True).expand_as(adv))
+        else:
+            q = adv
+
+        if self.num_atoms == 1:
+            q = q.squeeze(-1)
+        return q
+
+    def reset_noise(self):
+        for m in self.modules():
+            if isinstance(m, NoisyLinear):
+                m.reset_noise()
 
 
 class NatureCNN(nn.Module, ABC):
@@ -127,3 +209,7 @@ class NoisyLinear(nn.Module, ABC):
     @staticmethod
     def transform_noise(x):
         return x.sign().mul(x.abs().sqrt())
+
+
+if __name__ == '__main__':
+    model = ModelPredictive(4, 4)

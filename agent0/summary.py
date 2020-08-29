@@ -2,6 +2,7 @@ import glob
 import json
 import os
 import platform
+from collections import OrderedDict
 from pathlib import Path
 
 import numpy as np
@@ -47,13 +48,18 @@ if __name__ == '__main__':
         new_rows.append(new_row)
 
     df_rank = pd.DataFrame(new_rows)
-    mean_rank = {'game': 'Avg'}
+    mean_rank = OrderedDict()
     for col in df_rank.columns:
         if col != 'game':
             mean_rank[col] = df_rank[col].values.mean()
 
-    # for row in new_rows[1:]:
-    #     df_rank.append(row, ignore_index=True)
+    real_rank_ = sorted(mean_rank.keys(), key=lambda k: mean_rank[k])
+    real_rank = {'game': 'final'}
+    for i, key in enumerate(real_rank_):
+        real_rank[key] = i
+
+    mean_rank['game'] = 'avg'
     df_rank = df_rank.append(mean_rank, ignore_index=True)
+    df_rank = df_rank.append(real_rank, ignore_index=True)
     df_rank.to_csv('rank.csv')
     print(df_rank)

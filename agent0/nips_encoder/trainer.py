@@ -7,6 +7,7 @@ import numpy as np
 import ray
 import torch
 import torch.nn.functional as fx
+import torchvision as tv
 from lz4.block import compress, decompress
 from ray import tune
 from torch.utils.data import Dataset
@@ -49,7 +50,7 @@ class EncoderDataset(Dataset):
         else:
             st_next = self.data[idx + 1][0]
         st_next = np.frombuffer(decompress(st_next), dtype=np.uint8).reshape(*self.state_shape)
-        return st, at, rt, dt, st_next
+        return np.array(st), at, rt, dt, np.array(st_next)
 
 @ray.remote
 def sample(cfg):
@@ -153,7 +154,24 @@ class Trainer(tune.Trainable, ABC):
             }, './final.pth')
 
     def save_checkpoint(self, checkpoint_dir):
+
+        try:
+            data = self.data_fetcher.next()
+        except (StopIteration, AttributeError):
+            self.data_fetcher = self.get_data_fetcher()
+            data = self.data_fetcher.next()
+
+        states, actions, rewards, dones, next_states = data
+        states = states.float().div(255.0).permute(0, 3, 1, 2)
+        next_states = next_states.float().div(255.0).permute(0, 3, 1, 2)
+        actions = actions.long()
+
+        states_pred = self.model(states, actions)
+        obs = torch.cat((next_states, states_pred), dim=-1)
+        img = tv.utils.make_grid(obs).mul(255.0).permute(1, 2, 0).byte().numpy()
+
         return {
+            'img': img,
             'model': self.model.state_dict(),
             'optim': self.optimizer.state_dict()
         }
