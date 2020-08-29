@@ -2,17 +2,16 @@ import copy
 import time
 
 import numpy as np
-import ray
 import torch
 from lz4.block import compress
 
 from agent0.common.atari_wrappers import make_deepq_env
 from agent0.common.vec_env import ShmemVecEnv
-from agent0.deepq.config import Config, PARALLEL_TASKS
+from agent0.deepq.config import Config
 from agent0.deepq.model import NatureCNN
 
 
-@ray.remote(num_gpus=0.1 / PARALLEL_TASKS)
+# @ray.remote(num_gpus=0.1/PARALLEL_TASKS)
 class Actor:
     def __init__(self, rank, **kwargs):
 
@@ -23,7 +22,7 @@ class Actor:
         self.envs = ShmemVecEnv([lambda: make_deepq_env(game=self.cfg.game, episode_life=True, clip_rewards=True,
                                                         frame_stack=4, transpose_image=True, n_step=self.cfg.n_step,
                                                         discount=self.cfg.discount)
-                                 for _ in range(self.cfg.num_envs)], context='fork')
+                                 for _ in range(self.cfg.num_envs)], context='spawn')
         self.action_dim = self.envs.action_space.n
         self.device = torch.device('cuda:0')
 
