@@ -40,7 +40,7 @@ class Actor:
                                num_atoms=self.cfg.num_atoms, feature_mult=self.cfg.feature_mult).to(self.device)
         self.obs = self.envs.reset()
 
-    def sample(self, steps, epsilon, state_dict, testing=False, test_episodes=10, render=False):
+    def sample(self, steps, epsilon, state_dict, testing=False, test_episodes=20, render=False):
         self.model.load_state_dict(state_dict)
         rs, qs, data = [], [], []
         tic = time.time()
