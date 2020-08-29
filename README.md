@@ -12,20 +12,21 @@ cd AgentZero
 pip install -e .
 ```
 
-## Requirements
+Simple run
+```
+python -m agent0.deepq.run
+```
 
-#### Hardware Requirements:
+If you have library missing issues:
+```bash
+sudo apt install libsm6 libglib2.0-0
+```
+This is the required library for OpenCV
+
+## Hardware Requirements:
 - A GPU
 - RAM > 16G
 
-#### Package Requirements
- - gym[atari]
- - prefetch_generator
- - ray[tune]
- - torch
- - lz4
- - dataclasses
- - GitPython
 
 ## Speed Test
 Hardware Setting:
