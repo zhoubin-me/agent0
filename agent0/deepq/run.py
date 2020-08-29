@@ -13,9 +13,13 @@ def trial_str_creator(trial, sha):
 
 
 if __name__ == '__main__':
-    repo = git.Repo(search_parent_directories=True)
-    sha = repo.git.rev_parse(repo.head.object.hexsha, short=True)
-    sha_long = repo.head.object.hexsha
+    try:
+        repo = git.Repo(search_parent_directories=True)
+        sha = repo.git.rev_parse(repo.head.object.hexsha, short=True)
+        sha_long = repo.head.object.hexsha
+    except Exception as e:
+        sha = 'master'
+        sha_long = 'master'
 
     cfg = Config(sha=sha_long)
     args = parse_arguments(cfg)
