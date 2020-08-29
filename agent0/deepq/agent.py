@@ -41,6 +41,7 @@ class Agent:
 
         self.step = {
             'qr': self.train_step_qr,
+            'iqr': self.train_step_iqr,
             'c51': self.train_step_c51,
             'dqn': self.train_step_dqn,
             'mdqn': self.train_step_mdqn,
@@ -59,6 +60,13 @@ class Agent:
         data_fetcher = DataPrefetcher(data_loader, self.device)
         return data_fetcher
 
+    def train_step_iqr(self, states, next_states, actions, terminals, rewards):
+        pass
+
+    @staticmethod
+    def huber(x, k=1.0):
+        return torch.where(x.abs() < k, 0.5 * x.pow(2), k * (x.abs() - 0.5 * k))
+
     def train_step_qr(self, states, next_states, actions, terminals, rewards):
         with torch.no_grad():
             q_next = self.model_target(next_states)
@@ -72,10 +80,11 @@ class Agent:
                        self.cfg.discount ** self.cfg.n_step * (1 - terminals.unsqueeze(-1)) * q_next
 
         q = self.model(states)[self.batch_indices, actions, :]
-        q_target = q_target.t().unsqeeze(-1)
-        loss = fx.smooth_l1_loss(q, q_target, reduction='none')
+        q_target = q_target.t().unsqueeze(-1)
 
-        weights = torch.abs(self.cumulative_density.view(1, -1) - (q - q_target).detach().sign().float())
+        diff = q_target - q
+        loss = self.huber(diff)
+        weights = torch.abs(self.cumulative_density.view(1, -1) + diff.detach().sign().float())
         loss = loss * weights
         loss = loss.sum(-1).mean(0)
         return loss.view(-1)
