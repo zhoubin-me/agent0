@@ -39,10 +39,12 @@ class NatureCNN(nn.Module, ABC):
         self.convs = nn.Sequential(
             nn.Conv2d(in_channels, 32 * feature_mult, 8, stride=4), nn.ReLU(),
             nn.Conv2d(32 * feature_mult, 64 * feature_mult, 4, stride=2), nn.ReLU(),
-            nn.Conv2d(64 * feature_mult, 64 * feature_mult, 3, stride=1), nn.ReLU(), nn.Flatten(),
-            dense(64 * 7 * 7 * feature_mult, 512 * feature_mult), nn.ReLU())
+            nn.Conv2d(64 * feature_mult, 64 * feature_mult, 3, stride=1), nn.ReLU(), nn.Flatten())
+        self.first_dense = nn.Sequential(dense(64 * 7 * 7 * feature_mult, 512 * feature_mult), nn.ReLU())
 
         self.convs.apply(lambda m: init(m, nn.init.calculate_gain('relu')))
+        self.first_dense.apply(lambda m: init(m, nn.init.calculate_gain('relu')))
+
         self.p = dense(512 * feature_mult, action_dim * num_atoms)
         self.p.apply(lambda m: init(m, 0.01))
 
@@ -53,7 +55,7 @@ class NatureCNN(nn.Module, ABC):
             self.v = None
 
     def forward(self, x):
-        features = self.convs(x)
+        features = self.first_dense(self.convs(x))
         adv = self.p(features).view(-1, self.action_dim, self.num_atoms)
         if self.v is not None:
             v = self.v(features).view(-1, 1, self.num_atoms)

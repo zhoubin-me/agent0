@@ -16,7 +16,7 @@ class Agent:
         self.cfg = Config(**kwargs)
         self.cfg.update_atoms()
 
-        env = make_deepq_env(self.cfg.game)
+        env = make_deepq_env(self.cfg.game, frame_stack=self.cfg.frame_stack, transpose_image=True)
         self.obs_shape = env.observation_space.shape
         self.action_dim = env.action_space.n
         self.device = torch.device('cuda:0')
@@ -169,9 +169,9 @@ class Agent:
             self.data_fetcher = self.get_data_fetcher()
             data = self.data_fetcher.next()
 
-        states, actions, rewards, terminals, next_states, weights, indices = data
-        states = states.float().div(255.0)
-        next_states = next_states.float().div(255.0)
+        frames, actions, rewards, terminals, weights, indices = data
+        states = frames[:, :self.cfg.frame_stack, :, :].float().div(255.0)
+        next_states = frames[:, -self.cfg.frame_stack:, :, :].float().div(255.0)
         actions = actions.long()
         terminals = terminals.float()
         rewards = rewards.float()

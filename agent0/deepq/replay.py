@@ -13,7 +13,7 @@ class ReplayDataset(Dataset, Sampler):
     def __init__(self, obs_shape, **kwargs):
         self.cfg = Config(**kwargs)
 
-        self.obs_shape = obs_shape
+        self.frames_shape = (obs_shape[0] * 2, obs_shape[1], obs_shape[2])
         self.data = deque(maxlen=self.cfg.replay_size)
         self.top = 0
 
@@ -30,16 +30,15 @@ class ReplayDataset(Dataset, Sampler):
     def __getitem__(self, idx):
         idx = idx % self.top
 
-        st, at, rt, dt, st_next = self.data[idx]
-        st = np.frombuffer(decompress(st), dtype=np.uint8).reshape(self.obs_shape)
-        st_next = np.frombuffer(decompress(st_next), dtype=np.uint8).reshape(self.obs_shape)
+        frames, at, rt, dt = self.data[idx]
+        frames = np.frombuffer(decompress(frames), dtype=np.uint8).reshape(self.frames_shape)
 
         if self.cfg.prioritize:
             weight = self.prob[idx]
         else:
             weight = 1.0
 
-        return np.array(st), at, rt, dt, np.array(st_next), weight, idx
+        return frames, at, rt, dt, weight, idx
 
     def __iter__(self):
         for _ in range(self.top // self.cfg.batch_size):

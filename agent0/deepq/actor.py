@@ -77,10 +77,10 @@ class Actor:
                         at = inf['prev_action']
                         rt = inf['prev_reward']
                         dt = inf['prev_done']
-                        data.append((compress(st), at, rt, dt, compress(st_next)))
+                        data.append((compress(np.concatenate((st, st_next), axis=1)), at, rt, dt))
                 else:
                     for st, at, rt, dt, st_next in zip(self.obs, action, reward, done, obs_next):
-                        data.append((compress(st), at, rt, dt, compress(st_next)))
+                        data.append((compress(np.concatenate((st, st_next), axis=1)), at, rt, dt))
 
             self.obs = obs_next
 
