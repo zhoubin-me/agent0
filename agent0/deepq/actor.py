@@ -11,7 +11,6 @@ from agent0.deepq.config import Config
 from agent0.deepq.model import NatureCNN
 
 
-# @ray.remote(num_gpus=0.1/PARALLEL_TASKS)
 class Actor:
     def __init__(self, rank, **kwargs):
 

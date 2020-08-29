@@ -38,7 +38,7 @@ class Trainer(tune.Trainable, ABC):
 
         self.agent = Agent(**config)
         self.epsilon_schedule = LinearSchedule(1.0, self.cfg.min_eps, self.cfg.exploration_steps)
-        self.actors = [ray.remote(Actor, num_gpus=0.1 * self.cfg.gpu_mult).remote(rank=rank, **config)
+        self.actors = [ray.remote(Actor).options(num_gpus=0.1 * self.cfg.gpu_mult).remote(rank=rank, **config)
                        for rank in range(self.cfg.num_actors)]
 
         self.frame_count = 0
