@@ -1,7 +1,0 @@
-gym[atari]
-prefetch_generator
-ray[tune]
-lz4
-dataclasses
-GitPython
-pytorch
