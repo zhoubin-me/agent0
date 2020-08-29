@@ -15,8 +15,8 @@ setup(name='agent0',
           "prefetch_generator==1.0.1",
           "dataclasses==0.7",
           "GitPython==3.1.7",
-          "lz4==3.1.0"
-          "ray[tune]==0.8.7"
+          "lz4==3.1.0",
+          "ray[tune]==0.8.7",
       ],
       author="Zhou Bin",
       url='https://github.com/zmonoid/AgentZero',
