@@ -81,7 +81,7 @@ class Agent:
         loss = fx.smooth_l1_loss(q, q_target, reduction='none')
         weights = torch.abs(self.cumulative_density.view(1, -1) + (q_target - q).detach().sign().float())
         loss = loss * weights
-        loss = loss.sum(-1).mean(1)
+        loss = loss.sum(-1).mean(-1)
         return loss.view(-1)
 
     def train_step_c51(self, states, next_states, actions, terminals, rewards):
