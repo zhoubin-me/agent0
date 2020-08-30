@@ -1,12 +1,13 @@
 from abc import ABC
 
 import torch.nn as nn
-from torch.utils.data import Dataset
 
 
 class ModelEncoder(nn.Module, ABC):
-    def __init__(self, action_dim):
+    def __init__(self, action_dim, batch_size, recurrent=False):
         super(ModelEncoder, self).__init__()
+        self.recurrent = recurrent
+        self.batch_size = batch_size
         self.encoder = nn.Sequential(
             nn.Conv2d(3, 128, 8, 2),
             nn.ReLU(),
@@ -25,7 +26,7 @@ class ModelEncoder(nn.Module, ABC):
         self.action_embed = nn.Embedding(action_dim, 2048)
 
         self.linear_decoder = nn.Sequential(
-            nn.Linear(2048, 2048),
+            nn.Linear(2048, 2048), nn.ReLU(),
             nn.Linear(2048, 128 * 10 * 7),
             nn.ReLU()
         )
@@ -56,14 +57,3 @@ class ModelEncoder(nn.Module, ABC):
         h = self.decode(h)
         return h
 
-
-class ImageDataset(Dataset):
-    def __init__(self, data):
-        self.data = data
-
-    def __len__(self):
-        return len(self.data)
-
-    def __getitem__(self, idx):
-        st, at, stp1 = self.data[idx]
-        return st, at, stp1

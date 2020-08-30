@@ -132,7 +132,7 @@ class Agent:
             add_on = add_on[self.batch_indices, actions].clamp(self.cfg.mdqn_lo, 0)
 
             q_target = rewards + self.cfg.mdqn_alpha * add_on + \
-                       self.cfg.discount ** self.cfg.discount * (1 - terminals) * q_next
+                       self.cfg.discount ** self.cfg.n_step * (1 - terminals) * q_next
 
         q = self.model(states)[self.batch_indices, actions]
         loss = fx.smooth_l1_loss(q, q_target, reduction='none')
@@ -161,7 +161,7 @@ class Agent:
             else:
                 a_next = q_next.argmax(dim=-1)
             q_next = q_next[self.batch_indices, a_next]
-            q_target = rewards + self.cfg.discount ** self.cfg.discount * (1 - terminals) * q_next
+            q_target = rewards + self.cfg.discount ** self.cfg.n_step * (1 - terminals) * q_next
 
         q = self.model(states)[self.batch_indices, actions]
         loss = fx.smooth_l1_loss(q, q_target, reduction='none')
