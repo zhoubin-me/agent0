@@ -46,6 +46,7 @@ class Config:
     reset_noise_freq: int = 4
 
     max_record_ep_len = 100000
+    test_episode_per_actor = 20
     pin_memory = True
     fast_replay = True
     restore_checkpoint: str = ""

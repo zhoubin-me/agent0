@@ -94,7 +94,7 @@ class Trainer(tune.Trainable, ABC):
                                           self.cfg.test_eps,
                                           self.agent.model.state_dict(),
                                           testing=True,
-                                          test_episodes=10) for a in self.actors])
+                                          test_episodes=self.cfg.test_episode_per_actor) for a in self.actors])
 
         ckpt_rs = []
         for _, rs, qs, rank, fps in output:
