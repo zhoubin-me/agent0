@@ -78,9 +78,8 @@ class Agent:
         q = self.model(states)[self.batch_indices, actions, :]
         q_target = q_target.t().unsqueeze(-1)
 
-        loss = fx.smooth_l1_loss(q, q_target, reduction='none')
-        weights = torch.abs(self.cumulative_density.view(1, -1) + (q_target - q).detach().sign().float())
-        loss = loss * weights
+        huber_loss = fx.smooth_l1_loss(q, q_target, reduction='none')
+        loss = huber_loss * (self.cumulative_density.view(1, -1) - ((q_target - q).detach() < 0).float()).abs()
         loss = loss.sum(-1).mean(0)
         return loss.view(-1)
 
