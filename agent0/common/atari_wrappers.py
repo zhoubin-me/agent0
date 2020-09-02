@@ -361,10 +361,11 @@ def make_atari(env_id):
     return env
 
 
-def wrap_deepmind(env, episode_life=False, clip_rewards=False, frame_stack=4, scale=False, transpose_image=True,
-                  n_step=1, discount=0.99):
-    """Configure environment for DeepMind-style Atari.
-    """
+def make_deepq_env(game, episode_life=True, clip_rewards=True, frame_stack=4, transpose_image=True,
+                   n_step=1, discount=0.99, scale=False):
+    env = gym.make(f'{game}NoFrameskip-v4')
+    env = NoopResetEnv(env, noop_max=30)
+    env = MaxAndSkipEnv(env, skip=4)
     if episode_life:
         env = EpisodicLifeEnv(env)
     if 'FIRE' in env.unwrapped.get_action_meanings():
@@ -380,15 +381,6 @@ def wrap_deepmind(env, episode_life=False, clip_rewards=False, frame_stack=4, sc
         env = FrameStack(env, frame_stack)
     if n_step > 1:
         env = NStepEnv(env, n_step, discount)
-    return env
-
-
-def make_deepq_env(game, episode_life=True, clip_rewards=True, frame_stack=4, transpose_image=True,
-                   n_step=1, discount=0.99):
-    env = make_atari(f'{game}NoFrameskip-v4')
-    env = wrap_deepmind(env, episode_life=episode_life, clip_rewards=clip_rewards, scale=False,
-                        frame_stack=frame_stack, transpose_image=transpose_image, n_step=n_step, discount=discount)
-
     return env
 
 
