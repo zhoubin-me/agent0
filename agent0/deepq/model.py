@@ -65,14 +65,14 @@ class DeepQNet(nn.Module, ABC):
         params = (x.parameters() for x in layers if x is not None)
         return chain(*params)
 
-    def forward(self, x, iqr=False, n=32):
+    def forward(self, x, iqr=False, taus=None, n=32):
         if iqr:
             # Frames input
             if x.ndim == 4:
-                features, taus = self.feature_embed(self.convs(x), n)
+                features, taus, n = self.feature_embed(self.convs(x), taus=taus, n=n)
             # Feature input
             elif x.ndim == 2:
-                features, taus = self.feature_embed(x, n)
+                features, taus, n = self.feature_embed(x, taus=taus, n=n)
             else:
                 raise ValueError("No such input dim")
             features = self.first_dense(features)
@@ -107,20 +107,23 @@ class DeepQNet(nn.Module, ABC):
         taus = torch.cat((tau0, tau_1n), dim=-1)
         taus_hat = (taus[:, :-1] + taus[:, 1:]).detach() / 2.0
         entropies = probs.mul(log_probs).neg().sum(dim=-1, keepdim=True)
-        return taus, taus_hat, entropies
+        return taus.unsqueeze(-1), taus_hat.unsqueeze(-1), entropies
 
     # noinspection PyArgumentList
-    def feature_embed(self, x, n, taus=None):
+    def feature_embed(self, x, taus, n):
         batch_size = x.size(0)
         if taus is None:
-            taus = torch.rand(batch_size, n, 1).to(x)
+            taus = torch.rand(batch_size, n, 1)
+        else:
+            n = taus.size(1)
+
         ipi = np.pi * torch.arange(1, self.cfg.num_cosines + 1).to(x).view(1, 1, self.cfg.num_cosines)
         cosine = ipi.mul(taus).cos().view(batch_size * n, self.cfg.num_cosines)
 
         tau_embed = self.cosine_emb(cosine).view(batch_size, n, -1)
         state_embed = x.view(batch_size, 1, -1)
         features = (tau_embed * state_embed).view(batch_size * n, -1)
-        return features, taus
+        return features, taus, n
 
     def reset_noise(self):
         for m in self.modules():

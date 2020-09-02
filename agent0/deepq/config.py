@@ -14,6 +14,7 @@ class Config:
     algo: str = 'dqn'
 
     adam_lr: float = 5e-4
+    fraction_lr: float = 2.5e-8
     v_max: float = 10
     v_min: float = -10
     num_atoms: int = -1
