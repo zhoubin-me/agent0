@@ -6,7 +6,7 @@ import torch.nn.functional as fx
 from agent0.common.atari_wrappers import make_deepq_env
 from agent0.common.utils import DataLoaderX, DataPrefetcher
 from agent0.deepq.config import Config
-from agent0.deepq.model import NatureCNN
+from agent0.deepq.model import DeepQNet
 from agent0.deepq.replay import ReplayDataset
 
 
@@ -30,9 +30,15 @@ class Agent:
             self.cumulative_density = ((2 * torch.arange(self.cfg.num_atoms) + 1) /
                                        (2.0 * self.cfg.num_atoms)).to(self.device)
 
-        self.model = NatureCNN(self.action_dim, **kwargs).to(self.device)
+        self.model = DeepQNet(self.action_dim, **kwargs).to(self.device)
         self.model_target = copy.deepcopy(self.model)
-        self.optimizer = torch.optim.Adam(self.model.parameters(), self.cfg.adam_lr)
+        self.optimizer = torch.optim.Adam(self.model.params(), self.cfg.adam_lr, eps=1e-2 / self.cfg.batch_size)
+
+        if self.cfg.algo == 'fqf':
+            self.fraction_optim = torch.optim.RMSprop(
+                self.model.fraction_net.parameters(),
+                lr=self.cfg.adam_lr / 2e4,
+                alpha=0.95, eps=0.00001)
 
         self.update_steps = 0
         self.replay = ReplayDataset(self.obs_shape, **kwargs)
@@ -44,6 +50,7 @@ class Agent:
             'c51': self.train_step_c51,
             'dqn': self.train_step_dqn,
             'mdqn': self.train_step_mdqn,
+            'fqf': self.train_step_fqf,
         }
 
         assert self.cfg.algo in self.step
@@ -64,22 +71,25 @@ class Agent:
         loss = huber_loss * (taus.view(1, 1, -1) - ((q_target - q).detach() < 0).float()).abs()
         return loss.sum(-1).mean(-1)
 
+    def train_step_fqf(self, states, next_states, actions, terminals, rewards):
+        pass
+
     def train_step_iqr(self, states, next_states, actions, terminals, rewards):
         with torch.no_grad():
             q_next_convs = self.model_target.convs(next_states)
             if self.cfg.double_q:
-                q_next_online, _ = self.model(next_states, iqr=True, n=self.cfg.K)
+                q_next_online, _ = self.model(next_states, iqr=True, n=self.cfg.K_iqr)
                 a_next = q_next_online.mean(dim=1).argmax(dim=-1)
             else:
-                q_next_, _ = self.model_target(q_next_convs, iqr=True, n=self.cfg.K)
+                q_next_, _ = self.model_target(q_next_convs, iqr=True, n=self.cfg.K_iqr)
                 a_next = q_next_.mean(dim=1).argmax(dim=-1)
 
-            q_next, taus_dash = self.model_target(q_next_convs, iqr=True, n=self.cfg.N_dash)
+            q_next, taus_dash = self.model_target(q_next_convs, iqr=True, n=self.cfg.N_iqr_dash)
             q_next = q_next[self.batch_indices, :, a_next]
             q_target = rewards.unsqueeze(-1) + \
                        self.cfg.discount ** self.cfg.n_step * (1 - terminals.unsqueeze(-1)) * q_next
 
-        q, taus = self.model(states, iqr=True, n=self.cfg.N)[self.batch_indices, :, actions]
+        q, taus = self.model(states, iqr=True, n=self.cfg.N_iqr)[self.batch_indices, :, actions]
         q = q.unsqueeze(1)
         q_target = q_target.unsqueeze(-1)
 

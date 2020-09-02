@@ -1,4 +1,5 @@
 from abc import ABC
+from itertools import chain
 
 import numpy as np
 import torch
@@ -13,9 +14,16 @@ def init(m, gain=1.0):
         nn.init.zeros_(m.bias.data)
 
 
-class NatureCNN(nn.Module, ABC):
+def init_xavier(m, gain=1.0):
+    if isinstance(m, nn.Linear) or isinstance(m, nn.Conv2d):
+        torch.nn.init.xavier_uniform_(m.weight, gain=gain)
+        if m.bias is not None:
+            torch.nn.init.constant_(m.bias, 0)
+
+
+class DeepQNet(nn.Module, ABC):
     def __init__(self, action_dim, **kwargs):
-        super(NatureCNN, self).__init__()
+        super(DeepQNet, self).__init__()
         self.cfg = Config(**kwargs)
         self.cfg.update_atoms()
 
@@ -28,12 +36,20 @@ class NatureCNN(nn.Module, ABC):
             nn.Conv2d(64, 64, 3, stride=1), nn.ReLU(), nn.Flatten())
         self.convs.apply(lambda m: init(m, nn.init.calculate_gain('relu')))
 
-        if self.cfg.algo == 'iqn':
+        if self.cfg.algo in ['iqr', 'fqf']:
             self.cosine_emb = nn.Sequential(dense(self.cfg.num_cosines, 64 * 7 * 7), nn.ReLU())
             self.cosine_emb.apply(lambda m: init(m, nn.init.calculate_gain('relu')))
         else:
-            self.first_dense = nn.Sequential(dense(64 * 7 * 7, 512), nn.ReLU())
-            self.first_dense.apply(lambda m: init(m, nn.init.calculate_gain('relu')))
+            self.cosine_emb = None
+
+        if self.cfg.algo == 'fqf':
+            self.fraction_net = dense(64 * 7 * 7, self.cfg.N_fqf)
+            self.fraction_net.apply(lambda m: init_xavier(m, 0.01))
+        else:
+            self.fraction_net = None
+
+        self.first_dense = nn.Sequential(dense(64 * 7 * 7, 512), nn.ReLU())
+        self.first_dense.apply(lambda m: init(m, nn.init.calculate_gain('relu')))
 
         self.p = dense(512, action_dim * self.cfg.num_atoms)
         self.p.apply(lambda m: init(m, 0.01))
@@ -44,6 +60,11 @@ class NatureCNN(nn.Module, ABC):
         else:
             self.v = None
 
+    def params(self):
+        layers = (self.convs, self.cosine_emb, self.first_dense, self.p, self.v)
+        params = (x.parameters() for x in layers if x is not None)
+        return chain(*params)
+
     def forward(self, x, iqr=False, n=32):
         if iqr:
             # Frames input
@@ -53,7 +74,8 @@ class NatureCNN(nn.Module, ABC):
             elif x.ndim == 2:
                 features, taus = self.feature_embed(x, n)
             else:
-                raise ValueError("No such Input")
+                raise ValueError("No such input dim")
+            features = self.first_dense(features)
         else:
             features = self.first_dense(self.convs(x))
             taus = None
@@ -73,6 +95,19 @@ class NatureCNN(nn.Module, ABC):
             return q, taus
         else:
             return q
+
+    # noinspection PyArgumentList
+    def taus_prop(self, x):
+        batch_size = x.size(0)
+        log_probs = self.fraction_net(x).log_softmax(dim=-1)
+        probs = log_probs.exp()
+        tau0 = torch.zeros(batch_size, 1).to(x)
+        tau_1n = torch.cumsum(probs, dim=-1)
+
+        taus = torch.cat((tau0, tau_1n), dim=-1)
+        taus_hat = (taus[:, :-1] + taus[:, 1:]).detach() / 2.0
+        entropies = probs.mul(log_probs).neg().sum(dim=-1, keepdim=True)
+        return taus, taus_hat, entropies
 
     # noinspection PyArgumentList
     def feature_embed(self, x, n):
@@ -150,4 +185,4 @@ class NoisyLinear(nn.Module, ABC):
 
 
 if __name__ == '__main__':
-    model = ModelPredictive(4, 4)
+    pass

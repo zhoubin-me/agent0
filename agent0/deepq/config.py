@@ -22,9 +22,10 @@ class Config:
     mdqn_tau: float = 0.03
     mdqn_alpha: float = 0.9
     mdqn_lo: float = -1
-    K: int = 32
-    N: int = 64
-    N_dash: int = 64
+    K_iqr: int = 32
+    N_iqr: int = 64
+    N_iqr_dash: int = 64
+    N_fqf: int = 32
     num_cosines: int = 64
     clip_grad_norm: float = 5.0
 

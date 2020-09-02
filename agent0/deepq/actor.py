@@ -8,7 +8,7 @@ from lz4.block import compress
 from agent0.common.atari_wrappers import make_deepq_env
 from agent0.common.vec_env import ShmemVecEnv
 from agent0.deepq.config import Config
-from agent0.deepq.model import NatureCNN
+from agent0.deepq.model import DeepQNet
 
 
 class Actor:
@@ -31,12 +31,13 @@ class Actor:
             'iqr': lambda logits, _: logits.mean(1),
             'dqn': lambda logits: logits,
             'mdqn': lambda logits: logits,
+            'fqf': lambda logits, _: logits.mean(1),
         }
         assert self.cfg.algo in self.step
 
         if self.cfg.algo == 'c51':
             self.atoms = torch.linspace(self.cfg.v_min, self.cfg.v_max, self.cfg.num_atoms).to(self.device)
-        self.model = NatureCNN(self.action_dim, **kwargs).to(self.device)
+        self.model = DeepQNet(self.action_dim, **kwargs).to(self.device)
         self.obs = self.envs.reset()
 
     def sample(self, steps, epsilon, state_dict, testing=False, test_episodes=20, render=False):
