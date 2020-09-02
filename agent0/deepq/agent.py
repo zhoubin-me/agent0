@@ -68,7 +68,7 @@ class Agent:
     @staticmethod
     def calc_huber_qr_loss(q, q_target, taus):
         huber_loss = fx.smooth_l1_loss(q, q_target, reduction='none')
-        loss = huber_loss * (taus - ((q_target - q).detach() < 0).float()).abs()
+        loss = huber_loss * (taus - q_target.lt(q).detach().float()).abs()
         return loss.sum(-1).mean(-1).view(-1)
 
     @staticmethod
@@ -79,7 +79,7 @@ class Agent:
             convs = st
 
         # taus: B X (N+1) X 1, taus_hats: B X N X 1
-        taus, tau_hats, entropies = model.taus_prop(convs.detach())
+        taus, tau_hats, _ = model.taus_prop(convs.detach())
         q_hats, _ = model(convs, iqr=True, taus=tau_hats)
         q = ((taus[:, 1:, :] - taus[:, :-1, :]) * q_hats).sum(dim=1)
         return q
@@ -120,10 +120,10 @@ class Agent:
             q, _ = self.model(q_convs, iqr=True, taus=taus[1:-1])
             q = q[self.batch_indices, :, actions]
             values_1 = q - q_hat[:, :-1]
-            signs_1 = q > torch.cat((q_hat[:, :1], q[:, :-1]), dim=1)
+            signs_1 = q.gt(torch.cat((q_hat[:, :1], q[:, :-1]), dim=1))
 
             values_2 = q - q_hat[:, 1:]
-            signs_2 = q < torch.cat((q[:, 1:], q_hat[:, -1:]), dim=1)
+            signs_2 = q.lt(torch.cat((q[:, 1:], q_hat[:, -1:]), dim=1))
 
         # gradients: B X (N-1)
         gradients_of_taus = (torch.where(signs_1, values_1, -values_1)
