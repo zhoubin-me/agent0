@@ -150,7 +150,7 @@ class Agent:
         q, taus = self.model(states, iqr=True, n=self.cfg.N_iqr)
         q = q[self.batch_indices, :, actions]
         q = q.unsqueeze(1)
-        taus = taus.squeeze(-1).unsqeeze(1)
+        taus = taus.squeeze(-1).unsqueeze(1)
         q_target = q_target.unsqueeze(-1)
         loss = self.calc_huber_qr_loss(q, q_target, taus)
         return loss.view(-1)
