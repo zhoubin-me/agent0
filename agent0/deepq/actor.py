@@ -26,12 +26,12 @@ class Actor:
         self.device = torch.device('cuda:0')
 
         self.step = {
-            'c51': lambda logits: logits.softmax(dim=-1).mul(self.atoms).sum(-1),
-            'qr': lambda logits: logits.mean(-1),
-            'iqr': lambda logits: logits[0].mean(1),
-            'dqn': lambda logits: logits,
-            'mdqn': lambda logits: logits,
-            'fqf': lambda logits: logits.mean(1),
+            'c51': lambda st: self.model(st).softmax(dim=-1).mul(self.atoms).sum(-1),
+            'qr': lambda st: self.model(st).mean(-1),
+            'iqr': lambda st: self.model(st, iqr=True, n=self.cfg.K_iqr)[0].mean(1),
+            'dqn': lambda st: self.model(st),
+            'mdqn': lambda st: self.model(st),
+            'fqf': lambda st: self.model.calc_fqf_q(st),
         }
         assert self.cfg.algo in self.step
 
@@ -52,11 +52,8 @@ class Actor:
                 self.model.reset_noise()
 
             with torch.no_grad():
-                logits = self.model(
-                    torch.from_numpy(self.obs).to(self.device).float().div(255.0),
-                    iqr=self.cfg.algo == 'iqr',
-                    n=self.cfg.K_iqr)
-                qt = self.step[self.cfg.algo](logits)
+                st = torch.from_numpy(self.obs).to(self.device).float().div(255.0)
+                qt = self.step[self.cfg.algo](st)
 
             qt_max, qt_arg_max = qt.max(dim=-1)
             action_greedy = qt_arg_max.tolist()

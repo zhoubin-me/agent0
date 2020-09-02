@@ -71,19 +71,6 @@ class Agent:
         loss = huber_loss * (taus - q_target.lt(q).detach().float()).abs()
         return loss.sum(-1).mean(-1).view(-1)
 
-    @staticmethod
-    def calc_fqf_q(st, model):
-        if st.ndim == 4:
-            convs = model.convs(st)
-        else:
-            convs = st
-
-        # taus: B X (N+1) X 1, taus_hats: B X N X 1
-        taus, tau_hats, _ = model.taus_prop(convs.detach())
-        q_hats, _ = model(convs, iqr=True, taus=tau_hats)
-        q = ((taus[:, 1:, :] - taus[:, :-1, :]) * q_hats).sum(dim=1)
-        return q
-
     def train_step_fqf(self, states, next_states, actions, terminals, rewards):
         q_convs = self.model.convs(states)
         # taus: B X (N+1) X 1, taus_hats: B X N X 1
@@ -100,10 +87,10 @@ class Agent:
         with torch.no_grad():
             q_next_convs = self.model_target.convs(next_states)
             if self.cfg.double_q:
-                q_next_online = self.calc_fqf_q(next_states, self.model)
+                q_next_online = self.model.calc_fqf_q(next_states)
                 a_next = q_next_online.argmax(dim=-1)
             else:
-                q_next_ = self.calc_fqf_q(q_next_convs, self.model_target)
+                q_next_ = self.model_target.calc_fqf_q(q_next_convs)
                 a_next = q_next_.argmax(dim=-1)
 
             q_next, _ = self.model_target(q_next_convs, taus=tau_hats, iqr=True)

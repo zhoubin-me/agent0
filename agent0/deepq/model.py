@@ -96,6 +96,17 @@ class DeepQNet(nn.Module, ABC):
         else:
             return q
 
+    def calc_fqf_q(self, st):
+        if st.ndim == 4:
+            convs = self.convs(st)
+        else:
+            convs = st
+        # taus: B X (N+1) X 1, taus_hats: B X N X 1
+        taus, tau_hats, _ = self.model.taus_prop(convs.detach())
+        q_hats, _ = self.model(convs, iqr=True, taus=tau_hats)
+        q = ((taus[:, 1:, :] - taus[:, :-1, :]) * q_hats).sum(dim=1)
+        return q
+
     # noinspection PyArgumentList
     def taus_prop(self, x):
         batch_size = x.size(0)
