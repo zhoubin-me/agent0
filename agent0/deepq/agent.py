@@ -30,8 +30,7 @@ class Agent:
             self.cumulative_density = ((2 * torch.arange(self.cfg.num_atoms) + 1) /
                                        (2.0 * self.cfg.num_atoms)).to(self.device)
 
-        self.model = NatureCNN(self.cfg.frame_stack, self.action_dim, dueling=self.cfg.dueling, noisy=self.cfg.noisy,
-                               num_atoms=self.cfg.num_atoms, feature_mult=self.cfg.feature_mult).to(self.device)
+        self.model = NatureCNN(self.action_dim, **kwargs).to(self.device)
         self.model_target = copy.deepcopy(self.model)
         self.optimizer = torch.optim.Adam(self.model.parameters(), self.cfg.adam_lr)
 
@@ -45,7 +44,6 @@ class Agent:
             'c51': self.train_step_c51,
             'dqn': self.train_step_dqn,
             'mdqn': self.train_step_mdqn,
-            'kl': self.train_step_kl_dqn,
         }
 
         assert self.cfg.algo in self.step
@@ -60,8 +58,33 @@ class Agent:
         data_fetcher = DataPrefetcher(data_loader, self.device)
         return data_fetcher
 
+    @staticmethod
+    def calc_huber_qr_loss(q, q_target, taus):
+        huber_loss = fx.smooth_l1_loss(q, q_target, reduction='none')
+        loss = huber_loss * (taus.view(1, 1, -1) - ((q_target - q).detach() < 0).float()).abs()
+        return loss.sum(-1).mean(-1)
+
     def train_step_iqr(self, states, next_states, actions, terminals, rewards):
-        pass
+        with torch.no_grad():
+            q_next_convs = self.model_target.convs(next_states)
+            if self.cfg.double_q:
+                q_next_online, _ = self.model(next_states, iqr=True, n=self.cfg.K)
+                a_next = q_next_online.mean(dim=1).argmax(dim=-1)
+            else:
+                q_next_, _ = self.model_target(q_next_convs, iqr=True, n=self.cfg.K)
+                a_next = q_next_.mean(dim=1).argmax(dim=-1)
+
+            q_next, taus_dash = self.model_target(q_next_convs, iqr=True, n=self.cfg.N_dash)
+            q_next = q_next[self.batch_indices, :, a_next]
+            q_target = rewards.unsqueeze(-1) + \
+                       self.cfg.discount ** self.cfg.n_step * (1 - terminals.unsqueeze(-1)) * q_next
+
+        q, taus = self.model(states, iqr=True, n=self.cfg.N)[self.batch_indices, :, actions]
+        q = q.unsqueeze(1)
+        q_target = q_target.unsqueeze(-1)
+
+        loss = self.calc_huber_qr_loss(q, q_target, taus)
+        return loss.view(-1)
 
     def train_step_qr(self, states, next_states, actions, terminals, rewards):
         with torch.no_grad():
@@ -76,11 +99,10 @@ class Agent:
                        self.cfg.discount ** self.cfg.n_step * (1 - terminals.unsqueeze(-1)) * q_next
 
         q = self.model(states)[self.batch_indices, actions, :]
-        q_target = q_target.t().unsqueeze(-1)
+        q = q.unsqueeze(1)
+        q_target = q_target.unsqueeze(-1)
 
-        huber_loss = fx.smooth_l1_loss(q, q_target, reduction='none')
-        loss = huber_loss * (self.cumulative_density.view(1, -1) - ((q_target - q).detach() < 0).float()).abs()
-        loss = loss.sum(-1).mean(0)
+        loss = self.calc_huber_qr_loss(q, q_target, self.cumulative_density)
         return loss.view(-1)
 
     def train_step_c51(self, states, next_states, actions, terminals, rewards):
@@ -135,21 +157,6 @@ class Agent:
 
         q = self.model(states)[self.batch_indices, actions]
         loss = fx.smooth_l1_loss(q, q_target, reduction='none')
-        return loss.view(-1)
-
-    def train_step_kl_dqn(self, states, next_states, actions, terminals, rewards):
-        with torch.no_grad():
-            q_next_logits = self.model_target(next_states)
-            q_next = q_next_logits - self.log_softmax_stable(q_next_logits, self.cfg.mdqn_tau)
-            q_next = q_next_logits.softmax(dim=-1).mul(q_next).sum(dim=-1)
-
-            add_on = rewards + self.cfg.discount * (1 - terminals) * q_next
-            q_target = self.model_target(states)
-            q_target[self.batch_indices, actions] += add_on
-            q_target = q_target.softmax(dim=-1)
-
-        q = self.model(states).softmax(dim=-1)
-        loss = fx.kl_div(q_target.log(), q, reduction='none').sum(dim=-1)
         return loss.view(-1)
 
     def train_step_dqn(self, states, next_states, actions, terminals, rewards):

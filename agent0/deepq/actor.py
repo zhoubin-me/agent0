@@ -28,16 +28,15 @@ class Actor:
         self.step = {
             'c51': lambda logits: logits.softmax(dim=-1).mul(self.atoms).sum(-1),
             'qr': lambda logits: logits.mean(-1),
-            'dqn': lambda logits: logits.squeeze(-1),
-            'mdqn': lambda logits: logits.squeeze(-1),
-            'kl': lambda logits: logits.squeeze(-1),
+            'iqr': lambda logits, _: logits.mean(1),
+            'dqn': lambda logits: logits,
+            'mdqn': lambda logits: logits,
         }
         assert self.cfg.algo in self.step
 
         if self.cfg.algo == 'c51':
             self.atoms = torch.linspace(self.cfg.v_min, self.cfg.v_max, self.cfg.num_atoms).to(self.device)
-        self.model = NatureCNN(self.cfg.frame_stack, self.action_dim, dueling=self.cfg.dueling, noisy=self.cfg.noisy,
-                               num_atoms=self.cfg.num_atoms, feature_mult=self.cfg.feature_mult).to(self.device)
+        self.model = NatureCNN(self.action_dim, **kwargs).to(self.device)
         self.obs = self.envs.reset()
 
     def sample(self, steps, epsilon, state_dict, testing=False, test_episodes=20, render=False):
@@ -52,7 +51,10 @@ class Actor:
                 self.model.reset_noise()
 
             with torch.no_grad():
-                logits = self.model(torch.from_numpy(self.obs).to(self.device).float().div(255.0))
+                logits = self.model(
+                    torch.from_numpy(self.obs).to(self.device).float().div(255.0),
+                    iqr=self.cfg.algo == 'iqr',
+                    n=self.cfg.K)
                 qt = self.step[self.cfg.algo](logits)
 
             qt_max, qt_arg_max = qt.max(dim=-1)

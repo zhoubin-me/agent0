@@ -22,6 +22,10 @@ class Config:
     mdqn_tau: float = 0.03
     mdqn_alpha: float = 0.9
     mdqn_lo: float = -1
+    K: int = 32
+    N: int = 64
+    N_dash: int = 64
+    num_cosines: int = 64
     clip_grad_norm: float = 5.0
 
     batch_size: int = 512
@@ -57,7 +61,6 @@ class Config:
     mem_mult: float = 2.0
     gpu_mult: float = 0.5
     step_mult: int = 1
-    feature_mult: int = 1
 
     def update(self):
         self.actor_steps *= self.step_mult
@@ -90,7 +93,7 @@ class Config:
             'c51': 51,
             'qr': 200,
             'mdqn': 1,
-            'kl': 1,
+            'iqr': 1,
         }
 
         if self.num_atoms < 1:
