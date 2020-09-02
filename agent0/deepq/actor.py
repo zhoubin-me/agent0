@@ -28,10 +28,10 @@ class Actor:
         self.step = {
             'c51': lambda logits: logits.softmax(dim=-1).mul(self.atoms).sum(-1),
             'qr': lambda logits: logits.mean(-1),
-            'iqr': lambda logits, _: logits.mean(1),
+            'iqr': lambda logits: logits[0].mean(1),
             'dqn': lambda logits: logits,
             'mdqn': lambda logits: logits,
-            'fqf': lambda logits, _: logits.mean(1),
+            'fqf': lambda logits: logits.mean(1),
         }
         assert self.cfg.algo in self.step
 
@@ -55,7 +55,7 @@ class Actor:
                 logits = self.model(
                     torch.from_numpy(self.obs).to(self.device).float().div(255.0),
                     iqr=self.cfg.algo == 'iqr',
-                    n=self.cfg.K)
+                    n=self.cfg.K_iqr)
                 qt = self.step[self.cfg.algo](logits)
 
             qt_max, qt_arg_max = qt.max(dim=-1)

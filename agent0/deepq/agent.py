@@ -68,11 +68,14 @@ class Agent:
     @staticmethod
     def calc_huber_qr_loss(q, q_target, taus):
         huber_loss = fx.smooth_l1_loss(q, q_target, reduction='none')
-        loss = huber_loss * (taus.view(1, 1, -1) - ((q_target - q).detach() < 0).float()).abs()
+        loss = huber_loss * (taus - ((q_target - q).detach() < 0).float()).abs()
         return loss.sum(-1).mean(-1)
 
     def train_step_fqf(self, states, next_states, actions, terminals, rewards):
-        pass
+        q_convs = self.model.convs(states)
+        taus, taus_next, _ = self.model.taus_prop(q_convs)
+
+
 
     def train_step_iqr(self, states, next_states, actions, terminals, rewards):
         with torch.no_grad():
@@ -89,10 +92,11 @@ class Agent:
             q_target = rewards.unsqueeze(-1) + \
                        self.cfg.discount ** self.cfg.n_step * (1 - terminals.unsqueeze(-1)) * q_next
 
-        q, taus = self.model(states, iqr=True, n=self.cfg.N_iqr)[self.batch_indices, :, actions]
+        q, taus = self.model(states, iqr=True, n=self.cfg.N_iqr)
+        q = q[self.batch_indices, :, actions]
         q = q.unsqueeze(1)
+        taus = taus.squeeze(-1).unsqeeze(1)
         q_target = q_target.unsqueeze(-1)
-
         loss = self.calc_huber_qr_loss(q, q_target, taus)
         return loss.view(-1)
 
@@ -112,7 +116,7 @@ class Agent:
         q = q.unsqueeze(1)
         q_target = q_target.unsqueeze(-1)
 
-        loss = self.calc_huber_qr_loss(q, q_target, self.cumulative_density)
+        loss = self.calc_huber_qr_loss(q, q_target, self.cumulative_density.view(1, 1, -1))
         return loss.view(-1)
 
     def train_step_c51(self, states, next_states, actions, terminals, rewards):

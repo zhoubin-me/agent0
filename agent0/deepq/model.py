@@ -110,10 +110,10 @@ class DeepQNet(nn.Module, ABC):
         return taus, taus_hat, entropies
 
     # noinspection PyArgumentList
-    def feature_embed(self, x, n):
+    def feature_embed(self, x, n, taus=None):
         batch_size = x.size(0)
-
-        taus = torch.rand(batch_size, n, 1).to(x)
+        if taus is None:
+            taus = torch.rand(batch_size, n, 1).to(x)
         ipi = np.pi * torch.arange(1, self.cfg.num_cosines + 1).to(x).view(1, 1, self.cfg.num_cosines)
         cosine = ipi.mul(taus).cos().view(batch_size * n, self.cfg.num_cosines)
 
