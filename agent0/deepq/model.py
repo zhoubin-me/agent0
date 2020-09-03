@@ -102,8 +102,8 @@ class DeepQNet(nn.Module, ABC):
         else:
             convs = st
         # taus: B X (N+1) X 1, taus_hats: B X N X 1
-        taus, tau_hats, _ = self.model.taus_prop(convs.detach())
-        q_hats, _ = self.model(convs, iqr=True, taus=tau_hats)
+        taus, tau_hats, _ = self.taus_prop(convs.detach())
+        q_hats, _ = self.forward(convs, iqr=True, taus=tau_hats)
         q = ((taus[:, 1:, :] - taus[:, :-1, :]) * q_hats).sum(dim=1)
         return q
 

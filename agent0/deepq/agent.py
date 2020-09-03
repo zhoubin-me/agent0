@@ -79,10 +79,6 @@ class Agent:
         q_hat, _ = self.model(q_convs, iqr=True, taus=tau_hats)
         q_hat = q_hat[self.batch_indices, :, actions]
 
-        # q_hat: B X 1 X N
-        q_hat = q_hat.unsqueeze(1)
-        # taus: B X 1 X (N+1)
-        taus = taus.squeeze(-1).unsqeeze(1)
 
         with torch.no_grad():
             q_next_convs = self.model_target.convs(next_states)
@@ -99,12 +95,16 @@ class Agent:
                        self.cfg.discount ** self.cfg.n_step * (1 - terminals.unsqueeze(-1)) * q_next
             q_target = q_target.unsqueeze(-1)
 
-        huber_loss = self.calc_huber_qr_loss(q_hat, q_target, taus)
+        # q_hat: B X 1 X N
+        # q_hat = q_hat.unsqueeze(1)
+        # tau_hats: B X 1 X (N+1)
+        # tau_hats = tau_hats.squeeze(-1).unsqueeze(1)
+        huber_loss = self.calc_huber_qr_loss(q_hat.unsqueeze(1), q_target, tau_hats.squeeze(-1).unsqueeze(1))
 
         ###
         with torch.no_grad():
             # q: B X (N-1) X A
-            q, _ = self.model(q_convs, iqr=True, taus=taus[1:-1])
+            q, _ = self.model(q_convs, iqr=True, taus=taus[:, 1:-1])
             q = q[self.batch_indices, :, actions]
             values_1 = q - q_hat[:, :-1]
             signs_1 = q.gt(torch.cat((q_hat[:, :1], q[:, :-1]), dim=1))
@@ -115,8 +115,9 @@ class Agent:
         # gradients: B X (N-1)
         gradients_of_taus = (torch.where(signs_1, values_1, -values_1)
                              + torch.where(signs_2, values_2, -values_2)).view(self.cfg.batch_size, self.cfg.N_fqf - 1)
-
-        fraction_loss = (gradients_of_taus * taus[:, 1:-1]).sum(dim=1).view(-1)
+        # import pdb
+        # pdb.set_trace()
+        fraction_loss = (gradients_of_taus * taus[:, 1:-1, 0]).sum(dim=1).view(-1)
         return huber_loss, fraction_loss
 
     def train_step_iqr(self, states, next_states, actions, terminals, rewards):
