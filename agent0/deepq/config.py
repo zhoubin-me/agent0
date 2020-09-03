@@ -96,6 +96,7 @@ class Config:
             'qr': 200,
             'mdqn': 1,
             'iqr': 1,
+            'fqf': 1,
         }
 
         if self.num_atoms < 1:

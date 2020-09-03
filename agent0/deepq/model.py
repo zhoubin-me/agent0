@@ -124,7 +124,7 @@ class DeepQNet(nn.Module, ABC):
     def feature_embed(self, x, taus, n):
         batch_size = x.size(0)
         if taus is None:
-            taus = torch.rand(batch_size, n, 1)
+            taus = torch.rand(batch_size, n, 1).to(x)
         else:
             n = taus.size(1)
 
