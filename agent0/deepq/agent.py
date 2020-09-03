@@ -35,7 +35,7 @@ class Agent:
         self.optimizer = torch.optim.Adam(self.model.params(), self.cfg.adam_lr, eps=1e-2 / self.cfg.batch_size)
 
         if self.cfg.algo == 'fqf':
-            self.fraction_optim = torch.optim.RMSprop(
+            self.fraction_optimizer = torch.optim.RMSprop(
                 self.model.fraction_net.parameters(),
                 lr=self.cfg.adam_lr / 2e4,
                 alpha=0.95, eps=0.00001)
@@ -68,14 +68,56 @@ class Agent:
     @staticmethod
     def calc_huber_qr_loss(q, q_target, taus):
         huber_loss = fx.smooth_l1_loss(q, q_target, reduction='none')
-        loss = huber_loss * (taus - ((q_target - q).detach() < 0).float()).abs()
-        return loss.sum(-1).mean(-1)
+        loss = huber_loss * (taus - q_target.lt(q).detach().float()).abs()
+        return loss.sum(-1).mean(-1).view(-1)
 
     def train_step_fqf(self, states, next_states, actions, terminals, rewards):
         q_convs = self.model.convs(states)
-        taus, taus_next, _ = self.model.taus_prop(q_convs)
+        # taus: B X (N+1) X 1, taus_hats: B X N X 1
+        taus, tau_hats, _ = self.model.taus_prop(q_convs.detach())
+        # q_hat: B X N X A
+        q_hat, _ = self.model(q_convs, iqr=True, taus=tau_hats)
+        q_hat = q_hat[self.batch_indices, :, actions]
 
+        # q_hat: B X 1 X N
+        q_hat = q_hat.unsqueeze(1)
+        # taus: B X 1 X (N+1)
+        taus = taus.squeeze(-1).unsqeeze(1)
 
+        with torch.no_grad():
+            q_next_convs = self.model_target.convs(next_states)
+            if self.cfg.double_q:
+                q_next_online = self.model.calc_fqf_q(next_states)
+                a_next = q_next_online.argmax(dim=-1)
+            else:
+                q_next_ = self.model_target.calc_fqf_q(q_next_convs)
+                a_next = q_next_.argmax(dim=-1)
+
+            q_next, _ = self.model_target(q_next_convs, taus=tau_hats, iqr=True)
+            q_next = q_next[self.batch_indices, :, a_next]
+            q_target = rewards.unsqueeze(-1) + \
+                       self.cfg.discount ** self.cfg.n_step * (1 - terminals.unsqueeze(-1)) * q_next
+            q_target = q_target.unsqueeze(-1)
+
+        huber_loss = self.calc_huber_qr_loss(q_hat, q_target, taus)
+
+        ###
+        with torch.no_grad():
+            # q: B X (N-1) X A
+            q, _ = self.model(q_convs, iqr=True, taus=taus[1:-1])
+            q = q[self.batch_indices, :, actions]
+            values_1 = q - q_hat[:, :-1]
+            signs_1 = q.gt(torch.cat((q_hat[:, :1], q[:, :-1]), dim=1))
+
+            values_2 = q - q_hat[:, 1:]
+            signs_2 = q.lt(torch.cat((q[:, 1:], q_hat[:, -1:]), dim=1))
+
+        # gradients: B X (N-1)
+        gradients_of_taus = (torch.where(signs_1, values_1, -values_1)
+                             + torch.where(signs_2, values_2, -values_2)).view(self.cfg.batch_size, self.cfg.N_fqf - 1)
+
+        fraction_loss = (gradients_of_taus * taus[:, 1:-1]).sum(dim=1).view(-1)
+        return huber_loss, fraction_loss
 
     def train_step_iqr(self, states, next_states, actions, terminals, rewards):
         with torch.no_grad():
@@ -207,20 +249,29 @@ class Agent:
             self.model_target.reset_noise()
 
         loss = self.step[self.cfg.algo](states, next_states, actions, terminals, rewards)
+        if self.cfg.algo == 'fqf':
+            loss, fraction_loss = loss
+        else:
+            fraction_loss = None
 
         if self.cfg.prioritize:
             self.replay.update_priorities(indices.cpu(), loss.detach().cpu())
             weights /= weights.sum().add(1e-8)
             loss = loss.mul(weights).sum()
+            fraction_loss = fraction_loss.mul(weights).sum() if fraction_loss is not None else None
         else:
             loss = loss.mean()
+            fraction_loss = fraction_loss.mean() if fraction_loss is not None else None
+
+        if fraction_loss is not None:
+            self.fraction_optimizer.zero_grad()
+            fraction_loss.backward(retain_graph=True)
+            self.fraction_optimizer.step()
 
         self.optimizer.zero_grad()
         loss.backward()
-
         if self.cfg.algo == 'qr' and self.cfg.clip_grad_norm > 0:
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.cfg.clip_grad_norm)
-
         self.optimizer.step()
         self.update_steps += 1
 
