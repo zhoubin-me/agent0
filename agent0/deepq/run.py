@@ -41,6 +41,7 @@ if __name__ == '__main__':
         name=cfg.exp_name,
         verbose=1,
         checkpoint_at_end=True,
+        num_samples=cfg.num_samples,
         fail_fast=True,
         reuse_actors=True,
         restore=cfg.restore_checkpoint,
