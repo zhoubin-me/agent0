@@ -72,6 +72,21 @@ class ShmemVecEnv(VecEnv):
             pipe.send(('step', act))
         self.waiting_step = True
 
+    def clone(self):
+        if self.waiting_step:
+            logger.warn('Called clone() while waiting for the step to complete')
+            self.step_wait()
+        for pipe in self.parent_pipes:
+            pipe.send(('clone', None))
+        return np.array([pipe.recv() for pipe in self.parent_pipes])
+
+    def restore(self, state, index):
+        if self.waiting_step:
+            logger.warn('Called restore() while waiting for the step to complete')
+            self.step_wait()
+        self.parent_pipes[index].send(('restore', state))
+        return self._decode_obses(self.parent_pipes[index].recv())
+
     def step_wait(self):
         outs = [pipe.recv() for pipe in self.parent_pipes]
         self.waiting_step = False
@@ -123,6 +138,11 @@ def _subproc_worker(pipe, parent_pipe, env_fn_wrapper, obs_bufs, obs_shapes, obs
             cmd, data = pipe.recv()
             if cmd == 'reset':
                 pipe.send(_write_obs(env.reset()))
+            elif cmd == 'clone':
+                pipe.send(env.clone())
+            elif cmd == 'restore':
+                obs = env.restore(int(data))
+                pipe.send(_write_obs(obs))
             elif cmd == 'step':
                 obs, reward, done, info = env.step(data)
                 if done:

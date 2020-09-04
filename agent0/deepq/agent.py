@@ -22,13 +22,6 @@ class Agent:
         self.device = torch.device('cuda:0')
         # noinspection PyArgumentList
         self.batch_indices = torch.arange(self.cfg.batch_size).to(self.device)
-        if self.cfg.algo == 'c51':
-            self.atoms = torch.linspace(self.cfg.v_min, self.cfg.v_max, self.cfg.num_atoms).to(self.device)
-            self.delta_atom = (self.cfg.v_max - self.cfg.v_min) / (self.cfg.num_atoms - 1)
-        elif self.cfg.algo == 'qr':
-            # noinspection PyArgumentList
-            self.cumulative_density = ((2 * torch.arange(self.cfg.num_atoms) + 1) /
-                                       (2.0 * self.cfg.num_atoms)).to(self.device)
 
         self.model = DeepQNet(self.action_dim, **kwargs).to(self.device)
         self.model_target = copy.deepcopy(self.model)
@@ -78,7 +71,6 @@ class Agent:
         # q_hat: B X N X A
         q_hat, _ = self.model(q_convs, iqr=True, taus=tau_hats)
         q_hat = q_hat[self.batch_indices, :, actions]
-
 
         with torch.no_grad():
             q_next_convs = self.model_target.convs(next_states)
@@ -159,7 +151,7 @@ class Agent:
         q = q.unsqueeze(1)
         q_target = q_target.unsqueeze(-1)
 
-        loss = self.calc_huber_qr_loss(q, q_target, self.cumulative_density.view(1, 1, -1))
+        loss = self.calc_huber_qr_loss(q, q_target, self.model.cumulative_density.view(1, 1, -1))
         return loss.view(-1)
 
     def train_step_c51(self, states, next_states, actions, terminals, rewards):
@@ -167,16 +159,16 @@ class Agent:
             prob_next = self.model_target(next_states).softmax(dim=-1)
             if self.cfg.double_q:
                 prob_next_online = self.model(next_states).softmax(dim=-1)
-                actions_next = prob_next_online.mul(self.atoms).sum(dim=-1).argmax(dim=-1)
+                actions_next = prob_next_online.mul(self.model.atoms).sum(dim=-1).argmax(dim=-1)
             else:
-                actions_next = prob_next.mul(self.atoms).sum(dim=-1).argmax(dim=-1)
+                actions_next = prob_next.mul(self.model.atoms).sum(dim=-1).argmax(dim=-1)
             prob_next = prob_next[self.batch_indices, actions_next, :]
 
-            atoms_next = rewards.unsqueeze(-1) + \
-                         self.cfg.discount ** self.cfg.n_step * (1 - terminals.unsqueeze(-1)) * self.atoms.view(1, -1)
+            atoms_next = rewards.unsqueeze(-1) + self.cfg.discount ** self.cfg.n_step * \
+                         (1 - terminals.unsqueeze(-1)) * self.model.atoms.view(1, -1)
 
             atoms_next.clamp_(self.cfg.v_min, self.cfg.v_max)
-            base = (atoms_next - self.cfg.v_min) / self.delta_atom
+            base = (atoms_next - self.cfg.v_min) / self.model.delta_atom
 
             lo, up = base.floor().long(), base.ceil().long()
             lo[(up > 0) * (lo == up)] -= 1

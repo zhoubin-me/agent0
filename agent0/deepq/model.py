@@ -36,6 +36,14 @@ class DeepQNet(nn.Module, ABC):
             nn.Conv2d(64, 64, 3, stride=1), nn.ReLU(), nn.Flatten())
         self.convs.apply(lambda m: init(m, nn.init.calculate_gain('relu')))
 
+        if self.cfg.algo == 'c51':
+            self.register_buffer('atoms', torch.linspace(self.cfg.v_min, self.cfg.v_max, self.cfg.num_atoms))
+            self.delta_atom = (self.cfg.v_max - self.cfg.v_min) / (self.cfg.num_atoms - 1)
+
+        if self.cfg.algo == 'qr':
+            self.register_buffer(
+                'cumulative_density', (2 * torch.arange(self.cfg.num_atoms) + 1) / (2.0 * self.cfg.num_atoms))
+
         if self.cfg.algo in ['iqr', 'fqf']:
             self.cosine_emb = nn.Sequential(dense(self.cfg.num_cosines, 64 * 7 * 7), nn.ReLU())
             self.cosine_emb.apply(lambda m: init(m, nn.init.calculate_gain('relu')))
@@ -105,7 +113,7 @@ class DeepQNet(nn.Module, ABC):
         taus, tau_hats, _ = self.taus_prop(convs.detach())
         q_hats, _ = self.forward(convs, iqr=True, taus=tau_hats)
         q = ((taus[:, 1:, :] - taus[:, :-1, :]) * q_hats).sum(dim=1)
-        return q
+        return q, taus, q_hats
 
     # noinspection PyArgumentList
     def taus_prop(self, x):

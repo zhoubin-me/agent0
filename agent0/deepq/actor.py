@@ -24,21 +24,19 @@ class Actor:
                                  for _ in range(self.cfg.num_envs)], context='spawn')
         self.action_dim = self.envs.action_space.n
         self.device = torch.device('cuda:0')
+        self.model = DeepQNet(self.action_dim, **kwargs).to(self.device)
+        self.obs = self.envs.reset()
 
         self.step = {
-            'c51': lambda st: self.model(st).softmax(dim=-1).mul(self.atoms).sum(-1),
+            'c51': lambda st: self.model(st).softmax(dim=-1).mul(self.model.atoms).sum(-1),
             'qr': lambda st: self.model(st).mean(-1),
             'iqr': lambda st: self.model(st, iqr=True, n=self.cfg.K_iqr)[0].mean(1),
             'dqn': lambda st: self.model(st),
             'mdqn': lambda st: self.model(st),
             'fqf': lambda st: self.model.calc_fqf_q(st),
         }
-        assert self.cfg.algo in self.step
 
-        if self.cfg.algo == 'c51':
-            self.atoms = torch.linspace(self.cfg.v_min, self.cfg.v_max, self.cfg.num_atoms).to(self.device)
-        self.model = DeepQNet(self.action_dim, **kwargs).to(self.device)
-        self.obs = self.envs.reset()
+        assert self.cfg.algo in self.step
 
     def sample(self, steps, epsilon, state_dict, testing=False, test_episodes=20, render=False):
         self.model.load_state_dict(state_dict)

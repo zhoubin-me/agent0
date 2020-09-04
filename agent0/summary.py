@@ -39,15 +39,20 @@ if __name__ == '__main__':
     print(df)
     games = [g for g in df['game'].unique() if g != 'Pong' and g != 'Asterix']
     new_rows = []
+    new_scores = []
     for i, game in enumerate(games):
         scores = df[df['game'] == game].sort_values(['mean'], ascending=False).reset_index()
         new_row = {'game': game}
+        new_score = {'game': game}
         for index, row in scores.iterrows():
             new_name = row['exp_name'] + '_' + row['algo']
             new_row[new_name] = index
+            new_score[new_name] = row['mean']
         new_rows.append(new_row)
+        new_scores.append(new_score)
 
     df_rank = pd.DataFrame(new_rows)
+    df_score = pd.DataFrame(new_scores)
     mean_rank = OrderedDict()
     for col in df_rank.columns:
         if col != 'game':
@@ -61,5 +66,9 @@ if __name__ == '__main__':
     mean_rank['game'] = 'avg'
     df_rank = df_rank.append(mean_rank, ignore_index=True)
     df_rank = df_rank.append(real_rank, ignore_index=True)
+    df_rank = df_rank.reindex(sorted(df_rank.columns), axis=1)
+    df_score = df_score.reindex(sorted(df_score.columns), axis=1)
     df_rank.to_csv('rank.csv')
+    df_score.to_csv('score.csv')
     print(df_rank)
+    print(df_score)

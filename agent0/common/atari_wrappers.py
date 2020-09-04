@@ -20,13 +20,13 @@ class ClipActionsWrapper(gym.Wrapper):
 
 
 class NoopResetEnv(gym.Wrapper):
-    def __init__(self, env, noop_max=30):
+    def __init__(self, env, noop_max=30, noop_num=None):
         """Sample initial states by taking random number of no-ops on reset.
         No-op is assumed to be action 0.
         """
         gym.Wrapper.__init__(self, env)
         self.noop_max = noop_max
-        self.override_num_noops = None
+        self.override_num_noops = noop_num
         self.noop_action = 0
         assert env.unwrapped.get_action_meanings()[0] == 'NOOP'
 
@@ -223,6 +223,7 @@ class FrameStack(gym.Wrapper):
         gym.Wrapper.__init__(self, env)
         self.k = k
         self.frames = deque([], maxlen=k)
+        self.frames_ = self.frames.copy()
         shp = env.observation_space.shape
         self.observation_space = gym.spaces.Box(low=0, high=255, shape=((shp[0] * k,) + shp[1:]),
                                                 dtype=env.observation_space.dtype)
@@ -241,6 +242,16 @@ class FrameStack(gym.Wrapper):
     def _get_ob(self):
         assert len(self.frames) == self.k
         return np.concatenate(self.frames, axis=0)
+
+    def restore(self, state):
+        self.ale.restoreSystemState(state)
+        self.frames = self.frames_.copy()
+        return np.concatenate(self.frames_, axis=0)
+
+    def clone(self):
+        self.frames_ = self.frames.copy()
+        return self.ale.cloneSystemState()
+
 
 
 class NStepEnv(gym.Wrapper):
@@ -353,18 +364,10 @@ class NormalizedEnv(gym.ObservationWrapper):
         return (observation - unbiased_mean) / (unbiased_std + 1e-8)
 
 
-def make_atari(env_id):
-    env = gym.make(env_id)
-    assert 'NoFrameskip' in env.spec.id
-    env = NoopResetEnv(env, noop_max=30)
-    env = MaxAndSkipEnv(env, skip=4)
-    return env
-
-
 def make_deepq_env(game, episode_life=True, clip_rewards=True, frame_stack=4, transpose_image=True,
-                   n_step=1, discount=0.99, scale=False):
+                   n_step=1, discount=0.99, scale=False, noop_num=None, seed=None):
     env = gym.make(f'{game}NoFrameskip-v4')
-    env = NoopResetEnv(env, noop_max=30)
+    env = NoopResetEnv(env, noop_max=30, noop_num=noop_num)
     env = MaxAndSkipEnv(env, skip=4)
     if episode_life:
         env = EpisodicLifeEnv(env)
@@ -381,6 +384,8 @@ def make_deepq_env(game, episode_life=True, clip_rewards=True, frame_stack=4, tr
         env = FrameStack(env, frame_stack)
     if n_step > 1:
         env = NStepEnv(env, n_step, discount)
+    if seed is not None:
+        env.seed(seed)
     return env
 
 
