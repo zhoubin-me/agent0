@@ -256,14 +256,6 @@ class FrameStack(gym.Wrapper):
 
 class NStepEnv(gym.Wrapper):
     def __init__(self, env, n, discount):
-        """Stack k last frames.
-
-        Returns lazy array, which is much more memory efficient.
-
-        See Also
-        --------
-        baselines.common.atari_wrappers.LazyFrames
-        """
         gym.Wrapper.__init__(self, env)
         self.n = n
         self.discount = discount
