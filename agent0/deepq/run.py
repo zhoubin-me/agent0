@@ -7,8 +7,8 @@ from ray import tune
 from ray.tune import CLIReporter
 
 
-def trial_str_creator(trial, sha):
-    return "{}_{}_{}_{}".format(trial.trainable_name, trial.config['game'], sha, trial.trial_id)
+def trial_str_creator(trial, sha_short):
+    return "{}_{}_{}_{}".format(trial.trainable_name, trial.config['game'], sha_short, trial.trial_id)
 
 
 if __name__ == '__main__':

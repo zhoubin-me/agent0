@@ -2,7 +2,6 @@ import copy
 
 import torch
 import torch.nn.functional as fx
-
 from agent0.common.atari_wrappers import make_deepq_env
 from agent0.common.utils import DataLoaderX, DataPrefetcher
 from agent0.deepq.config import Config
@@ -83,8 +82,9 @@ class Agent:
 
             q_next, _ = self.model_target(q_next_convs, taus=tau_hats, iqr=True)
             q_next = q_next[self.batch_indices, :, a_next]
-            q_target = rewards.unsqueeze(-1) + \
-                       self.cfg.discount ** self.cfg.n_step * (1 - terminals.unsqueeze(-1)) * q_next
+            q_target = rewards.unsqueeze(-1).add(
+                self.cfg.discount ** self.cfg.n_step * (1 - terminals.unsqueeze(-1)) * q_next)
+
             q_target = q_target.unsqueeze(-1)
 
         # q_hat: B X 1 X N
@@ -124,8 +124,9 @@ class Agent:
 
             q_next, taus_dash = self.model_target(q_next_convs, iqr=True, n=self.cfg.N_iqr_dash)
             q_next = q_next[self.batch_indices, :, a_next]
-            q_target = rewards.unsqueeze(-1) + \
-                       self.cfg.discount ** self.cfg.n_step * (1 - terminals.unsqueeze(-1)) * q_next
+            q_target = rewards.unsqueeze(-1).add(
+                self.cfg.discount ** self.cfg.n_step * (1 - terminals.unsqueeze(-1)) * q_next
+            )
 
         q, taus = self.model(states, iqr=True, n=self.cfg.N_iqr)
         q = q[self.batch_indices, :, actions]
@@ -144,8 +145,9 @@ class Agent:
             else:
                 a_next = q_next.mean(dim=-1).argmax(dim=-1)
             q_next = q_next[self.batch_indices, a_next, :]
-            q_target = rewards.unsqueeze(-1) + \
-                       self.cfg.discount ** self.cfg.n_step * (1 - terminals.unsqueeze(-1)) * q_next
+            q_target = rewards.unsqueeze(-1).add(
+                self.cfg.discount ** self.cfg.n_step * (1 - terminals.unsqueeze(-1)) * q_next
+            )
 
         q = self.model(states)[self.batch_indices, actions, :]
         q = q.unsqueeze(1)
@@ -164,8 +166,9 @@ class Agent:
                 actions_next = prob_next.mul(self.model.atoms).sum(dim=-1).argmax(dim=-1)
             prob_next = prob_next[self.batch_indices, actions_next, :]
 
-            atoms_next = rewards.unsqueeze(-1) + self.cfg.discount ** self.cfg.n_step * \
-                         (1 - terminals.unsqueeze(-1)) * self.model.atoms.view(1, -1)
+            atoms_next = rewards.unsqueeze(-1).add(
+                self.cfg.discount ** self.cfg.n_step * (1 - terminals.unsqueeze(-1)) * self.model.atoms.view(1, -1)
+            )
 
             atoms_next.clamp_(self.cfg.v_min, self.cfg.v_max)
             base = (atoms_next - self.cfg.v_min) / self.model.delta_atom
@@ -201,8 +204,9 @@ class Agent:
             add_on = self.log_softmax_stable(add_on, self.cfg.mdqn_tau)
             add_on = add_on[self.batch_indices, actions].clamp(self.cfg.mdqn_lo, 0)
 
-            q_target = rewards + self.cfg.mdqn_alpha * add_on + \
-                       self.cfg.discount ** self.cfg.n_step * (1 - terminals) * q_next
+            q_target = rewards.add(self.cfg.mdqn_alpha * add_on).add(
+                self.cfg.discount ** self.cfg.n_step * (1 - terminals) * q_next
+            )
 
         q = self.model(states)[self.batch_indices, actions]
         loss = fx.smooth_l1_loss(q, q_target, reduction='none')
