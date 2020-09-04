@@ -16,7 +16,7 @@ setup(name='agent0',
           "dataclasses==0.6",
           "GitPython==3.1.7",
           "lz4==3.1.0",
-          "ray[tune]==0.8.7",
+          "ray[tune]==0.8.7", 'cv2'
       ],
       author="Zhou Bin",
       url='https://github.com/zmonoid/AgentZero',

@@ -1,8 +1,11 @@
-from . import VecEnvWrapper
-from agent0.common.monitor import ResultsWriter
-import numpy as np
 import time
 from collections import deque
+
+import numpy as np
+
+from . import VecEnvWrapper
+from .monitor import ResultsWriter
+
 
 class VecMonitor(VecEnvWrapper):
     def __init__(self, venv, filename=None, keep_buf=0, info_keywords=()):

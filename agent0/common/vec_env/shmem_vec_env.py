@@ -2,13 +2,13 @@
 An interface for asynchronous vectorized environments.
 """
 
-import multiprocessing as mp
-import numpy as np
-from .vec_env import VecEnv, CloudpickleWrapper, clear_mpi_env_vars
 import ctypes
-from agent0.common import logger
+import multiprocessing as mp
+
+import numpy as np
 
 from .util import dict_to_obs, obs_space_info, obs_to_dict
+from .vec_env import VecEnv, CloudpickleWrapper, clear_mpi_env_vars
 
 _NP_TO_CT = {np.float32: ctypes.c_float,
              np.int32: ctypes.c_int32,
@@ -31,12 +31,12 @@ class ShmemVecEnv(VecEnv):
         if spaces:
             observation_space, action_space = spaces
         else:
-            logger.log('Creating dummy env object to get spaces')
-            with logger.scoped_configure(format_strs=[]):
-                dummy = env_fns[0]()
-                observation_space, action_space = dummy.observation_space, dummy.action_space
-                dummy.close()
-                del dummy
+            print('Creating dummy env object to get spaces')
+            dummy = env_fns[0]()
+            observation_space, action_space = dummy.observation_space, dummy.action_space
+            dummy.close()
+            del dummy
+
         VecEnv.__init__(self, len(env_fns), observation_space, action_space)
         self.obs_keys, self.obs_shapes, self.obs_dtypes = obs_space_info(observation_space)
         self.obs_bufs = [
@@ -60,7 +60,7 @@ class ShmemVecEnv(VecEnv):
 
     def reset(self):
         if self.waiting_step:
-            logger.warn('Called reset() while waiting for the step to complete')
+            print('Called reset() while waiting for the step to complete')
             self.step_wait()
         for pipe in self.parent_pipes:
             pipe.send(('reset', None))
@@ -74,7 +74,7 @@ class ShmemVecEnv(VecEnv):
 
     def clone(self):
         if self.waiting_step:
-            logger.warn('Called clone() while waiting for the step to complete')
+            print('Called clone() while waiting for the step to complete')
             self.step_wait()
         for pipe in self.parent_pipes:
             pipe.send(('clone', None))
@@ -82,7 +82,7 @@ class ShmemVecEnv(VecEnv):
 
     def restore(self, state, index):
         if self.waiting_step:
-            logger.warn('Called restore() while waiting for the step to complete')
+            print('Called restore() while waiting for the step to complete')
             self.step_wait()
         self.parent_pipes[index].send(('restore', state))
         return self._decode_obses(self.parent_pipes[index].recv())

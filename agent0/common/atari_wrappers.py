@@ -9,8 +9,7 @@ cv2.ocl.setUseOpenCL(False)
 
 
 class ClipActionsWrapper(gym.Wrapper):
-    def step(self, action):
-        import numpy as np
+    def step(self, action: int):
         action = np.nan_to_num(action)
         action = np.clip(action, self.action_space.low, self.action_space.high)
         return self.env.step(action)
@@ -112,6 +111,7 @@ class EpisodicLifeEnv(gym.Wrapper):
         return obs
 
 
+# noinspection PyArgumentList
 class MaxAndSkipEnv(gym.Wrapper):
     def __init__(self, env, skip=4):
         """Return only every `skip`-th frame"""
@@ -127,9 +127,11 @@ class MaxAndSkipEnv(gym.Wrapper):
         info = {}
         done = None
         for i in range(self._skip):
-            obs, reward, done, info = self.env.step(action)
-            if i == self._skip - 2: self._obs_buffer[0] = obs
-            if i == self._skip - 1: self._obs_buffer[1] = obs
+            obs_, reward, done, info = self.env.step(action)
+            if i == self._skip - 2:
+                self._obs_buffer[0] = obs_
+            if i == self._skip - 1:
+                self._obs_buffer[1] = obs_
             total_reward += reward
             if done:
                 break
@@ -251,7 +253,6 @@ class FrameStack(gym.Wrapper):
     def clone(self):
         self.frames_ = self.frames.copy()
         return self.ale.cloneSystemState()
-
 
 
 class NStepEnv(gym.Wrapper):
