@@ -26,7 +26,7 @@ class Agent:
         self.model_target = copy.deepcopy(self.model)
         self.optimizer = torch.optim.Adam(self.model.params(), self.cfg.adam_lr, eps=1e-2 / self.cfg.batch_size)
 
-        if self.cfg.algo == 'fqf':
+        if self.cfg.algo in ['fqf', 'gmm']:
             self.fraction_optimizer = torch.optim.RMSprop(
                 self.model.fraction_net.parameters(),
                 lr=self.cfg.adam_lr / 2e4,
@@ -66,7 +66,7 @@ class Agent:
 
     @staticmethod
     def calc_kl_loss(q_mean, q_logstd, q_target_mean, q_target_logstd, taus):
-        taus_w = taus[:, 1:, :] - taus[:, :-1, :]
+        taus_w = taus[:, :, 1:] - taus[:, :, :-1]
         ce_loss = q_target_logstd - q_logstd - 0.5 + \
                   (q_logstd.exp().pow(2) + (q_mean - q_target_mean).pow(2)).div(2 * q_target_logstd.exp().pow(2))
         ce_loss = ce_loss.mul(taus_w).sum(-1).mean(-1).view(-1)
@@ -100,7 +100,8 @@ class Agent:
             q_next_mean, q_next_logstd = q_next.split(dim=-1, split_size=1)
 
             q_target_mean = rewards.unsqueeze(-1).add(
-                self.cfg.discount ** self.cfg.n_step * (1 - terminals.unsqueeze(-1)) * q_next_mean)
+                self.cfg.discount ** self.cfg.n_step * (1 - terminals.unsqueeze(-1)) * q_next_mean.squeeze(-1))
+            q_target_mean = q_target_mean.unsqueeze(-1)
 
         # q_hat: B X 1 X N
         # tau_hats: B X 1 X N
@@ -114,11 +115,11 @@ class Agent:
             qx, _ = self.model(q_convs, iqr=True, taus=taus[:, 1:-1])
             q_mean = qx.view(self.cfg.batch_size, -1, self.action_dim, self.cfg.num_atoms)[:, :, :, 0]
             q = q_mean[self.batch_indices, :, actions]
-            values_1 = q - q_hat_mean[:, :-1]
-            signs_1 = q.gt(torch.cat((q_hat_mean[:, :1], q[:, :-1]), dim=1))
+            values_1 = q - q_hat_mean[:, 0, :-1]
+            signs_1 = q.gt(torch.cat((q_hat_mean[:, 0, :1], q[:, :-1]), dim=1))
 
-            values_2 = q - q_hat_mean[:, 1:]
-            signs_2 = q.lt(torch.cat((q[:, 1:], q_hat_mean[:, -1:]), dim=1))
+            values_2 = q - q_hat_mean[:, 0, 1:]
+            signs_2 = q.lt(torch.cat((q[:, 1:], q_hat_mean[:, 0, -1:]), dim=1))
 
         # gradients: B X (N-1)
         gradients_of_taus = (torch.where(signs_1, values_1, -values_1)
