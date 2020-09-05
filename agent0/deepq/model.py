@@ -4,7 +4,6 @@ from itertools import chain
 import numpy as np
 import torch
 import torch.nn as nn
-
 from agent0.deepq.config import Config
 
 
@@ -99,7 +98,7 @@ class DeepQNet(nn.Module, ABC):
             q = q.squeeze(-1)
 
         if iqr:
-            q = q.view(-1, n, self.action_dim)
+            q = q.view(-1, n, self.action_dim * self.cfg.num_atoms)
             return q, taus
         else:
             return q
@@ -113,7 +112,9 @@ class DeepQNet(nn.Module, ABC):
         taus, tau_hats, _ = self.taus_prop(convs.detach())
         q_hats, _ = self.forward(convs, iqr=True, taus=tau_hats)
         q = ((taus[:, 1:, :] - taus[:, :-1, :]) * q_hats).sum(dim=1)
-        return q, taus, q_hats
+        if self.cfg.algo == 'gmm':
+            q = q.view(-1, self.action_dim, self.cfg.num_atoms)[:, :, 0]
+        return q
 
     # noinspection PyArgumentList
     def taus_prop(self, x):

@@ -3,12 +3,11 @@ import time
 
 import numpy as np
 import torch
-from lz4.block import compress
-
 from agent0.common.atari_wrappers import make_deepq_env
 from agent0.common.vec_env import ShmemVecEnv
 from agent0.deepq.config import Config
 from agent0.deepq.model import DeepQNet
+from lz4.block import compress
 
 
 class Actor:
@@ -34,6 +33,7 @@ class Actor:
             'dqn': lambda st: self.model(st),
             'mdqn': lambda st: self.model(st),
             'fqf': lambda st: self.model.calc_fqf_q(st),
+            'gmm': lambda st: self.model.calc_fqf_q(st),
         }
 
         assert self.cfg.algo in self.step
