@@ -32,9 +32,11 @@ if __name__ == '__main__':
         cfg.game = tune.grid_search(cfg.game)
 
     ray.init(memory=10 * cfg.mem_mult * 2 ** 30, object_store_memory=20 * cfg.mem_mult * 2 ** 30, num_cpus=20)
-    reporter = CLIReporter(
-        metric_columns=["frames", "loss", "ep_reward_test", "ep_reward_train",
-                        "ep_reward_train_max", "time_past", "time_remain", "speed", "velocity", "epsilon", "qmax"])
+    metric_columns = ["frames", "loss", "ep_reward_test", "ep_reward_train",
+                      "ep_reward_train_max", "time_past", "time_remain", "speed", "velocity", "epsilon", "qmax"]
+    if cfg.algo in ['gmm', 'fqf']:
+        metric_columns.append('fraction_loss')
+    reporter = CLIReporter(metric_columns=metric_columns)
 
     tune.run(
         Trainer,
