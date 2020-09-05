@@ -66,10 +66,11 @@ class Agent:
 
     @staticmethod
     def calc_kl_loss(q_mean, q_logstd, q_target_mean, q_target_logstd, taus):
-        taus_w = taus[:, :, 1:] - taus[:, :, :-1]
+        # taus_w = taus[:, :, 1:] - taus[:, :, :-1]
         ce_loss = q_target_logstd - q_logstd - 0.5 + \
                   (q_logstd.exp().pow(2) + (q_mean - q_target_mean).pow(2)).div(2 * q_target_logstd.exp().pow(2))
-        ce_loss = ce_loss.mul(taus_w).sum(-1).mean(-1).view(-1)
+        # ce_loss = ce_loss.mul(taus_w.clone()).sum(-1).mean(-1).view(-1)
+        ce_loss = ce_loss.mul((taus - q_target_mean.lt(q_mean).detach().float()).abs()).sum(-1).mean(-1).view(-1)
         return ce_loss
 
     def train_step_gmm(self, states, next_states, actions, terminals, rewards):
@@ -106,8 +107,9 @@ class Agent:
         # q_hat: B X 1 X N
         # tau_hats: B X 1 X N
         # q_target: B X N X 1
-        ce_loss = self.calc_kl_loss(q_hat_mean, q_hat_logstd, q_target_mean, q_next_logstd,
-                                    taus.squeeze(-1).unsqueeze(1))
+        ce_loss = self.calc_kl_loss(q_hat_mean, q_hat_logstd, q_target_mean, q_next_logstd, tau_hats.squeeze(-1).unsqueeze(1))
+        # ce_loss = self.calc_huber_qr_loss(q_hat_mean, q_target_mean, tau_hats.squeeze(-1).unsqueeze(1))
+
 
         ###
         with torch.no_grad():
