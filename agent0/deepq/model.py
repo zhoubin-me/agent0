@@ -43,13 +43,13 @@ class DeepQNet(nn.Module, ABC):
             self.register_buffer(
                 'cumulative_density', (2 * torch.arange(self.cfg.num_atoms) + 1) / (2.0 * self.cfg.num_atoms))
 
-        if self.cfg.algo in ['iqr', 'fqf']:
+        if self.cfg.algo in ['iqr', 'fqf', 'gmm']:
             self.cosine_emb = nn.Sequential(dense(self.cfg.num_cosines, 64 * 7 * 7), nn.ReLU())
             self.cosine_emb.apply(lambda m: init(m, nn.init.calculate_gain('relu')))
         else:
             self.cosine_emb = None
 
-        if self.cfg.algo == 'fqf':
+        if self.cfg.algo == ['fqf', 'gmm']:
             self.fraction_net = dense(64 * 7 * 7, self.cfg.N_fqf)
             self.fraction_net.apply(lambda m: init_xavier(m, 0.01))
         else:

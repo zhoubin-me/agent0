@@ -150,7 +150,6 @@ class Agent:
             q_target = rewards.unsqueeze(-1).add(
                 self.cfg.discount ** self.cfg.n_step * (1 - terminals.unsqueeze(-1)) * q_next)
 
-            q_target = q_target.unsqueeze(-1)
 
         # q_hat: B X 1 X N
         # tau_hats: B X 1 X N
