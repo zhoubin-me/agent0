@@ -341,4 +341,5 @@ class Agent:
 
         if self.update_steps % self.cfg.target_update_freq == 0:
             self.model_target.load_state_dict(self.model.state_dict())
-        return loss.detach()
+        return {'loss': loss.detach(),
+                'fraction_loss': fraction_loss.detach() if fraction_loss is not None else 0}

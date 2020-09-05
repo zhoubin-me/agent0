@@ -6,13 +6,12 @@ from abc import ABC
 import numpy as np
 import ray
 import torch
-from ray import tune
-from ray.tune.trial import ExportFormat
-
 from agent0.common.utils import LinearSchedule, set_random_seed
 from agent0.deepq.actor import Actor
 from agent0.deepq.agent import Agent
 from agent0.deepq.config import Config
+from ray import tune
+from ray.tune.trial import ExportFormat
 
 
 class Trainer(tune.Trainable, ABC):
@@ -49,6 +48,7 @@ class Trainer(tune.Trainable, ABC):
                            self.actors]
 
     def step(self):
+        fraction_loss = None
         tic = time.time()
         done_id, self.sample_ops = ray.wait(self.sample_ops)
         data = ray.get(done_id)
@@ -65,7 +65,10 @@ class Trainer(tune.Trainable, ABC):
         self.Qs += qs
         # Start training at
         if len(self.agent.replay) > self.cfg.start_training_step:
-            loss = [self.agent.train_step() for _ in range(self.cfg.agent_train_steps)]
+            data = [self.agent.train_step() for _ in range(self.cfg.agent_train_steps)]
+            if self.cfg.algo in ['gmm', 'fqf']:
+                fraction_loss = torch.stack([x['fraction_loss'] for x in data]).mean().item()
+            loss = [x['loss'] for x in data]
             loss = torch.stack(loss)
             self.Ls += loss.tolist()
         toc = time.time()
@@ -77,6 +80,7 @@ class Trainer(tune.Trainable, ABC):
             epsilon=self.epsilon,
             adam_lr=self.cfg.adam_lr,
             frames=self.frame_count,
+            fraction_loss=fraction_loss if fraction_loss is not None else 0,
             velocity=np.mean(self.velocity[-20:]) if len(self.velocity) > 0 else 0,
             speed=self.frame_count / (self._time_total + 1),
             time_remain=(self.cfg.total_steps - self.frame_count) / ((self.frame_count + 1) / (self._time_total + 1)),
