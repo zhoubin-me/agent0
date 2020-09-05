@@ -49,7 +49,7 @@ class DeepQNet(nn.Module, ABC):
         else:
             self.cosine_emb = None
 
-        if self.cfg.algo == ['fqf', 'gmm']:
+        if self.cfg.algo in ['fqf', 'gmm']:
             self.fraction_net = dense(64 * 7 * 7, self.cfg.N_fqf)
             self.fraction_net.apply(lambda m: init_xavier(m, 0.01))
         else:
