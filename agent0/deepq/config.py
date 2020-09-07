@@ -28,7 +28,7 @@ class Config:
     N_iqr_dash: int = 64
     N_fqf: int = 32
     num_cosines: int = 64
-    clip_grad_norm: float = 5.0
+    clip_grad_norm: float = -1
 
     batch_size: int = 512
     replay_size: int = int(1e6)
@@ -98,13 +98,15 @@ class Config:
             'mdqn': 1,
             'iqr': 1,
             'fqf': 1,
-            'gmm': 2,
+            'gmm': 11,
         }
 
         if self.num_atoms < 1:
             try:
                 if self.algo != 'all':
                     self.num_atoms = algo_num_atoms[self.algo]
+                    if self.algo == 'gmm':
+                        self.num_atoms *= 3
             except Exception as e:
                 print(e)
                 raise ValueError(f"Algo {self.algo} not implemented\n"

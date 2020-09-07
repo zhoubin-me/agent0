@@ -43,13 +43,13 @@ class DeepQNet(nn.Module, ABC):
             self.register_buffer(
                 'cumulative_density', (2 * torch.arange(self.cfg.num_atoms) + 1) / (2.0 * self.cfg.num_atoms))
 
-        if self.cfg.algo in ['iqr', 'fqf', 'gmm']:
+        if self.cfg.algo in ['iqr', 'fqf']:
             self.cosine_emb = nn.Sequential(dense(self.cfg.num_cosines, 64 * 7 * 7), nn.ReLU())
             self.cosine_emb.apply(lambda m: init(m, nn.init.calculate_gain('relu')))
         else:
             self.cosine_emb = None
 
-        if self.cfg.algo in ['fqf', 'gmm']:
+        if self.cfg.algo in ['fqf']:
             self.fraction_net = dense(64 * 7 * 7, self.cfg.N_fqf)
             self.fraction_net.apply(lambda m: init_xavier(m, 0.01))
         else:
@@ -103,6 +103,11 @@ class DeepQNet(nn.Module, ABC):
         else:
             return q
 
+    def calc_gmm_q(self, st):
+        q = self.forward(st).view(-1, self.action_dim, self.cfg.num_atoms)
+        q_mean, _, q_weights = q.split(dim=-1, split_size=self.cfg.num_atoms // 3)
+        return q_mean.mul(q_weights.softmax(dim=-1)).sum(-1)
+
     def calc_fqf_q(self, st):
         if st.ndim == 4:
             convs = self.convs(st)
@@ -112,8 +117,6 @@ class DeepQNet(nn.Module, ABC):
         taus, tau_hats, _ = self.taus_prop(convs.detach())
         q_hats, _ = self.forward(convs, iqr=True, taus=tau_hats)
         q = ((taus[:, 1:, :] - taus[:, :-1, :]) * q_hats).sum(dim=1)
-        if self.cfg.algo == 'gmm':
-            q = q.view(-1, self.action_dim, self.cfg.num_atoms)[:, :, 0]
         return q
 
     # noinspection PyArgumentList

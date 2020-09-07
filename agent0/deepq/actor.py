@@ -33,7 +33,7 @@ class Actor:
             'dqn': lambda st: self.model(st),
             'mdqn': lambda st: self.model(st),
             'fqf': lambda st: self.model.calc_fqf_q(st),
-            'gmm': lambda st: self.model.calc_fqf_q(st),
+            'gmm': lambda st: self.model.calc_gmm_q(st),
         }
 
         assert self.cfg.algo in self.step
