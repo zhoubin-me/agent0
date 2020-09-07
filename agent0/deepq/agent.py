@@ -215,10 +215,11 @@ class Agent:
     def train_step_gmm(self, states, next_states, actions, terminals, rewards):
         with torch.no_grad():
             q_next = self.model_target(next_states).view(-1, self.action_dim, self.cfg.num_atoms)
+            q_next_mean, q_next_logstd, q_next_weights = q_next.split(dim=-1, split_size=self.cfg.num_atoms // 3)
             if self.cfg.double_q:
                 a_next = self.model.calc_gmm_q(next_states).argmax(dim=-1)
             else:
-                a_next = q_next.argmax(dim=-1)
+                a_next = q_next.mul(q_next_weights.softmax(dim=-1)).sum(-1)
             q_next = q_next[self.batch_indices, a_next, :]
             q_next_mean, q_next_logstd, q_next_weights = q_next.split(dim=-1, split_size=self.cfg.num_atoms // 3)
             q_target_mean = rewards.view(-1, 1).add(
