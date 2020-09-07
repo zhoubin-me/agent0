@@ -27,7 +27,7 @@ class Agent:
         self.model_target = copy.deepcopy(self.model)
         self.optimizer = torch.optim.Adam(self.model.params(), self.cfg.adam_lr, eps=1e-2 / self.cfg.batch_size)
 
-        if self.cfg.algo in ['fqf', 'gmm']:
+        if self.cfg.algo in ['fqf']:
             self.fraction_optimizer = torch.optim.RMSprop(
                 self.model.fraction_net.parameters(),
                 lr=self.cfg.adam_lr / 2e4,
