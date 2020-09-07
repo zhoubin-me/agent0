@@ -219,7 +219,7 @@ class Agent:
             if self.cfg.double_q:
                 a_next = self.model.calc_gmm_q(next_states).argmax(dim=-1)
             else:
-                a_next = q_next.mul(q_next_weights.softmax(dim=-1)).sum(-1)
+                a_next = q_next_mean.mul(q_next_weights.softmax(dim=-1)).sum(-1).argmax(dim=-1)
             q_next = q_next[self.batch_indices, a_next, :]
             q_next_mean, q_next_logstd, q_next_weights = q_next.split(dim=-1, split_size=self.cfg.num_atoms // 3)
             q_target_mean = rewards.view(-1, 1).add(

@@ -66,7 +66,7 @@ class Trainer(tune.Trainable, ABC):
         # Start training at
         if len(self.agent.replay) > self.cfg.start_training_step:
             data = [self.agent.train_step() for _ in range(self.cfg.agent_train_steps)]
-            if self.cfg.algo in ['gmm', 'fqf']:
+            if self.cfg.algo in ['fqf']:
                 fraction_loss = torch.stack([x['fraction_loss'] for x in data]).mean().item()
             loss = [x['loss'] for x in data]
             loss = torch.stack(loss)
