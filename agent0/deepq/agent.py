@@ -234,7 +234,7 @@ class Agent:
         q = self.model(states).view(-1, self.action_dim, self.cfg.num_atoms)[self.batch_indices, actions, :]
         q_mean, q_logstd, q_weights = q.split(dim=-1, split_size=self.cfg.num_atoms // 3)
 
-        comp = Normal(q_mean.squeeze(), q_logstd.clamp(-3, 3).exp().squeeze())
+        comp = Normal(q_mean.squeeze(), q_logstd.exp().squeeze())
         mix = Categorical(q_weights.squeeze().softmax(dim=-1))
         q_gmm = MixtureSameFamily(mix, comp)
         loss = q_gmm.log_prob(q_target_sample).neg().mean(0)
@@ -295,12 +295,15 @@ class Agent:
                 torch.nn.utils.clip_grad_norm_(self.model.fraction_net.parameters(), self.cfg.clip_grad_norm)
             self.fraction_optimizer.step()
 
-        self.optimizer.zero_grad()
-        loss.backward()
-        if self.cfg.clip_grad_norm > 0:
-            torch.nn.utils.clip_grad_norm_(self.model.params(), self.cfg.clip_grad_norm)
-        self.optimizer.step()
-        self.update_steps += 1
+        if not loss.isnan().any():
+            self.optimizer.zero_grad()
+            loss.backward()
+            if self.cfg.clip_grad_norm > 0:
+                torch.nn.utils.clip_grad_norm_(self.model.params(), self.cfg.clip_grad_norm)
+            self.optimizer.step()
+            self.update_steps += 1
+        else:
+            loss = torch.zeros_like(loss).to(loss)
 
         if self.update_steps % self.cfg.target_update_freq == 0:
             self.model_target.load_state_dict(self.model.state_dict())
