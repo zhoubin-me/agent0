@@ -27,6 +27,8 @@ class Config:
     N_iqr: int = 64
     N_iqr_dash: int = 64
     N_fqf: int = 32
+    gmm_num_samples = 10000
+    gmm_min_logstd = -10
     num_cosines: int = 64
     clip_grad_norm: float = -1
 

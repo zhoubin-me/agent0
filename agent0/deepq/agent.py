@@ -229,12 +229,12 @@ class Agent:
             comp = Normal(q_target_mean.squeeze(), q_next_logstd.exp().squeeze())
             mix = Categorical(q_next_weights.squeeze().softmax(dim=-1))
             target_gmm = MixtureSameFamily(mix, comp)
-            q_target_sample = target_gmm.sample_n(10000)
+            q_target_sample = target_gmm.sample_n(self.cfg.gmm_num_samples)
 
         q = self.model(states).view(-1, self.action_dim, self.cfg.num_atoms)[self.batch_indices, actions, :]
         q_mean, q_logstd, q_weights = q.split(dim=-1, split_size=self.cfg.num_atoms // 3)
 
-        comp = Normal(q_mean.squeeze(), q_logstd.exp().squeeze())
+        comp = Normal(q_mean.squeeze(), q_logstd.clamp(-3, 3).exp().squeeze())
         mix = Categorical(q_weights.squeeze().softmax(dim=-1))
         q_gmm = MixtureSameFamily(mix, comp)
         loss = q_gmm.log_prob(q_target_sample).neg().mean(0)
