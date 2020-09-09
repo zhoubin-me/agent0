@@ -94,6 +94,7 @@ class Trainer(tune.Trainable, ABC):
         return result
 
     def save_checkpoint(self, checkpoint_dir):
+        print(f"Iteration {self.training_iteration} testing started")
         output = ray.get([a.sample.remote(self.cfg.actor_steps,
                                           self.cfg.test_eps,
                                           self.agent.model.state_dict(),
