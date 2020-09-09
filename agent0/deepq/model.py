@@ -97,6 +97,11 @@ class DeepQNet(nn.Module, ABC):
         if self.cfg.num_atoms == 1:
             q = q.squeeze(-1)
 
+        if self.cfg.algo == 'gmm':
+            q = q.view(-1, self.action_dim, self.cfg.num_atoms)
+            q_mean, q_logstd, q_weight = q.split(dim=-1, split_size=self.cfg.num_atoms // 3)
+            return q_mean, q_logstd.tanh().mul(2).exp(), q_weight.softmax(-1)
+
         if iqr:
             q = q.view(-1, n, self.action_dim * self.cfg.num_atoms)
             return q, taus
@@ -104,9 +109,8 @@ class DeepQNet(nn.Module, ABC):
             return q
 
     def calc_gmm_q(self, st):
-        q = self.forward(st).view(-1, self.action_dim, self.cfg.num_atoms)
-        q_mean, _, q_weights = q.split(dim=-1, split_size=self.cfg.num_atoms // 3)
-        return q_mean.mul(q_weights.softmax(dim=-1)).sum(-1)
+        q_mean, _, q_weights = self.forward(st)
+        return q_mean.mul(q_weights).sum(-1)
 
     def calc_fqf_q(self, st):
         if st.ndim == 4:

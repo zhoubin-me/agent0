@@ -215,26 +215,25 @@ class Agent:
 
     def train_step_gmm(self, states, next_states, actions, terminals, rewards):
         with torch.no_grad():
-            q_next = self.model_target(next_states).view(-1, self.action_dim, self.cfg.num_atoms)
-            q_next_mean, q_next_logstd, q_next_weights = q_next.split(dim=-1, split_size=self.cfg.num_atoms // 3)
+            q_next_mean, q_next_std, q_next_weight = self.model_target(next_states)
             if self.cfg.double_q:
                 a_next = self.model.calc_gmm_q(next_states).argmax(dim=-1)
             else:
-                a_next = q_next_mean.mul(q_next_weights.softmax(dim=-1)).sum(-1).argmax(dim=-1)
-            q_next = q_next[self.batch_indices, a_next, :]
-            q_next_mean, q_next_logstd, q_next_weights = q_next.split(dim=-1, split_size=self.cfg.num_atoms // 3)
+                a_next = q_next_mean.mul(q_next_weight).sum(-1).argmax(dim=-1)
+            q_next_mean = q_next_mean[self.batch_indices, a_next, :]
+            q_next_std = q_next_std[self.batch_indices, a_next, :]
+            q_next_weight = q_next_weight[self.batch_indices, a_next, :]
             q_target_mean = rewards.view(-1, 1).add(
                 self.cfg.discount ** self.cfg.n_step * (1 - terminals.view(-1, 1)) * q_next_mean)
 
-            comp = Normal(q_target_mean.squeeze(), q_next_logstd.exp().squeeze())
-            mix = Categorical(q_next_weights.squeeze().softmax(dim=-1))
+            comp = Normal(q_target_mean.squeeze(), q_next_std)
+            mix = Categorical(q_next_weight.squeeze())
             target_gmm = MixtureSameFamily(mix, comp)
             q_target_sample = target_gmm.sample_n(self.cfg.gmm_num_samples)
 
-        q = self.model(states).view(-1, self.action_dim, self.cfg.num_atoms)[self.batch_indices, actions, :]
-        q_mean, q_logstd, q_weights = q.split(dim=-1, split_size=self.cfg.num_atoms // 3)
+        q_mean, q_std, q_weights = map(lambda x: x[self.batch_indices, actions, :], self.model(states))
 
-        comp = Normal(q_mean.squeeze(), q_logstd.exp().squeeze())
+        comp = Normal(q_mean.squeeze(), q_std.exp().squeeze())
         mix = Categorical(q_weights.squeeze().softmax(dim=-1))
         q_gmm = MixtureSameFamily(mix, comp)
         loss = q_gmm.log_prob(q_target_sample).neg().mean(0)
@@ -304,6 +303,7 @@ class Agent:
             self.update_steps += 1
         else:
             loss = torch.zeros_like(loss).to(loss)
+            self.update_steps += 1
 
         if self.update_steps % self.cfg.target_update_freq == 0:
             self.model_target.load_state_dict(self.model.state_dict())
