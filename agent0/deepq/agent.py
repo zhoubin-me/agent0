@@ -231,10 +231,10 @@ class Agent:
             target_gmm = MixtureSameFamily(mix, comp)
             q_target_sample = target_gmm.sample_n(self.cfg.gmm_num_samples)
 
-        q_mean, q_std, q_weights = map(lambda x: x[self.batch_indices, actions, :], self.model(states))
+        q_mean, q_std, q_weight = map(lambda x: x[self.batch_indices, actions, :], self.model(states))
 
-        comp = Normal(q_mean.squeeze(), q_std.exp().squeeze())
-        mix = Categorical(q_weights.squeeze().softmax(dim=-1))
+        comp = Normal(q_mean.squeeze(), q_std.squeeze())
+        mix = Categorical(q_weight.squeeze())
         q_gmm = MixtureSameFamily(mix, comp)
         loss = q_gmm.log_prob(q_target_sample).neg().mean(0)
         return loss.view(-1)
