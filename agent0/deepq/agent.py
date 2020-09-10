@@ -294,7 +294,7 @@ class Agent:
                 torch.nn.utils.clip_grad_norm_(self.model.fraction_net.parameters(), self.cfg.clip_grad_norm)
             self.fraction_optimizer.step()
 
-        if not loss.isnan().any():
+        if not torch.isnan(loss).any():
             self.optimizer.zero_grad()
             loss.backward()
             if self.cfg.clip_grad_norm > 0:
