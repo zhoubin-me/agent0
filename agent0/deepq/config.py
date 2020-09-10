@@ -66,6 +66,7 @@ class Config:
     gpu_mult: float = 0.5
     step_mult: int = 1
     num_samples: int = 1
+    reversed: bool = False
 
     def update(self):
         self.actor_steps *= self.step_mult

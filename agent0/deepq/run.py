@@ -29,7 +29,10 @@ if __name__ == '__main__':
         cfg.algo = tune.grid_search(['dqn', 'mdqn', 'c51', 'qr'])
 
     if isinstance(cfg.game, list):
-        cfg.game = tune.grid_search(cfg.game)
+        if cfg.reversed:
+            cfg.game = tune.grid_search(cfg.game[::-1])
+        else:
+            cfg.game = tune.grid_search(cfg.game)
 
     ray.init(memory=10 * cfg.mem_mult * 2 ** 30, object_store_memory=20 * cfg.mem_mult * 2 ** 30, num_cpus=20)
     metric_columns = ["frames", "loss", "ep_reward_test", "ep_reward_train",
