@@ -100,7 +100,7 @@ class DeepQNet(nn.Module, ABC):
         if self.cfg.algo == 'gmm':
             q = q.view(-1, self.action_dim, self.cfg.num_atoms)
             q_mean, q_logstd, q_weight = q.split(dim=-1, split_size=self.cfg.num_atoms // 3)
-            return q_mean, q_logstd.tanh().mul(3).exp(), q_weight.softmax(-1)
+            return q_mean, q_logstd.tanh().mul(self.cfg.max_gmm_std).exp(), q_weight.softmax(-1)
 
         if iqr:
             q = q.view(-1, n, self.action_dim * self.cfg.num_atoms)

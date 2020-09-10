@@ -31,6 +31,7 @@ class Config:
     gmm_min_logstd = -10
     num_cosines: int = 64
     clip_grad_norm: float = -1
+    max_gmm_std: float = 5.0
 
     batch_size: int = 512
     replay_size: int = int(1e6)
