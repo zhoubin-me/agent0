@@ -215,7 +215,7 @@ class Agent:
 
     def train_step_gmm(self, states, next_states, actions, terminals, rewards):
         with torch.no_grad():
-            q_next_mean, q_next_std, q_next_weight = self.model_target(next_states)
+            q_next_mean, q_next_std, q_next_weight = self.model_target.forward_gmm(next_states)
             if self.cfg.double_q:
                 a_next = self.model.calc_gmm_q(next_states).argmax(dim=-1)
             else:
@@ -231,7 +231,7 @@ class Agent:
             target_gmm = MixtureSameFamily(mix, comp)
             q_target_sample = target_gmm.sample_n(self.cfg.gmm_num_samples)
 
-        q_mean, q_std, q_weight = map(lambda x: x[self.batch_indices, actions, :], self.model(states))
+        q_mean, q_std, q_weight = map(lambda x: x[self.batch_indices, actions, :], self.model.forward_gmm(states))
 
         comp = Normal(q_mean.squeeze(), q_std.squeeze())
         mix = Categorical(q_weight.squeeze())
