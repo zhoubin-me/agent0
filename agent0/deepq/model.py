@@ -62,54 +62,79 @@ class DeepQNet(nn.Module, ABC):
         self.p.apply(lambda m: init(m, 0.01))
 
         if self.cfg.dueling:
-            self.v = dense(512, self.cfg.num_atoms)
+            if self.cfg.algo == 'gmm':
+                self.v = dense(512, self.cfg.num_atoms // 3)
+            else:
+                self.v = dense(512, self.cfg.num_atoms)
             self.v.apply(lambda m: init(m, 1.0))
         else:
             self.v = None
+
+        self.qvals = {
+            'c51': lambda x: self.calc_c51_q(x),
+            'qr': lambda x: self.forward(x).mean(-1),
+            'iqr': lambda x: self.forward_iqr(x, n=self.cfg.K_iqr)[0].mean(1),
+            'dqn': lambda x: self.forward(x),
+            'mdqn': lambda x: self.forward(x),
+            'fqf': lambda x: self.calc_fqf_q(x),
+            'gmm': lambda x: self.calc_gmm_q(x),
+        }
+
+        assert self.cfg.algo in self.qvals
 
     def params(self):
         layers = (self.convs, self.cosine_emb, self.first_dense, self.p, self.v)
         params = (x.parameters() for x in layers if x is not None)
         return chain(*params)
 
-    def forward(self, x, iqr=False, taus=None, n=32):
-        if iqr:
-            # Frames input
-            if x.ndim == 4:
-                features, taus, n = self.feature_embed(self.convs(x), taus=taus, n=n)
-            # Feature input
-            elif x.ndim == 2:
-                features, taus, n = self.feature_embed(x, taus=taus, n=n)
-            else:
-                raise ValueError("No such input dim")
-            features = self.first_dense(features)
+    def forward_iqr(self, x, taus=None, n=32):
+        if x.ndim == 4:
+            features, taus, n = self.feature_embed(self.convs(x), taus=taus, n=n)
+        elif x.ndim == 2:
+            features, taus, n = self.feature_embed(x, taus=taus, n=n)
         else:
-            features = self.first_dense(self.convs(x))
-            taus = None
-
+            raise ValueError("No such input dim")
+        features = self.first_dense(features)
         adv = self.p(features).view(-1, self.action_dim, self.cfg.num_atoms)
+
         if self.cfg.dueling:
             v = self.v(features).view(-1, 1, self.cfg.num_atoms)
             q = v.expand_as(adv) + (adv - adv.mean(dim=1, keepdim=True).expand_as(adv))
         else:
             q = adv
 
+        q = q.view(-1, n, self.action_dim * self.cfg.num_atoms)
+        return q, taus
+
+    def forward_gmm(self, x):
+        features = self.first_dense(self.convs(x))
+        adv = self.p(features).view(-1, self.action_dim, self.cfg.num_atoms)
+        q_mean, q_logstd, q_weight = adv.split(dim=-1, split_size=self.cfg.num_atoms // 3)
+        if self.cfg.dueling:
+            v = self.v(features).view(-1, 1, self.cfg.num_atoms // 3)
+            q_mean = v.expand_as(q_mean) + (q_mean - q_mean.mean(dim=1, keepdim=True).expand_as(q_mean))
+        return q_mean, q_logstd.tanh().mul(self.cfg.max_gmm_std).exp(), q_weight.softmax(-1)
+
+    def forward(self, x):
+        features = self.first_dense(self.convs(x))
+        adv = self.p(features).view(-1, self.action_dim, self.cfg.num_atoms)
+        if self.cfg.dueling:
+            v = self.v(features).view(-1, 1, self.cfg.num_atoms)
+            q = v.expand_as(adv) + (adv - adv.mean(dim=1, keepdim=True).expand_as(adv))
+        else:
+            q = adv
         if self.cfg.num_atoms == 1:
             q = q.squeeze(-1)
+        return q
 
-        if self.cfg.algo == 'gmm':
-            q = q.view(-1, self.action_dim, self.cfg.num_atoms)
-            q_mean, q_logstd, q_weight = q.split(dim=-1, split_size=self.cfg.num_atoms // 3)
-            return q_mean, q_logstd.tanh().mul(self.cfg.max_gmm_std).exp(), q_weight.softmax(-1)
+    def calc_q(self, x):
+        return self.qvals[self.cfg.algo](x)
 
-        if iqr:
-            q = q.view(-1, n, self.action_dim * self.cfg.num_atoms)
-            return q, taus
-        else:
-            return q
+    def calc_c51_q(self, st):
+        return self.forward(st).softmax(dim=-1).mul(self.atoms).sum(-1),
 
     def calc_gmm_q(self, st):
-        q_mean, _, q_weights = self.forward(st)
+        q_mean, _, q_weights = self.forward_gmm(st)
         return q_mean.mul(q_weights).sum(-1)
 
     def calc_fqf_q(self, st):
@@ -119,7 +144,7 @@ class DeepQNet(nn.Module, ABC):
             convs = st
         # taus: B X (N+1) X 1, taus_hats: B X N X 1
         taus, tau_hats, _ = self.taus_prop(convs.detach())
-        q_hats, _ = self.forward(convs, iqr=True, taus=tau_hats)
+        q_hats, _ = self.forward_iqr(convs, taus=tau_hats)
         q = ((taus[:, 1:, :] - taus[:, :-1, :]) * q_hats).sum(dim=1)
         return q
 

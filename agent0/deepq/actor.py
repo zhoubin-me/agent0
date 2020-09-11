@@ -26,18 +26,6 @@ class Actor:
         self.model = DeepQNet(self.action_dim, **kwargs).to(self.device)
         self.obs = self.envs.reset()
 
-        self.step = {
-            'c51': lambda st: self.model(st).softmax(dim=-1).mul(self.model.atoms).sum(-1),
-            'qr': lambda st: self.model(st).mean(-1),
-            'iqr': lambda st: self.model(st, iqr=True, n=self.cfg.K_iqr)[0].mean(1),
-            'dqn': lambda st: self.model(st),
-            'mdqn': lambda st: self.model(st),
-            'fqf': lambda st: self.model.calc_fqf_q(st),
-            'gmm': lambda st: self.model.calc_gmm_q(st),
-        }
-
-        assert self.cfg.algo in self.step
-
     def sample(self, steps, epsilon, state_dict, testing=False, test_episodes=20, render=False):
         self.model.load_state_dict(state_dict)
         rs, qs, data = [], [], []
@@ -51,7 +39,7 @@ class Actor:
 
             with torch.no_grad():
                 st = torch.from_numpy(self.obs).to(self.device).float().div(255.0)
-                qt = self.step[self.cfg.algo](st)
+                qt = self.model.calc_q(st)
 
             qt_max, qt_arg_max = qt.max(dim=-1)
             action_greedy = qt_arg_max.tolist()

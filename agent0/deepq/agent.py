@@ -71,7 +71,7 @@ class Agent:
         # taus: B X (N+1) X 1, taus_hats: B X N X 1
         taus, tau_hats, _ = self.model.taus_prop(q_convs.detach())
         # q_hat: B X N X A
-        q_hat, _ = self.model(q_convs, iqr=True, taus=tau_hats)
+        q_hat, _ = self.model.forward_iqr(q_convs, taus=tau_hats)
         q_hat = q_hat[self.batch_indices, :, actions]
 
         with torch.no_grad():
@@ -83,7 +83,7 @@ class Agent:
                 q_next_ = self.model_target.calc_fqf_q(q_next_convs)
                 a_next = q_next_.argmax(dim=-1)
 
-            q_next, _ = self.model_target(q_next_convs, taus=tau_hats, iqr=True)
+            q_next, _ = self.model_target.forward_iqr(q_next_convs, taus=tau_hats)
             q_next = q_next[self.batch_indices, :, a_next]
             q_target = rewards.unsqueeze(-1).add(
                 self.cfg.discount ** self.cfg.n_step * (1 - terminals.unsqueeze(-1)) * q_next)
@@ -97,7 +97,7 @@ class Agent:
         ###
         with torch.no_grad():
             # q: B X (N-1) X A
-            q, _ = self.model(q_convs, iqr=True, taus=taus[:, 1:-1])
+            q, _ = self.model.forward_iqr(q_convs, taus=taus[:, 1:-1])
             q = q[self.batch_indices, :, actions]
             values_1 = q - q_hat[:, :-1]
             signs_1 = q.gt(torch.cat((q_hat[:, :1], q[:, :-1]), dim=1))
@@ -117,19 +117,19 @@ class Agent:
         with torch.no_grad():
             q_next_convs = self.model_target.convs(next_states)
             if self.cfg.double_q:
-                q_next_online, _ = self.model(next_states, iqr=True, n=self.cfg.K_iqr)
+                q_next_online, _ = self.model.forward_iqr(next_states, n=self.cfg.K_iqr)
                 a_next = q_next_online.mean(dim=1).argmax(dim=-1)
             else:
-                q_next_, _ = self.model_target(q_next_convs, iqr=True, n=self.cfg.K_iqr)
+                q_next_, _ = self.model_target.forward_iqr(q_next_convs, n=self.cfg.K_iqr)
                 a_next = q_next_.mean(dim=1).argmax(dim=-1)
 
-            q_next, taus_dash = self.model_target(q_next_convs, iqr=True, n=self.cfg.N_iqr_dash)
+            q_next, taus_dash = self.model_target.forward_iqr(q_next_convs, n=self.cfg.N_iqr_dash)
             q_next = q_next[self.batch_indices, :, a_next]
             q_target = rewards.unsqueeze(-1).add(
                 self.cfg.discount ** self.cfg.n_step * (1 - terminals.unsqueeze(-1)) * q_next
             )
 
-        q, taus = self.model(states, iqr=True, n=self.cfg.N_iqr)
+        q, taus = self.model.forward_iqr(states, n=self.cfg.N_iqr)
         q = q[self.batch_indices, :, actions]
         q = q.unsqueeze(1)
         taus = taus.squeeze(-1).unsqueeze(1)
