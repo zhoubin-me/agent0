@@ -27,11 +27,10 @@ class Config:
     N_iqr: int = 64
     N_iqr_dash: int = 64
     N_fqf: int = 32
-    gmm_num_samples = 40000
-    gmm_min_logstd = -10
+    gmm_num_samples: int = 35000
+    gmm_max_std: float = 3.0
     num_cosines: int = 64
     clip_grad_norm: float = -1
-    max_gmm_std: float = 5.0
 
     batch_size: int = 512
     replay_size: int = int(1e6)
@@ -54,10 +53,10 @@ class Config:
     num_data_workers: int = 4
     reset_noise_freq: int = 4
 
-    max_record_ep_len = 100000
-    test_episode_per_actor = 20
-    pin_memory = True
-    fast_replay = True
+    max_record_ep_len: int = 100000
+    test_episode_per_actor: int = 20
+    pin_memory: bool = True
+    fast_replay: bool = True
     restore_checkpoint: str = ""
     random_seed: int = 42
     exp_name: str = 'atari_deepq'

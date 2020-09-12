@@ -113,7 +113,7 @@ class DeepQNet(nn.Module, ABC):
         if self.cfg.dueling:
             v = self.v(features).view(-1, 1, self.cfg.num_atoms // 3)
             q_mean = v.expand_as(q_mean) + (q_mean - q_mean.mean(dim=1, keepdim=True).expand_as(q_mean))
-        return q_mean, q_logstd.tanh().mul(self.cfg.max_gmm_std).exp(), q_weight.softmax(-1)
+        return q_mean, q_logstd.tanh().mul(self.cfg.gmm_max_std).exp(), q_weight.softmax(-1)
 
     def forward(self, x):
         features = self.first_dense(self.convs(x))
