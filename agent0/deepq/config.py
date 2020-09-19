@@ -11,7 +11,10 @@ class Config:
     noisy: bool = False
     prioritize: bool = False
     n_step: int = 1
+    # support: dqn, mdqn, c51, qr, iqr, fqf, gmm
     algo: str = 'dqn'
+    # support: epsilon_greedy, soft_explore
+    policy: str = 'epsilon_greedy'
 
     adam_lr: float = 5e-4
     fraction_lr: float = 2.5e-8
