@@ -4,7 +4,9 @@ from itertools import chain
 import numpy as np
 import torch
 import torch.nn as nn
+from agent0.common.MixtureSameFamily import MixtureSameFamily
 from agent0.deepq.config import Config
+from torch.distributions import Normal, Categorical
 
 
 def init(m, gain=1.0):
@@ -27,7 +29,14 @@ class DeepQNet(nn.Module, ABC):
         self.cfg.update_atoms()
 
         self.action_dim = action_dim
-        dense = NoisyLinear if self.cfg.noisy else nn.Linear
+
+        if self.cfg.noisy:
+            if self.cfg.gmm_layer:
+                dense = GMMLinear
+            else:
+                dense = NoisyLinear
+        else:
+            dense = nn.Linear
 
         self.convs = nn.Sequential(
             nn.Conv2d(self.cfg.frame_stack, 32, 8, stride=4), nn.ReLU(),
@@ -181,6 +190,33 @@ class DeepQNet(nn.Module, ABC):
         for m in self.modules():
             if isinstance(m, NoisyLinear):
                 m.reset_noise()
+
+
+class GMMLinear(nn.Module, ABC):
+    def __init__(self, in_features, out_features, max_std=3.0, num_gmm=5, num_samples=3):
+        super(GMMLinear, self).__init__()
+
+        self.in_features = in_features
+        self.out_features = out_features
+        self.N = num_gmm
+        self.max_std = max_std
+        self.num_samples = 3
+
+        in_features += 1
+        self.mean = nn.Parameter(torch.randn((in_features * out_features, num_gmm)), requires_grad=True)
+        self.logstd = nn.Parameter(torch.randn((in_features * out_features, num_gmm)), requires_grad=True)
+        self.weight = nn.Parameter(torch.randn((in_features * out_features, num_gmm)), requires_grad=True)
+
+    def forward(self, x):
+        comp = Normal(self.mean, self.logstd.tanh().mul(self.max_std).exp())
+        mix = Categorical(self.weight.softmax(dim=-1))
+        gmm = MixtureSameFamily(mix, comp)
+
+        weight_bias = gmm.sample()
+        bias = weight_bias[0].view(-1)
+        weight = weight_bias[1:].view(self.in_features, self.out_features)
+
+        return nn.functional.linear(x, weight, bias)
 
 
 # noinspection PyArgumentList

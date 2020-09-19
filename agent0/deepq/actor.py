@@ -47,10 +47,11 @@ class Actor:
 
     @staticmethod
     def act_soft(qt, epsilon):
-        temperature = (epsilon + 0.0001) * 100
+        # temperature = (epsilon + 0.0001) * 100
+        temperature = 1
         dist = Categorical(logits=qt / temperature)
         action = dist.sample()
-        qt_max = qt.gather(1, action.unsqueez(-1))
+        qt_max = qt.gather(1, action.unsqueeze(-1))
         return action.tolist(), qt_max.mean().item()
 
     def sample(self, steps, epsilon, state_dict, testing=False, test_episodes=20, render=False):
