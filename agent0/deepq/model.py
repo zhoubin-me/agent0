@@ -213,9 +213,8 @@ class GMMLinear(nn.Module, ABC):
         gmm = MixtureSameFamily(mix, comp)
 
         weight_bias = gmm.sample()
-        bias = weight_bias[0].view(-1)
-        weight = weight_bias[1:].view(self.in_features, self.out_features)
-
+        bias = weight_bias[:self.out_features].view(-1)
+        weight = weight_bias[self.out_features:].view(self.out_features, self.in_features)
         return nn.functional.linear(x, weight, bias)
 
 
@@ -276,4 +275,7 @@ class NoisyLinear(nn.Module, ABC):
 
 
 if __name__ == '__main__':
-    pass
+    model = DeepQNet(4, noisy=True, gmm_layer=True)
+    x = torch.randn(512, 4, 84, 84)
+    y = model(x)
+
