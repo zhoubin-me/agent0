@@ -1,5 +1,6 @@
 import copy
 import time
+from collections import defaultdict
 
 import numpy as np
 import torch
@@ -31,6 +32,8 @@ class Actor:
             'epsilon_greedy': self.act_epsilon_greedy,
             'soft_explore': self.act_soft,
         }
+
+        self.local_buffer = defaultdict(int)
 
     def act_epsilon_greedy(self, qt, epsilon):
         action_random = np.random.randint(0, self.action_dim, self.cfg.num_envs)

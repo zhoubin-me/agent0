@@ -149,6 +149,25 @@ class MaxAndSkipEnv(gym.Wrapper):
         return self.env.reset(**kwargs)
 
 
+class NormReward(gym.RewardWrapper):
+    def __init__(self, env):
+        gym.RewardWrapper.__init__(self, env)
+        self.max_abs_reward = 1
+
+    def reward(self, reward):
+        if np.abs(reward) > self.max_abs_reward:
+            self.max_abs_reward = np.abs(reward)
+        return reward / self.max_abs_reward
+
+
+class GaussianReward(gym.RewardWrapper):
+    def __init__(self, env):
+        gym.RewardWrapper.__init__(self, env)
+
+    def reward(self, reward):
+        return np.random.randn(reward)
+
+
 class ClipRewardEnv(gym.RewardWrapper):
     def __init__(self, env):
         gym.RewardWrapper.__init__(self, env)
@@ -357,8 +376,9 @@ class NormalizedEnv(gym.ObservationWrapper):
         return (observation - unbiased_mean) / (unbiased_std + 1e-8)
 
 
-def make_deepq_env(game, episode_life=True, clip_rewards=True, frame_stack=4, transpose_image=True,
-                   n_step=1, discount=0.99, scale=False, noop_num=None, seed=None):
+def make_deepq_env(game, episode_life=True, clip_rewards=True, frame_stack=4, transpose_image=True, norm_reward=False,
+                   n_step=1, discount=0.99, scale=False, noop_num=None, seed=None, gaussian_reward=False):
+    assert not (clip_rewards and norm_reward)
     env = gym.make(f'{game}NoFrameskip-v4')
     env = NoopResetEnv(env, noop_max=30, noop_num=noop_num)
     env = MaxAndSkipEnv(env, skip=4)
@@ -373,6 +393,10 @@ def make_deepq_env(game, episode_life=True, clip_rewards=True, frame_stack=4, tr
         env = ScaledFloatFrame(env)
     if clip_rewards:
         env = ClipRewardEnv(env)
+    if norm_reward:
+        env = NormReward(env)
+    if gaussian_reward:
+        env = GaussianReward(env)
     if frame_stack > 1:
         env = FrameStack(env, frame_stack)
     if n_step > 1:
