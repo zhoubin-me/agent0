@@ -140,7 +140,7 @@ class DeepQNet(nn.Module, ABC):
         return self.qvals[self.cfg.algo](x)
 
     def calc_c51_q(self, st):
-        return self.forward(st).softmax(dim=-1).mul(self.atoms).sum(-1),
+        return self.forward(st).softmax(dim=-1).mul(self.atoms).sum(-1)
 
     def calc_gmm_q(self, st):
         q_mean, _, q_weights = self.forward_gmm(st)
@@ -275,7 +275,7 @@ class NoisyLinear(nn.Module, ABC):
 
 
 if __name__ == '__main__':
-    model = DeepQNet(4, noisy=True, gmm_layer=True)
+    model = DeepQNet(4, algo='c51')
     x = torch.randn(512, 4, 84, 84)
-    y = model(x)
-
+    y = model.calc_c51_q(x)
+    print(model.forward(x).softmax(dim=-1).mul(model.atoms).sum(-1), )
