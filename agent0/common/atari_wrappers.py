@@ -1,4 +1,4 @@
-from collections import deque
+from collections import deque, defaultdict
 
 import cv2
 import gym
@@ -76,13 +76,11 @@ class EpisodicLifeEnv(gym.Wrapper):
         """
         gym.Wrapper.__init__(self, env)
         self.lives = 0
-        self.steps = 0
         self.was_real_done = True
 
     def step(self, action):
         obs, reward, done, info = self.env.step(action)
         self.was_real_done = done
-        self.steps += 1
         # check current lives, make loss of life terminal,
         # then update lives to handle bonus lives
         lives = self.env.unwrapped.ale.lives()
@@ -92,9 +90,6 @@ class EpisodicLifeEnv(gym.Wrapper):
             # the environment advertises done.
             done = True
         self.lives = lives
-        if done:
-            info.update(steps=self.steps)
-            self.steps = 0
         return obs, reward, done, info
 
     def reset(self, **kwargs):
@@ -120,6 +115,7 @@ class MaxAndSkipEnv(gym.Wrapper):
         self._obs_buffer = np.zeros((2,) + env.observation_space.shape, dtype=np.uint8)
         self._skip = skip
         self.real_reward = 0
+        self.steps = 0
 
     def step(self, action):
         """Repeat action, sum reward, and max over last observations."""
@@ -133,6 +129,7 @@ class MaxAndSkipEnv(gym.Wrapper):
             if i == self._skip - 1:
                 self._obs_buffer[1] = obs_
             total_reward += reward
+            self.steps += 1
             if done:
                 break
         # Note that the observation on the done=True frame
@@ -140,12 +137,13 @@ class MaxAndSkipEnv(gym.Wrapper):
         max_frame = self._obs_buffer.max(axis=0)
         self.real_reward += total_reward
         if done:
-            info.update(real_reward=self.real_reward)
+            info.update(real_reward=self.real_reward, steps=self.steps)
+            self.real_reward = 0
+            self.steps = 0
 
         return max_frame, total_reward, done, info
 
     def reset(self, **kwargs):
-        self.real_reward = 0
         return self.env.reset(**kwargs)
 
 
@@ -155,8 +153,7 @@ class NormReward(gym.RewardWrapper):
         self.max_abs_reward = 1
 
     def reward(self, reward):
-        if np.abs(reward) > self.max_abs_reward:
-            self.max_abs_reward = np.abs(reward)
+        self.max_abs_reward = max(np.abs(reward), self.max_abs_reward)
         return reward / self.max_abs_reward
 
 
@@ -309,6 +306,33 @@ class NStepEnv(gym.Wrapper):
         return ob, reward, done, info
 
 
+class StateCountEnv(gym.Wrapper):
+    def __init__(self, env):
+        gym.Wrapper.__init__(self, env)
+        self.ep_counter = defaultdict(int)
+        self.ep_len = 0
+        self.last_obs = None
+        self.max_count = 10
+
+    def reset(self):
+        ob = self.env.reset()
+        self.ep_counter.clear()
+        self.last_obs = ob
+        self.ep_len = 0
+        return ob
+
+    def step(self, action):
+        ob, reward, done, info = self.env.step(action)
+        key = hash((self.last_obs.tobytes(), action))
+        self.ep_counter[key] += 1
+        self.ep_len += 1
+        if self.ep_counter[key] > self.max_count:
+            info.update(counter=(self.max_count, self.ep_len))
+            done = True
+        self.last_obs = ob
+        return ob, reward, done, info
+
+
 class ScaledFloatFrame(gym.ObservationWrapper):
     def __init__(self, env):
         gym.ObservationWrapper.__init__(self, env)
@@ -377,7 +401,8 @@ class NormalizedEnv(gym.ObservationWrapper):
 
 
 def make_deepq_env(game, episode_life=True, clip_rewards=True, frame_stack=4, transpose_image=True, norm_reward=False,
-                   n_step=1, discount=0.99, scale=False, noop_num=None, seed=None, gaussian_reward=False):
+                   n_step=1, discount=0.99, scale=False, noop_num=None, seed=None, gaussian_reward=False,
+                   state_count=False):
     assert not (clip_rewards and norm_reward)
     env = gym.make(f'{game}NoFrameskip-v4')
     env = NoopResetEnv(env, noop_max=30, noop_num=noop_num)
@@ -401,12 +426,24 @@ def make_deepq_env(game, episode_life=True, clip_rewards=True, frame_stack=4, tr
         env = FrameStack(env, frame_stack)
     if n_step > 1:
         env = NStepEnv(env, n_step, discount)
+    if state_count:
+        env = StateCountEnv(env)
     if seed is not None:
         env.seed(seed)
+
     return env
 
 
 if __name__ == '__main__':
     env = make_deepq_env('Breakout')
     obs = env.reset()
-    print(env.observation_space.shape)
+    import time
+    import tqdm
+
+    tic = time.time()
+    for _ in tqdm.tqdm(range(1000)):
+        _, _, done, _ = env.step(env.action_space.sample())
+        if done:
+            env.reset()
+    toc = time.time()
+    print(toc - tic)

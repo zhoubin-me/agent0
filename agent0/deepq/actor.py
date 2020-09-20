@@ -4,12 +4,13 @@ from collections import defaultdict
 
 import numpy as np
 import torch
+from lz4.block import compress
+from torch.distributions import Categorical
+
 from agent0.common.atari_wrappers import make_deepq_env
 from agent0.common.vec_env import ShmemVecEnv
 from agent0.deepq.config import Config
 from agent0.deepq.model import DeepQNet
-from lz4.block import compress
-from torch.distributions import Categorical
 
 
 class Actor:
@@ -59,7 +60,7 @@ class Actor:
 
     def sample(self, steps, epsilon, state_dict, testing=False, test_episodes=20, render=False):
         self.model.load_state_dict(state_dict)
-        rs, qs, data = [], [], []
+        rs, qs, data, ep_len = [], [], [], []
         tic = time.time()
         step = 0
         while True:
@@ -77,7 +78,7 @@ class Actor:
             obs_next, reward, done, info = self.envs.step(action)
             if render:
                 self.envs.render()
-                time.sleep(0.05)
+                time.sleep(0.01)
 
             if not testing:
                 if self.cfg.n_step > 1:
@@ -88,7 +89,9 @@ class Actor:
                         dt = inf['prev_done']
                         data.append((compress(np.concatenate((st, st_next), axis=0)), at, rt, dt))
                 else:
-                    for st, at, rt, dt, st_next in zip(self.obs, action, reward, done, obs_next):
+                    for st, at, rt, dt, st_next, inf in zip(self.obs, action, reward, done, obs_next, info):
+                        if 'counter' in inf:
+                            dt = not dt
                         data.append((compress(np.concatenate((st, st_next), axis=0)), at, rt, dt))
 
             self.obs = obs_next
@@ -96,8 +99,9 @@ class Actor:
             for inf in info:
                 if 'real_reward' in inf:
                     rs.append(inf['real_reward'])
+                    ep_len.append(inf['steps'])
                     if render:
-                        print(rs[-1], len(rs), np.mean(rs), np.max(rs))
+                        print(rs[-1], ep_len[-1], len(rs), np.mean(rs), np.max(rs))
 
             if testing and (len(rs) > test_episodes or step > self.cfg.max_record_ep_len):
                 break
