@@ -22,7 +22,7 @@ class Actor:
         # Training
         self.envs = ShmemVecEnv([lambda: make_deepq_env(game=self.cfg.game, episode_life=True, clip_rewards=True,
                                                         frame_stack=4, transpose_image=True, n_step=self.cfg.n_step,
-                                                        discount=self.cfg.discount, state_count=True,
+                                                        discount=self.cfg.discount, state_count=False,
                                                         gaussian_reward=True, seed=None)
                                  for _ in range(self.cfg.num_envs)], context='spawn')
         self.action_dim = self.envs.action_space.n
