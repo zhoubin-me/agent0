@@ -92,12 +92,12 @@ class EpisodicLifeEnv(gym.Wrapper):
         self.lives = lives
         return obs, reward, done, info
 
-    def reset(self, **kwargs):
+    def reset(self, force_reset=False, **kwargs):
         """Reset only when lives are exhausted.
         This way all states are still reachable even though lives are episodic,
         and the learner need not know about any of this behind-the-scenes.
         """
-        if self.was_real_done:
+        if self.was_real_done or force_reset:
             obs = self.env.reset(**kwargs)
         else:
             # no-op step to advance from terminal/lost life state
@@ -114,8 +114,6 @@ class MaxAndSkipEnv(gym.Wrapper):
         # most recent raw observations (for max pooling across time steps)
         self._obs_buffer = np.zeros((2,) + env.observation_space.shape, dtype=np.uint8)
         self._skip = skip
-        self.real_reward = 0
-        self.steps = 0
 
     def step(self, action):
         """Repeat action, sum reward, and max over last observations."""
@@ -129,18 +127,11 @@ class MaxAndSkipEnv(gym.Wrapper):
             if i == self._skip - 1:
                 self._obs_buffer[1] = obs_
             total_reward += reward
-            self.steps += 1
             if done:
                 break
         # Note that the observation on the done=True frame
         # doesn't matter
         max_frame = self._obs_buffer.max(axis=0)
-        self.real_reward += total_reward
-        if done:
-            info.update(real_reward=self.real_reward, steps=self.steps)
-            self.real_reward = 0
-            self.steps = 0
-
         return max_frame, total_reward, done, info
 
     def reset(self, **kwargs):
@@ -246,8 +237,8 @@ class FrameStack(gym.Wrapper):
         self.observation_space = gym.spaces.Box(low=0, high=255, shape=((shp[0] * k,) + shp[1:]),
                                                 dtype=env.observation_space.dtype)
 
-    def reset(self):
-        ob = self.env.reset()
+    def reset(self, **kwargs):
+        ob = self.env.reset(**kwargs)
         for _ in range(self.k):
             self.frames.append(ob)
         return self._get_ob()
@@ -279,28 +270,32 @@ class NStepEnv(gym.Wrapper):
         self.tracker = deque(maxlen=n)
         self.last_obs = None
 
-    def reset(self):
-        ob = self.env.reset()
+    def reset(self, **kwargs):
+        ob = self.env.reset(**kwargs)
         self.last_obs = ob
         return ob
 
     def step(self, action):
         ob, reward, done, info = self.env.step(action)
-        self.tracker.append((self.last_obs, action, reward, done))
+        self.tracker.append((self.last_obs, action, reward, done, info))
         self.last_obs = ob
 
         r_discounted = 0
         done_discounted = False
-        for _, _, r, d in reversed(self.tracker):
+        bad_transit = False
+        for _, _, r, d, inf in reversed(self.tracker):
             r_discounted = r_discounted * self.discount * (1 - d) + r
             if d:
                 done_discounted = True
+            if 'counter' in inf:
+                bad_transit = True
 
         info.update(
             prev_obs=self.tracker[0][0],
             prev_action=self.tracker[0][1],
             prev_reward=r_discounted,
             prev_done=done_discounted,
+            prev_bad_transit=bad_transit,
         )
 
         return ob, reward, done, info
@@ -311,25 +306,45 @@ class StateCountEnv(gym.Wrapper):
         gym.Wrapper.__init__(self, env)
         self.ep_counter = defaultdict(int)
         self.ep_len = 0
-        self.last_obs = None
+        self.obs_ = None
         self.max_count = 10
 
-    def reset(self):
-        ob = self.env.reset()
+    def reset(self, **kwargs):
+        if len(self.ep_counter) > 0 and max(self.ep_counter.values()) > self.max_count:
+            kwargs.update(force_reset=True)
+        ob = self.env.reset(**kwargs)
         self.ep_counter.clear()
-        self.last_obs = ob
+        self.obs_ = ob
         self.ep_len = 0
         return ob
 
     def step(self, action):
         ob, reward, done, info = self.env.step(action)
-        key = hash((self.last_obs.tobytes(), action))
+        key = hash((self.obs_.tobytes(), action))
         self.ep_counter[key] += 1
         self.ep_len += 1
-        if self.ep_counter[key] > self.max_count:
+        if self.ep_len > 100 and self.ep_counter[key] > self.max_count:
             info.update(counter=(self.max_count, self.ep_len))
             done = True
-        self.last_obs = ob
+        self.obs_ = ob
+        return ob, reward, done, info
+
+
+class RewardStatEnv(gym.Wrapper):
+    def __init__(self, env):
+        gym.Wrapper.__init__(self, env)
+        self.steps = 0
+        self.real_reward = 0
+
+    def step(self, action):
+        ob, reward, done, info = self.env.step(action)
+        self.steps += 1
+        self.real_reward += reward
+        if done:
+            if self.was_real_done or 'counter' in info:
+                info.update(real_reward=self.real_reward, steps=self.steps, real_done=self.was_real_done)
+                self.steps = 0
+                self.real_reward = 0
         return ob, reward, done, info
 
 
@@ -416,33 +431,37 @@ def make_deepq_env(game, episode_life=True, clip_rewards=True, frame_stack=4, tr
         env = TransposeImage(env)
     if scale:
         env = ScaledFloatFrame(env)
+    if frame_stack > 1:
+        env = FrameStack(env, frame_stack)
+    if state_count:
+        env = StateCountEnv(env)
+    env = RewardStatEnv(env)
+
     if clip_rewards:
         env = ClipRewardEnv(env)
     if norm_reward:
         env = NormReward(env)
     if gaussian_reward:
         env = GaussianReward(env)
-    if frame_stack > 1:
-        env = FrameStack(env, frame_stack)
     if n_step > 1:
         env = NStepEnv(env, n_step, discount)
-    if state_count:
-        env = StateCountEnv(env)
     if seed is not None:
         env.seed(seed)
-
     return env
 
 
 if __name__ == '__main__':
-    env = make_deepq_env('Breakout')
+    env = make_deepq_env('Breakout', state_count=True, episode_life=False)
     obs = env.reset()
+
     import time
     import tqdm
 
     tic = time.time()
     for _ in tqdm.tqdm(range(1000)):
-        _, _, done, _ = env.step(env.action_space.sample())
+        _, _, done, info = env.step(env.action_space.sample())
+        if 'real_reward' in info:
+            print(info)
         if done:
             env.reset()
     toc = time.time()

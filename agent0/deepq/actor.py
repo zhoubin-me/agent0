@@ -22,7 +22,8 @@ class Actor:
         # Training
         self.envs = ShmemVecEnv([lambda: make_deepq_env(game=self.cfg.game, episode_life=True, clip_rewards=True,
                                                         frame_stack=4, transpose_image=True, n_step=self.cfg.n_step,
-                                                        discount=self.cfg.discount)
+                                                        discount=self.cfg.discount, state_count=True,
+                                                        seed=None)
                                  for _ in range(self.cfg.num_envs)], context='spawn')
         self.action_dim = self.envs.action_space.n
         self.device = torch.device('cuda:0')
@@ -78,7 +79,7 @@ class Actor:
             obs_next, reward, done, info = self.envs.step(action)
             if render:
                 self.envs.render()
-                time.sleep(0.01)
+                time.sleep(0.001)
 
             if not testing:
                 if self.cfg.n_step > 1:
@@ -87,10 +88,13 @@ class Actor:
                         at = inf['prev_action']
                         rt = inf['prev_reward']
                         dt = inf['prev_done']
+                        if inf['prev_bad_transit']:
+                            dt = not dt
                         data.append((compress(np.concatenate((st, st_next), axis=0)), at, rt, dt))
                 else:
                     for st, at, rt, dt, st_next, inf in zip(self.obs, action, reward, done, obs_next, info):
-                        if 'counter' in inf:
+                        if 'counter' in inf and dt:
+                            # print('bad transit')
                             dt = not dt
                         data.append((compress(np.concatenate((st, st_next), axis=0)), at, rt, dt))
 
@@ -101,7 +105,7 @@ class Actor:
                     rs.append(inf['real_reward'])
                     ep_len.append(inf['steps'])
                     if render:
-                        print(rs[-1], ep_len[-1], len(rs), np.mean(rs), np.max(rs))
+                        print(rs[-1], ep_len[-1], len(rs), np.mean(rs), np.max(rs), inf)
 
             if testing and (len(rs) > test_episodes or step > self.cfg.max_record_ep_len):
                 break
