@@ -153,7 +153,7 @@ class GaussianReward(gym.RewardWrapper):
         gym.RewardWrapper.__init__(self, env)
 
     def reward(self, reward):
-        return np.random.randn(reward)
+        return np.random.normal(float(reward), 0.25)
 
 
 class ClipRewardEnv(gym.RewardWrapper):
