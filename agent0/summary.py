@@ -25,7 +25,7 @@ if __name__ == '__main__':
             data = torch.load(f, map_location=torch.device('cpu'))
             rs = np.array(data['ITRs'])
             frames = data['frame_count']
-            exp_name = f.split('\\')[-3]
+            exp_name = f.split(spliter)[-3]
             with open(f[:-8] + 'params.json', 'r') as fp:
                 djson = json.load(fp)
                 game = djson['game']
