@@ -1,6 +1,5 @@
 import copy
 import time
-from collections import defaultdict
 
 import numpy as np
 import torch
@@ -33,11 +32,13 @@ class Actor:
         self.act = {
             'epsilon_greedy': self.act_epsilon_greedy,
             'soft_explore': self.act_soft,
+            'dltv': self.act_dltv,
         }
 
-        self.local_buffer = defaultdict(int)
+        self.steps = 1
 
-    def act_epsilon_greedy(self, qt, epsilon):
+    def act_epsilon_greedy(self, st, epsilon):
+        qt = self.model.calc_q(st)
         action_random = np.random.randint(0, self.action_dim, self.cfg.num_envs)
         qt_max, qt_arg_max = qt.max(dim=-1)
         action_greedy = qt_arg_max.tolist()
@@ -50,13 +51,23 @@ class Actor:
 
         return action, qt_max.mean().item()
 
-    @staticmethod
-    def act_soft(qt, epsilon):
+    def act_soft(self, st, epsilon=None):
+        qt = self.model.calc_q(st)
         # temperature = (epsilon + 0.0001) * 100
         temperature = 1
         dist = Categorical(logits=qt / temperature)
         action = dist.sample()
         qt_max = qt.gather(1, action.unsqueeze(-1))
+        return action.tolist(), qt_max.mean().item()
+
+    def act_dltv(self, st, epsilon=None):
+        qt = self.model(st)
+        qt_median = qt.median(dim=-1, keepdim=True)
+        qt_mean = qt.mean(dim=-1)
+        sigma = (qt - qt_median).pow(2).mean(-1).sqrt()
+        ct = 50 * np.log(self.steps) / self.steps
+        action = (qt_mean + ct * sigma).argmax(-1)
+        qt_max = qt_mean.gather(1, action.unsqueeze(-1))
         return action.tolist(), qt_max.mean().item()
 
     def sample(self, steps, epsilon, state_dict, testing=False, test_episodes=20, render=False):
@@ -71,9 +82,7 @@ class Actor:
 
             with torch.no_grad():
                 st = torch.from_numpy(self.obs).to(self.device).float().div(255.0)
-                qt = self.model.calc_q(st)
-
-            action, qt_max = self.act[self.cfg.policy](qt, epsilon)
+                action, qt_max = self.act[self.cfg.policy](st, epsilon)
 
             qs.append(qt_max)
             obs_next, reward, done, info = self.envs.step(action)
@@ -82,6 +91,7 @@ class Actor:
                 time.sleep(0.001)
 
             if not testing:
+                self.steps += self.cfg.num_envs
                 if self.cfg.n_step > 1:
                     for inf, st_next in zip(info, obs_next):
                         st = inf['prev_obs']
