@@ -62,7 +62,7 @@ class Actor:
 
     def act_dltv(self, st, epsilon=None):
         qt = self.model(st)
-        qt_median = qt.median(dim=-1, keepdim=True)
+        qt_median, _ = qt.median(dim=-1, keepdim=True)
         qt_mean = qt.mean(dim=-1)
         sigma = (qt - qt_median).pow(2).mean(-1).sqrt()
         ct = 50 * np.log(self.steps) / self.steps
