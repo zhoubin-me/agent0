@@ -104,9 +104,9 @@ if __name__ == '__main__':
         if info['rs'] is not None:
             rs.append(info['rs'])
         if info['vloss'] is not None:
-            rs.append(info['vloss'])
+            vloss.append(info['vloss'])
         if info['ploss'] is not None:
-            rs.append(info['ploss'])
+            ploss.append(info['ploss'])
 
         if agent.total_steps % 5000 == 0:
             stream = ""
