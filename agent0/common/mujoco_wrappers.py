@@ -1,5 +1,5 @@
 import gym
-
+import pybulletgym
 
 class RewardStatEnv(gym.Wrapper):
     def __init__(self, env):
