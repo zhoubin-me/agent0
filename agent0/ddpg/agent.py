@@ -26,7 +26,7 @@ class Agent:
         self.actor_optimizer = torch.optim.Adam(self.network.get_policy_params(), lr=self.cfg.p_lr)
         self.critic_optimizer = torch.optim.Adam(self.network.get_value_params(), lr=self.cfg.v_lr)
         self.total_steps = 0
-        self.noise_std = self.cfg.action_noise_level * self.action_high
+        self.noise_std = torch.tensor(self.cfg.action_noise_level * self.action_high).to(self.device)
         self.replay = ReplayDataset(self.obs_shape, **kwargs)
         self.data_fetcher = None
         self.state = self.env.reset()
@@ -44,14 +44,21 @@ class Agent:
 
         current_q = self.network.action_value(states, actions)
         value_loss = fx.mse_loss(current_q, target_q)
+        self.critic_optimizer.zero_grad()
+        value_loss.backward()
+        self.critic_optimizer.step()
+
         policy_loss = self.network.action_value(states, self.network.act(states)).mean().neg()
+        self.actor_optimizer.zero_grad()
+        policy_loss.backward()
+        self.actor_optimizer.step()
         return value_loss, policy_loss
 
     def act_eval(self, action_mean):
         return action_mean.squeeze(0).cpu().numpy()
 
     def act_explore(self, action_mean):
-        action_std = torch.tensor(self.noise_std).expand_as(action_mean).to(self.device)
+        action_std = self.noise_std.expand_as(action_mean).to(self.device)
         dist = Normal(action_mean, action_std)
         action = dist.sample().clamp(-self.action_high, self.action_high).squeeze(0).cpu().numpy()
         return action
@@ -106,14 +113,6 @@ class Agent:
         rewards = rewards.float().view(-1, 1)
 
         value_loss, policy_loss = self.train_ddpg_step(states, next_states, actions, terminals, rewards)
-
-        self.critic_optimizer.zero_grad()
-        value_loss.backward()
-        self.critic_optimizer.step()
-
-        self.actor_optimizer.zero_grad()
-        policy_loss.backward()
-        self.actor_optimizer.step()
 
         for param, target_param in zip(self.network.parameters(), self.target_network.parameters()):
             target_param.data.copy_(self.cfg.tau * param.data + (1 - self.cfg.tau) * target_param.data)

@@ -17,7 +17,7 @@ class Config:
     ckpt_freq = int(1e5)
 
     total_steps = int(1e6)
-    exploration_steps = int(1e4)
+    exploration_steps = 25000
     action_noise_level = 0.1
 
     # Replay related
