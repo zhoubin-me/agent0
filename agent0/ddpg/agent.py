@@ -71,7 +71,8 @@ class Agent:
     def step(self, testing=False):
 
         st = torch.tensor(self.state).float().to(self.device).unsqueeze(0)
-        action = self.act(st, random=self.total_steps < self.cfg.exploration_steps, testing=testing)
+        with torch.no_grad():
+            action = self.act(st, random=self.total_steps < self.cfg.exploration_steps, testing=testing)
         next_state, reward, done, info = self.env.step(action)
 
         if not testing:
