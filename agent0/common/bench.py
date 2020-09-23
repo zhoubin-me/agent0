@@ -1,5 +1,6 @@
 import atari_py
 import gym
+import pybulletgym
 
 atari6 = ['Breakout', 'Enduro', 'Qbert', 'Seaquest', 'SpaceInvaders', 'BeamRider']
 

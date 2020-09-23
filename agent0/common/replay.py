@@ -13,7 +13,7 @@ class ReplayDataset(Dataset, Sampler):
         self.cfg = Config(**kwargs)
 
         self.obs_shape = obs_shape
-        if len(obs_shape > 1):
+        if len(obs_shape) > 1:
             self.frames_shape = (obs_shape[0] * 2, obs_shape[1], obs_shape[2])
         self.data = deque(maxlen=self.cfg.replay_size)
         self.top = 0
