@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 @dataclass
 class Config:
-    game = "Reacher"
+    game = "HalfCheetah"
     algo = "DDPG"
     seed = 0
 
