@@ -23,13 +23,13 @@ if __name__ == '__main__':
     cfg = Config(sha=sha_long)
     args = parse_arguments(cfg)
     cfg = Config(**vars(args))
-    cfg.update_game()
+    cfg.update()
 
     if isinstance(cfg.game, list):
-        if cfg.reversed:
-            cfg.game = tune.grid_search(cfg.game[::-1])
-        else:
-            cfg.game = tune.grid_search(cfg.game)
+        cfg.game = tune.grid_search(cfg.game)
+
+    if isinstance(cfg.algo, list):
+        cfg.algo = tune.grid_search(cfg.algo)
 
     ray.init(memory=10 * 2 ** 30, object_store_memory=20 * 2 ** 30, num_cpus=20)
     metric_columns = ["frames", "v_loss", "p_loss", "ep_reward_test", "ep_reward_train",
