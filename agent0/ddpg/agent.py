@@ -1,6 +1,5 @@
 import copy
 
-import numpy as np
 import torch
 import torch.nn.functional as fx
 from agent0.common.mujoco_wrappers import make_bullet_env
@@ -94,26 +93,3 @@ class Agent:
             target_param.data.copy_(self.cfg.tau * param.data + (1 - self.cfg.tau) * target_param.data)
 
         return value_loss.item(), policy_loss.item()
-
-
-if __name__ == '__main__':
-    agent = Agent()
-    rs, vloss, ploss = [], [], []
-    while True:
-        info = agent.step()
-        if info['rs'] is not None:
-            rs.append(info['rs'])
-        if info['vloss'] is not None:
-            vloss.append(info['vloss'])
-        if info['ploss'] is not None:
-            ploss.append(info['ploss'])
-
-        if agent.total_steps % 5000 == 0:
-            stream = ""
-            if len(rs) > 10:
-                stream += f"Rs: {np.mean(rs[-100:])}\t"
-            if len(vloss) > 10:
-                stream += f"VLoss: {np.mean(vloss[-100:])}\t"
-            if len(ploss) > 10:
-                stream += f"PLoss: {np.mean(ploss[-100:])}"
-            print(stream)
