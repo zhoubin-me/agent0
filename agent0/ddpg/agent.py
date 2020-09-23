@@ -5,7 +5,7 @@ import torch
 import torch.nn.functional as fx
 from agent0.common.mujoco_wrappers import make_bullet_env
 from agent0.ddpg.config import Config
-from agent0.ddpg.model import DDPGMLP, SACMLP
+from agent0.ddpg.model import DDPGMLP, SACMLP, TD3MLP
 from agent0.ddpg.replay_buffer import ReplayBuffer
 from torch.distributions import Normal
 
@@ -23,11 +23,13 @@ class Agent:
         self.net = {
             'ddpg': DDPGMLP,
             'sac': SACMLP,
+            'td3': TD3MLP,
         }
 
         self.step = {
             'ddpg': self.train_step_ddpg,
             'sac': self.train_step_sac,
+            'td3': self.train_step_td3,
         }
 
         assert self.cfg.algo in self.net
@@ -105,12 +107,15 @@ class Agent:
         self.critic_optimizer.zero_grad()
         value_loss.backward()
         self.critic_optimizer.step()
+        loss = dict(vloss=value_loss.item())
 
         if self.total_steps % self.cfg.policy_update_freq == 0:
             policy_loss = self.network.v(torch.cat([states, self.network.p(states)], dim=1)).mean().neg()
             self.actor_optimizer.zero_grad()
             policy_loss.backward()
             self.actor_optimizer.step()
+            loss.update(ploss=policy_loss.item())
+        return loss
 
     def train_step_sac(self, states, actions, rewards, next_states, terminals):
         with torch.no_grad():
@@ -167,7 +172,7 @@ class Agent:
         terminals = terminals.float().view(-1, 1)
         rewards = rewards.float().view(-1, 1)
 
-        loss = self.train_step_ddpg(states, actions, rewards, next_states, terminals)
+        loss = self.step[self.cfg.algo](states, actions, rewards, next_states, terminals)
 
         for param, target_param in zip(self.network.parameters(), self.target_network.parameters()):
             target_param.data.copy_(self.cfg.tau * param.data + (1 - self.cfg.tau) * target_param.data)

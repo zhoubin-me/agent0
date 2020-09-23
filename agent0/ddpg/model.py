@@ -94,3 +94,41 @@ class SACMLP(nn.Module):
 
     def get_value_params(self):
         return chain(self.v.parameters(), self.v2.parameters())
+
+
+class TD3MLP(nn.Module):
+    def __init__(self, num_inputs, action_dim, max_action, hidden_size=256):
+        super(TD3MLP, self).__init__()
+        self.max_action = max_action
+        self.v = nn.Sequential(
+            nn.Linear(num_inputs + action_dim, hidden_size), nn.Tanh(),
+            nn.Linear(hidden_size, hidden_size), nn.Tanh(),
+            nn.Linear(hidden_size, 1)
+        )
+
+        self.v2 = nn.Sequential(
+            nn.Linear(num_inputs + action_dim, hidden_size), nn.Tanh(),
+            nn.Linear(hidden_size, hidden_size), nn.Tanh(),
+            nn.Linear(hidden_size, 1)
+        )
+
+        self.p = nn.Sequential(
+            nn.Linear(num_inputs, hidden_size), nn.Tanh(),
+            nn.Linear(hidden_size, hidden_size), nn.Tanh(),
+            nn.Linear(hidden_size, action_dim), nn.Tanh()
+        )
+
+        self.apply(lambda m: init(m, np.sqrt(2)))
+
+    def act(self, x):
+        return self.p(x) * self.max_action
+
+    def action_value(self, state, action):
+        x = torch.cat([state, action], dim=1)
+        return self.v(x), self.v2(x)
+
+    def get_policy_params(self):
+        return self.p.parameters()
+
+    def get_value_params(self):
+        return chain(self.v.parameters(), self.v2.parameters())
