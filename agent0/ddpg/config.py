@@ -18,6 +18,7 @@ class Config:
     test_episodes: int = 20
     save_interval: int = 50000
     action_noise_level: float = 0.1
+    policy_update_freq: int = 2
 
     # Replay related
     buffer_size: int = int(1e6)

@@ -90,6 +90,28 @@ class Agent:
 
         return loss
 
+    def train_step_td3(self, states, actions, rewards, next_states, terminals):
+        with torch.no_grad():
+            next_actions_mean = self.target_network.act(next_states)
+            dist = Normal(next_actions_mean, self.noise_std.expand_as(next_actions_mean))
+            next_actions = dist.sample().clamp(-self.action_high, self.action_high)
+            target_q1, target_q2 = self.target_network.action_value(next_states, next_actions)
+            target_q = torch.min(target_q1, target_q2)
+            target_q = rewards + (1.0 - terminals) * self.cfg.gamma * target_q.detach()
+
+        current_q1, current_q2 = self.network.action_value(states, actions)
+        value_loss = fx.mse_loss(current_q1, target_q) + fx.mse_loss(current_q2, target_q)
+
+        self.critic_optimizer.zero_grad()
+        value_loss.backward()
+        self.critic_optimizer.step()
+
+        if self.total_steps % self.cfg.policy_update_freq == 0:
+            policy_loss = self.network.v(torch.cat([states, self.network.p(states)], dim=1)).mean().neg()
+            self.actor_optimizer.zero_grad()
+            policy_loss.backward()
+            self.actor_optimizer.step()
+
     def train_step_sac(self, states, actions, rewards, next_states, terminals):
         with torch.no_grad():
             next_actions, next_entropies, _ = self.network.act(next_states)
