@@ -53,9 +53,8 @@ class Agent:
         return action.squeeze(0).cpu().numpy()
 
     def act_explore(self):
-        with torch.no_grad():
-            state = torch.from_numpy(self.state).to(self.device).float()
-            action = self.network.act(state)
+        state = torch.from_numpy(self.state).to(self.device).float()
+        action = self.network.act(state)
         return action.squeeze(0).cpu().numpy()
 
     def act_random(self):
@@ -65,12 +64,13 @@ class Agent:
         data, rs = [], []
         step = 0
         while True:
-            if testing:
-                action = self.act_eval()
-            elif act_random:
-                action = self.act_random()
-            else:
-                action = self.act_explore()
+            with torch.no_grad():
+                if testing:
+                    action = self.act_eval()
+                elif act_random:
+                    action = self.act_random()
+                else:
+                    action = self.act_explore()
             next_state, reward, done, info = self.env.step(action)
             if 'real_reward' in info:
                 rs.append(info['real_reward'])
