@@ -38,7 +38,6 @@ class DataPrefetcher:
         try:
             self.next_data = next(self.data_loader)
         except Exception as e:
-            print(e)
             raise StopIteration
 
         # noinspection PyTypeChecker
