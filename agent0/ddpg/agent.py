@@ -51,7 +51,7 @@ class Agent:
         return action_mean.squeeze(0).cpu().numpy()
 
     def act_explore(self, action_mean):
-        action_std = self.noise_std.expand_as(action_mean)
+        action_std = torch.tensor(self.noise_std).expand_as(action_mean).to(self.device)
         dist = Normal(action_mean, action_std)
         action = dist.sample().clamp(-self.action_high, self.action_high).squeeze(0).cpu().numpy()
         return action
