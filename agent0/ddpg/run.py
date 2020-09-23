@@ -45,7 +45,7 @@ if __name__ == '__main__':
         reuse_actors=True,
         restore=cfg.restore_checkpoint,
         stop=lambda trial_id, result: result['frames'] > cfg.total_steps,
-        checkpoint_freq=1000,
+        checkpoint_freq=10000,
         trial_name_creator=tune.function(lambda trial: trial_str_creator(trial, sha)),
         progress_reporter=reporter,
         resources_per_trial={"gpu": 0.1},
