@@ -48,6 +48,6 @@ if __name__ == '__main__':
         checkpoint_freq=cfg.ckpt_freq,
         trial_name_creator=tune.function(lambda trial: trial_str_creator(trial, sha)),
         progress_reporter=reporter,
-        resources_per_trial={"gpu": 0.1},
+        resources_per_trial={"gpu": 0.2},
         config=vars(cfg),
     )
