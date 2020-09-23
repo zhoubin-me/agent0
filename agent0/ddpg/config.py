@@ -3,9 +3,10 @@ from dataclasses import dataclass
 
 @dataclass
 class Config:
-    game = "HalfCheetah"
-    algo = "DDPG"
-    seed = 0
+    game: str = "HalfCheetah"
+    algo: str = "DDPG"
+    seed: int = 0
+    sha: str = ""
 
     max_steps = int(1e6)
     exploration_steps = 25000
