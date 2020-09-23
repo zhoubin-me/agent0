@@ -67,13 +67,7 @@ class Agent:
             vloss, ploss = None, None
         return rs, vloss, ploss
 
-    def train_step(self):
-        experiences = self.replay.sample(self.cfg.batch_size)
-        states, actions, rewards, next_states, terminals = map(lambda x: torch.tensor(x).to(self.device).float(),
-                                                               experiences)
-
-        terminals = terminals.float().view(-1, 1)
-        rewards = rewards.float().view(-1, 1)
+    def train_step_ddpg(self, states, actions, rewards, next_states, terminals):
         with torch.no_grad():
             target_q = self.target_network.action_value(next_states, self.target_network.p(next_states))
             target_q = rewards + (1.0 - terminals) * self.cfg.gamma * target_q.detach()
@@ -88,6 +82,16 @@ class Agent:
         self.actor_optimizer.zero_grad()
         policy_loss.backward()
         self.actor_optimizer.step()
+        return value_loss, policy_loss
+
+    def train_step(self):
+        states, actions, rewards, next_states, terminals = map(
+            lambda x: torch.tensor(x).to(self.device).float(), self.replay.sample(self.cfg.batch_size))
+
+        terminals = terminals.float().view(-1, 1)
+        rewards = rewards.float().view(-1, 1)
+
+        value_loss, policy_loss = self.train_step_ddpg(states, actions, rewards, next_states, terminals)
 
         for param, target_param in zip(self.network.parameters(), self.target_network.parameters()):
             target_param.data.copy_(self.cfg.tau * param.data + (1 - self.cfg.tau) * target_param.data)
