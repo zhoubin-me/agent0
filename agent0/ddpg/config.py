@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+
 @dataclass
 class Config:
     game = "Reacher"
@@ -29,3 +30,6 @@ class Config:
     ckpt = ""
     log_dir = ""
     play = False
+
+    def update(self):
+        pass

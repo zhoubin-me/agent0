@@ -15,13 +15,12 @@ class DDPGAgent:
         self.cfg = Config(**kwargs)
         cfg = self.cfg
         self.device = torch.device('cuda:0')
-        self.env = make_bullet_env(cfg.game, seed=cfg.seed)()
-        self.test_env = make_bullet_env(cfg.game, seed=cfg.seed + 1)()
-        self.action_high = self.test_env.action_space.high[0]
+        self.env = make_bullet_env(cfg.game, seed=cfg.seed)
+        self.action_high = self.env.action_space.high[0]
 
         self.replay = ReplayBuffer(size=cfg.buffer_size)
 
-        self.network = DDPGMLP(self.test_env.observation_space.shape[0], self.test_env.action_space.shape[0],
+        self.network = DDPGMLP(self.env.observation_space.shape[0], self.env.action_space.shape[0],
                                self.action_high, cfg.hidden_size).to(self.device)
         self.network.train()
         self.target_network = copy.deepcopy(self.network)
