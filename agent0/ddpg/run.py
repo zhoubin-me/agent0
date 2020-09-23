@@ -23,7 +23,7 @@ if __name__ == '__main__':
     cfg = Config(sha=sha_long)
     args = parse_arguments(cfg)
     cfg = Config(**vars(args))
-    cfg.update()
+    cfg.update_game()
 
     if isinstance(cfg.game, list):
         if cfg.reversed:

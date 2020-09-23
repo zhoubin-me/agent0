@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 
+from agent0.common.bench import bullet, mujoco7
+
 
 @dataclass
 class Config:
@@ -7,33 +9,44 @@ class Config:
     algo: str = "DDPG"
     seed: int = 0
     sha: str = ""
-    exp_name: str = "mujoco"
+    exp_name: str = "mujoco_ddpg"
     restore_checkpoint: str = ""
     ckpt_freq: int = 50000
 
-    total_steps = int(1e6)
-    exploration_steps = 25000
-    log_interval = 5000
-    eval_episodes = 10
-    save_interval = int(1e5)
-    action_noise_level = 0.1
+    total_steps: int = int(1e6)
+    exploration_steps: int = 25000
+    eval_episodes: int = 20
+    save_interval: int = 50000
+    action_noise_level: float = 0.1
 
     # Replay related
-    buffer_size = int(1e6)
-    batch_size = 256
+    buffer_size: int = int(1e6)
+    batch_size: int = 256
 
     # Optimizer related
-    optimizer = 'adam'
-    gamma = 0.99
-    p_lr = 3e-4
-    v_lr = 3e-4
-    tau = 0.005
+    optimizer: str = 'adam'
+    gamma: float = 0.99
+    p_lr: float = 3e-4
+    v_lr: float = 3e-4
+    tau: float = 0.005
 
     # Others
-    hidden_size = 256
-    ckpt = ""
-    log_dir = ""
-    play = False
+    hidden_size: int = 256
+    reversed: bool = False
 
-    def update(self):
-        pass
+    def update_game(self):
+        if self.game == "":
+            self.game = "Reacher"
+        if self.game not in bullet:
+            game_dict = {
+                'mujoco7': mujoco7,
+                'bullet15': bullet
+            }
+
+            try:
+                self.game = game_dict[self.game]
+            except Exception as e:
+                print(e)
+                raise ValueError(f"No such atari games as {self.game}\n"
+                                 f"available games[list] are {game_dict.keys()} and:\n"
+                                 f"{bullet}")
