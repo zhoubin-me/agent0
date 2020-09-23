@@ -23,4 +23,4 @@ atari47 = [  # actually 47
 atari63 = ["".join(list(map(lambda x: x.capitalize(), game.split('_')))) for game in atari_py.list_games()]
 
 mujoco7 = ['Reacher', 'Hopper', 'HalfCheetah', 'Walker2D', "Ant", "Pusher", "Humanoid"]
-bullet = [x.id[:-12] for x in gym.envs.registry.all() if 'BulletEnv' in x.id]
+bullet = [x.id[:-14] for x in gym.envs.registry.all() if 'BulletEnv' in x.id]

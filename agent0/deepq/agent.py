@@ -4,10 +4,10 @@ import torch
 import torch.nn.functional as fx
 from agent0.common.MixtureSameFamily import MixtureSameFamily
 from agent0.common.atari_wrappers import make_deepq_env
+from agent0.common.replay import ReplayDataset
 from agent0.common.utils import DataLoaderX, DataPrefetcher
 from agent0.deepq.config import Config
 from agent0.deepq.model import DeepQNet
-from agent0.deepq.replay import ReplayDataset
 from torch.distributions import Normal, Categorical
 
 

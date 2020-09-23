@@ -2,18 +2,19 @@ from collections import deque
 
 import numpy as np
 import torch
-from lz4.block import decompress
-from torch.utils.data import Dataset, Sampler
-
 from agent0.common.utils import LinearSchedule
 from agent0.deepq.config import Config
+from lz4.block import decompress
+from torch.utils.data import Dataset, Sampler
 
 
 class ReplayDataset(Dataset, Sampler):
     def __init__(self, obs_shape, **kwargs):
         self.cfg = Config(**kwargs)
 
-        self.frames_shape = (obs_shape[0] * 2, obs_shape[1], obs_shape[2])
+        self.obs_shape = obs_shape
+        if len(obs_shape > 1):
+            self.frames_shape = (obs_shape[0] * 2, obs_shape[1], obs_shape[2])
         self.data = deque(maxlen=self.cfg.replay_size)
         self.top = 0
 
@@ -31,7 +32,8 @@ class ReplayDataset(Dataset, Sampler):
         idx = idx % self.top
 
         frames, at, rt, dt = self.data[idx]
-        frames = np.frombuffer(decompress(frames), dtype=np.uint8).reshape(self.frames_shape)
+        if len(self.obs_shape) > 1:
+            frames = np.frombuffer(decompress(frames), dtype=np.uint8).reshape(self.frames_shape)
 
         if self.cfg.prioritize:
             weight = self.prob[idx]
