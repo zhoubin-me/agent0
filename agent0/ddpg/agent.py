@@ -15,21 +15,22 @@ class Agent:
     def __init__(self, **kwargs):
         self.cfg = Config(**kwargs)
         self.env = make_bullet_env(self.cfg.game, seed=None)
-        self.obs_shape = self.env.observation_space.shape
         self.state_dim = self.env.observation_space.shape[0]
         self.action_dim = self.env.action_space.shape[0]
         self.action_high = self.env.action_space.high[0]
         self.device = torch.device('cuda:0')
+
         self.network = DDPGMLP(self.state_dim, self.action_dim, self.action_high).to(self.device)
+        self.network.train()
         self.target_network = copy.deepcopy(self.network)
 
         self.actor_optimizer = torch.optim.Adam(self.network.get_policy_params(), lr=self.cfg.p_lr)
         self.critic_optimizer = torch.optim.Adam(self.network.get_value_params(), lr=self.cfg.v_lr)
-        self.total_steps = 0
+
         self.noise_std = torch.tensor(self.cfg.action_noise_level * self.action_high).to(self.device)
-        self.replay = ReplayDataset(self.obs_shape, **kwargs)
-        self.data_fetcher = None
         self.state = self.env.reset()
+        self.replay = ReplayDataset(self.env.observation_space, )
+        self.data_fetcher = None
 
     def get_data_fetcher(self):
         data_loader = DataLoaderX(self.replay, batch_size=self.cfg.batch_size, shuffle=True,
@@ -52,19 +53,13 @@ class Agent:
         self.actor_optimizer.zero_grad()
         policy_loss.backward()
         self.actor_optimizer.step()
+
         return value_loss, policy_loss
 
-    def act_eval(self, action_mean):
-        return action_mean.squeeze(0).cpu().numpy()
-
     def act_explore(self, action_mean):
-        action_std = self.noise_std.expand_as(action_mean).to(self.device)
-        dist = Normal(action_mean, action_std)
+        dist = Normal(action_mean, self.noise_std.expand_as(action_mean))
         action = dist.sample().clamp(-self.action_high, self.action_high).squeeze(0).cpu().numpy()
         return action
-
-    def act_random(self):
-        return self.env.action_space.sample()
 
     def sample(self, steps, act_random=False, testing=False, test_episodes=10):
         data, rs = [], []
@@ -74,15 +69,14 @@ class Agent:
                 state = torch.from_numpy(self.state).to(self.device).float().unsqueeze(0)
                 action_mean = self.network.act(state)
                 if testing:
-                    action = self.act_eval(action_mean)
+                    action = action_mean.squeeze(0).cpu().numpy()
                 elif act_random:
-                    action = self.act_random()
+                    action = self.env.action_space.sample()
                 else:
                     action = self.act_explore(action_mean)
             next_state, reward, done, info = self.env.step(action)
             if 'real_reward' in info:
                 rs.append(info['real_reward'])
-            self.total_steps += 1
             if not testing:
                 data.append((np.concatenate((self.state.reshape(1, -1), next_state.reshape(1, -1)), axis=0),
                              action, reward, done))
