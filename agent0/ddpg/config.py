@@ -53,7 +53,7 @@ class Config:
             }
 
             try:
-                self.game = game_dict[self.game.lower()]
+                self.game = game_dict[self.game]
             except Exception as e:
                 print(e)
                 raise ValueError(f"No such atari games as {self.game}\n"
