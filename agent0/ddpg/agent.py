@@ -1,13 +1,11 @@
 import copy
 
-import numpy as np
 import torch
 import torch.nn.functional as fx
 from agent0.common.mujoco_wrappers import make_bullet_env
-from agent0.common.replay import ReplayDataset
-from agent0.common.utils import DataLoaderX, DataPrefetcher
 from agent0.ddpg.config import Config
 from agent0.ddpg.model import DDPGMLP
+from agent0.ddpg.replay import ReplayBuffer
 from torch.distributions import Normal
 
 
@@ -29,14 +27,7 @@ class Agent:
 
         self.noise_std = torch.tensor(self.cfg.action_noise_level * self.action_high).to(self.device)
         self.state = self.env.reset()
-        self.replay = ReplayDataset(self.env.observation_space.shape, self.cfg.replay_size)
-        self.data_fetcher = None
-
-    def get_data_fetcher(self):
-        data_loader = DataLoaderX(self.replay, batch_size=self.cfg.batch_size, shuffle=True,
-                                  num_workers=self.cfg.num_data_workers, pin_memory=self.cfg.pin_memory)
-        data_fetcher = DataPrefetcher(data_loader, self.device)
-        return data_fetcher
+        self.replay = ReplayBuffer(size=self.cfg.replay_size)
 
     def train_ddpg_step(self, states, next_states, actions, terminals, rewards):
         with torch.no_grad():
@@ -78,8 +69,8 @@ class Agent:
             if 'real_reward' in info:
                 rs.append(info['real_reward'])
             if not testing:
-                data.append((np.concatenate((self.state.reshape(1, -1), next_state.reshape(1, -1)), axis=0),
-                             action, reward, done))
+                self.replay.add(self.state, action, reward, next_state, int(done))
+
             self.state = next_state
             if done:
                 self.state = self.env.reset()
@@ -93,19 +84,10 @@ class Agent:
         return data, rs
 
     def train_step(self):
-        try:
-            data = self.data_fetcher.next()
-        except (StopIteration, AttributeError):
-            self.data_fetcher = self.get_data_fetcher()
-            data = self.data_fetcher.next()
-
-        frames, actions, rewards, terminals, _, _ = data
-        states = frames[:, 0, :].float().view(-1, self.state_dim)
-        next_states = frames[:, 1, :].float().view(-1, self.state_dim)
-        actions = actions.float().view(-1, self.action_dim)
+        data = self.replay.sample(self.cfg.batch_size)
+        states, actions, rewards, next_states, terminals = map(lambda x: torch.tensor(x).to(self.device).float(), data)
         terminals = terminals.float().view(-1, 1)
         rewards = rewards.float().view(-1, 1)
-
         value_loss, policy_loss = self.train_ddpg_step(states, next_states, actions, terminals, rewards)
 
         for param, target_param in zip(self.network.parameters(), self.target_network.parameters()):

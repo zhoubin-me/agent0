@@ -41,8 +41,6 @@ class Trainer(tune.Trainable, ABC):
         self.Rs += rs
         self.frame_count += self.cfg.actor_steps * self.cfg.num_envs
 
-        if len(data) > 0:
-            self.agent.replay.extend(data)
         if len(self.agent.replay) > self.cfg.exploration_steps:
             loss = self.agent.train_step()
             self.VLoss.append(loss['v_loss'])
