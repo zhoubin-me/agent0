@@ -13,11 +13,11 @@ class Config:
     # Training related
     num_envs = 1
     actor_steps = 1
-    test_episodes = 10
+    test_episodes = 20
     ckpt_freq = int(1e5)
 
     total_steps = int(1e6)
-    exploration_steps = 25000
+    exploration_steps = int(1e4)
     action_noise_level = 0.1
 
     # Replay related

@@ -8,6 +8,7 @@ from agent0.common.replay import ReplayDataset
 from agent0.common.utils import DataLoaderX, DataPrefetcher
 from agent0.ddpg.config import Config
 from agent0.ddpg.model import DDPGMLP
+from torch.distributions import Normal
 
 
 class Agent:
@@ -29,7 +30,6 @@ class Agent:
         self.replay = ReplayDataset(self.obs_shape, **kwargs)
         self.data_fetcher = None
         self.state = self.env.reset()
-        self.steps = 0
 
     def get_data_fetcher(self):
         data_loader = DataLoaderX(self.replay, batch_size=self.cfg.batch_size, shuffle=True,
@@ -47,15 +47,14 @@ class Agent:
         policy_loss = self.network.action_value(states, self.network.act(states)).mean().neg()
         return value_loss, policy_loss
 
-    def act_eval(self):
-        state = torch.from_numpy(self.state).to(self.device).float()
-        action = self.network.act(state)
-        return action.squeeze(0).cpu().numpy()
+    def act_eval(self, action_mean):
+        return action_mean.squeeze(0).cpu().numpy()
 
-    def act_explore(self):
-        state = torch.from_numpy(self.state).to(self.device).float()
-        action = self.network.act(state)
-        return action.squeeze(0).cpu().numpy()
+    def act_explore(self, action_mean):
+        action_std = self.noise_std.expand_as(action_mean)
+        dist = Normal(action_mean, action_std)
+        action = dist.sample().clamp(-self.action_high, self.action_high).squeeze(0).cpu().numpy()
+        return action
 
     def act_random(self):
         return self.env.action_space.sample()
@@ -65,12 +64,14 @@ class Agent:
         step = 1
         while True:
             with torch.no_grad():
+                state = torch.from_numpy(self.state).to(self.device).float().unsqueeze(0)
+                action_mean = self.network.act(state)
                 if testing:
-                    action = self.act_eval()
+                    action = self.act_eval(action_mean)
                 elif act_random:
                     action = self.act_random()
                 else:
-                    action = self.act_explore()
+                    action = self.act_explore(action_mean)
             next_state, reward, done, info = self.env.step(action)
             if 'real_reward' in info:
                 rs.append(info['real_reward'])
