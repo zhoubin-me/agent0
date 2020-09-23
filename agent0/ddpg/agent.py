@@ -10,7 +10,7 @@ from agent0.ddpg.replay_buffer import ReplayBuffer
 from torch.distributions import Normal
 
 
-class DDPGAgent:
+class Agent:
     def __init__(self, **kwargs):
         self.cfg = Config(**kwargs)
         cfg = self.cfg
@@ -66,7 +66,7 @@ class DDPGAgent:
             vloss, ploss = self.train_step()
         else:
             vloss, ploss = None, None
-        return dict(rs=rs, ploss=ploss, vloss=vloss)
+        return rs, vloss, ploss
 
     def train_step(self):
         experiences = self.replay.sample(self.cfg.batch_size)
@@ -97,7 +97,7 @@ class DDPGAgent:
 
 
 if __name__ == '__main__':
-    agent = DDPGAgent()
+    agent = Agent()
     rs, vloss, ploss = [], [], []
     while True:
         info = agent.step()
