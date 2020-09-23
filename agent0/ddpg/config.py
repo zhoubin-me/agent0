@@ -15,7 +15,7 @@ class Config:
 
     total_steps: int = int(1e6)
     exploration_steps: int = 25000
-    eval_episodes: int = 20
+    test_episodes: int = 20
     save_interval: int = 50000
     action_noise_level: float = 0.1
 
