@@ -8,7 +8,7 @@ class Config:
     game: str = ""
     algo: str = "ddpg"
     sha: str = 'master'
-    exp_name: str = 'mujoco'
+    exp_name: str = 'mujoco_ddpg'
 
     # Training related
     num_envs = 1

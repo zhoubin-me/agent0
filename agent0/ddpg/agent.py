@@ -62,7 +62,7 @@ class Agent:
 
     def sample(self, steps, act_random=False, testing=False, test_episodes=10):
         data, rs = [], []
-        step = 0
+        step = 1
         while True:
             with torch.no_grad():
                 if testing:
