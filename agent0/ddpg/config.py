@@ -21,7 +21,7 @@ class Config:
     action_noise_level = 0.1
 
     # Replay related
-    replay_size = int(1e6)
+    buffer_size = int(1e6)
     batch_size = 256
 
     # Optimizer related
@@ -34,9 +34,8 @@ class Config:
     # Others
     restore_checkpoint: str = ""
     play = False
+    hidden_size = 256
     random_seed = 42
-    num_data_workers = 4
-    pin_memory = True
     reversed: bool = False
 
     def update(self):

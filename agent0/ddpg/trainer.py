@@ -37,11 +37,11 @@ class Trainer(tune.Trainable, ABC):
 
     def step(self):
         tic = time.time()
-        data, rs = self.agent.sample(self.cfg.actor_steps, self.frame_count < self.cfg.exploration_steps)
-        self.Rs += rs
-        self.frame_count += self.cfg.actor_steps * self.cfg.num_envs
+        rs = self.agent.sample()
 
-        if len(self.agent.replay) > self.cfg.exploration_steps:
+        self.Rs += rs
+
+        if self.agent.total_steps > self.cfg.exploration_steps:
             loss = self.agent.train_step()
             self.VLoss.append(loss['v_loss'])
             self.PLoss.append(loss['p_loss'])
@@ -52,7 +52,7 @@ class Trainer(tune.Trainable, ABC):
         result = dict(
             game=self.cfg.game,
             time_past=self._time_total,
-            frames=self.frame_count,
+            frames=self._iteration,
             velocity=np.mean(self.velocity[-20:]) if len(self.velocity) > 0 else 0,
             speed=self.frame_count / (self._time_total + 1),
             time_remain=(self.cfg.total_steps - self.frame_count) / ((self.frame_count + 1) / (self._time_total + 1)),
@@ -66,7 +66,11 @@ class Trainer(tune.Trainable, ABC):
         return result
 
     def save_checkpoint(self, checkpoint_dir):
-        _, rs = self.agent.sample(self.cfg.actor_steps, False, testing=True, test_episodes=self.cfg.test_episodes)
+        rs = []
+        while True:
+            rs += self.agent.sample(testing=True)
+            if len(rs) > self.cfg.test_episodes:
+                break
 
         self.ITRs = rs
         self.TRs += rs
