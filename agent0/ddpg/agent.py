@@ -55,7 +55,7 @@ class Agent:
         if random:
             return self.env.action_space.sample()
 
-        if self.cfg.algo == 'ddpg':
+        if self.cfg.algo in ['ddpg', 'td3']:
             action_mean = self.network.act(st)
         elif self.cfg.algo == 'sac':
             _, _, action_mean = self.network.act(st)
