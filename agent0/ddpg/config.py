@@ -7,8 +7,11 @@ class Config:
     algo: str = "DDPG"
     seed: int = 0
     sha: str = ""
+    exp_name: str = "mujoco"
+    restore_checkpoint: str = ""
+    ckpt_freq: int = 50000
 
-    max_steps = int(1e6)
+    total_steps = int(1e6)
     exploration_steps = 25000
     log_interval = 5000
     eval_episodes = 10
