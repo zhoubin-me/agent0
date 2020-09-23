@@ -6,7 +6,7 @@ from agent0.common.bench import bullet, mujoco7
 @dataclass
 class Config:
     game: str = "HalfCheetah"
-    algo: str = "DDPG"
+    algo: str = "ddpg"
     seed: int = 0
     sha: str = ""
     exp_name: str = "mujoco_ddpg"

@@ -26,7 +26,7 @@ class Agent:
             'td3': TD3MLP,
         }
 
-        self.step = {
+        self.step_fn = {
             'ddpg': self.train_step_ddpg,
             'sac': self.train_step_sac,
             'td3': self.train_step_td3,
@@ -175,7 +175,7 @@ class Agent:
         terminals = terminals.float().view(-1, 1)
         rewards = rewards.float().view(-1, 1)
 
-        loss = self.step[self.cfg.algo](states, actions, rewards, next_states, terminals)
+        loss = self.step_fn[self.cfg.algo](states, actions, rewards, next_states, terminals)
 
         for param, target_param in zip(self.network.parameters(), self.target_network.parameters()):
             target_param.data.copy_(self.cfg.tau * param.data + (1 - self.cfg.tau) * target_param.data)
