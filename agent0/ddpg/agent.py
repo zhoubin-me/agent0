@@ -92,6 +92,9 @@ class Agent:
 
         return loss
 
+    def train_step_gmm(self, states, actions, rewards, next_states, terminals):
+        pass
+
     def train_step_td3(self, states, actions, rewards, next_states, terminals):
         with torch.no_grad():
             next_actions_mean = self.target_network.act(next_states)

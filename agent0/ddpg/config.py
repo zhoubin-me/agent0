@@ -35,19 +35,26 @@ class Config:
     hidden_size: int = 256
     reversed: bool = False
 
-    def update_game(self):
+    def update(self):
         if self.game == "":
-            self.game = "Reacher"
-        if self.game not in bullet:
-            game_dict = {
-                'mujoco7': mujoco7,
-                'bullet15': bullet
-            }
+            self.game = "HalfCheetah"
 
-            try:
-                self.game = game_dict[self.game]
-            except Exception as e:
-                print(e)
+        if self.game not in bullet:
+            if self.game == 'mujoco7':
+                self.game = mujoco7
+            elif self.game == 'bullet15':
+                self.game = bullet
+            else:
                 raise ValueError(f"No such atari games as {self.game}\n"
-                                 f"available games[list] are {game_dict.keys()} and:\n"
+                                 f"available games[list] are [mujoco7, bullet15] and:\n"
                                  f"{bullet}")
+
+        if self.algo == "":
+            self.algo = "ddpg"
+
+        if self.algo not in ['ddpg', 'sac', 'td3']:
+            if self.algo == 'all':
+                self.algo = ['ddpg', 'sac', 'td3']
+            else:
+                raise ValueError(f"No such algo as {self.algo}\n"
+                                 f"available algos are [ddpg, sac, td3']")
