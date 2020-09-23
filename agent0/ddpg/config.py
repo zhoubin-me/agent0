@@ -14,6 +14,7 @@ class Config:
     num_envs = 1
     actor_steps = 1
     test_episodes = 10
+    ckpt_freq = int(1e5)
 
     total_steps = int(1e6)
     exploration_steps = 25000
@@ -32,7 +33,6 @@ class Config:
     tau = 0.005
 
     # Others
-    hidden_size = 256
     restore_checkpoint: str = ""
     play = False
     random_seed = 42
