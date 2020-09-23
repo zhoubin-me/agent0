@@ -1,23 +1,16 @@
 from dataclasses import dataclass
 
-from agent0.common.bench import bullet, mujoco7
-
-
 @dataclass
 class Config:
-    game: str = ""
-    algo: str = "ddpg"
-    sha: str = 'master'
-    exp_name: str = 'mujoco_ddpg'
+    game = "Reacher"
+    algo = "DDPG"
+    seed = 0
 
-    # Training related
-    num_envs = 1
-    actor_steps = 1
-    test_episodes = 20
-    ckpt_freq = int(1e5)
-
-    total_steps = int(1e6)
+    max_steps = int(1e6)
     exploration_steps = 25000
+    log_interval = 5000
+    eval_episodes = 10
+    save_interval = int(1e5)
     action_noise_level = 0.1
 
     # Replay related
@@ -32,28 +25,7 @@ class Config:
     tau = 0.005
 
     # Others
-    restore_checkpoint: str = ""
-    play = False
     hidden_size = 256
-    random_seed = 42
-    reversed: bool = False
-
-    def update(self):
-        self.update_game()
-
-    def update_game(self):
-        if self.game == "":
-            self.game = "Reacher"
-        if self.game not in bullet:
-            game_dict = {
-                'mujoco7': mujoco7,
-                'bullet15': bullet
-            }
-
-            try:
-                self.game = game_dict[self.game]
-            except Exception as e:
-                print(e)
-                raise ValueError(f"No such atari games as {self.game}\n"
-                                 f"available games[list] are {game_dict.keys()} and:\n"
-                                 f"{bullet}")
+    ckpt = ""
+    log_dir = ""
+    play = False

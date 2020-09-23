@@ -1,5 +1,3 @@
-from abc import ABC
-
 import numpy as np
 import torch
 import torch.nn as nn
@@ -11,22 +9,20 @@ def init(m, gain=1.0):
         nn.init.zeros_(m.bias.data)
 
 
-class DDPGMLP(nn.Module, ABC):
+class DDPGMLP(nn.Module):
     def __init__(self, num_inputs, action_dim, max_action, hidden_size=256):
         super(DDPGMLP, self).__init__()
 
         self.max_action = max_action
         self.v = nn.Sequential(
-            nn.Linear(num_inputs + action_dim, hidden_size), nn.ReLU(),
-            nn.Linear(hidden_size, hidden_size), nn.ReLU(),
-            nn.Linear(hidden_size, hidden_size), nn.ReLU(),
+            nn.Linear(num_inputs + action_dim, hidden_size), nn.Tanh(),
+            nn.Linear(hidden_size, hidden_size), nn.Tanh(),
             nn.Linear(hidden_size, 1)
         )
 
         self.p = nn.Sequential(
-            nn.Linear(num_inputs, hidden_size), nn.ReLU(),
-            nn.Linear(hidden_size, hidden_size), nn.ReLU(),
-            nn.Linear(hidden_size, hidden_size), nn.ReLU(),
+            nn.Linear(num_inputs, hidden_size), nn.Tanh(),
+            nn.Linear(hidden_size, hidden_size), nn.Tanh(),
             nn.Linear(hidden_size, action_dim), nn.Tanh()
         )
 

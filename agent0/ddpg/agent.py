@@ -1,37 +1,41 @@
 import copy
 
+import numpy as np
 import torch
 import torch.nn.functional as fx
 from agent0.common.mujoco_wrappers import make_bullet_env
 from agent0.ddpg.config import Config
 from agent0.ddpg.model import DDPGMLP
-from agent0.ddpg.replay import ReplayBuffer
+from agent0.ddpg.replay_buffer import ReplayBuffer
 from torch.distributions import Normal
 
 
-class Agent:
+class DDPGAgent:
     def __init__(self, **kwargs):
         self.cfg = Config(**kwargs)
+        cfg = self.cfg
         self.device = torch.device('cuda:0')
+        self.env = make_bullet_env(cfg.game, seed=cfg.seed)()
+        self.test_env = make_bullet_env(cfg.game, seed=cfg.seed + 1)()
+        self.action_high = self.test_env.action_space.high[0]
 
-        self.env = make_bullet_env(self.cfg.game, seed=self.cfg.random_seed)()
-        self.action_high = self.env.action_space.high[0]
+        self.replay = ReplayBuffer(size=cfg.buffer_size)
 
-        self.replay = ReplayBuffer(size=self.cfg.buffer_size)
-
-        self.network = DDPGMLP(self.env.observation_space.shape[0], self.env.action_space.shape[0],
-                               self.action_high, self.cfg.hidden_size).to(self.device)
+        self.network = DDPGMLP(self.test_env.observation_space.shape[0], self.test_env.action_space.shape[0],
+                               self.action_high, cfg.hidden_size).to(self.device)
         self.network.train()
         self.target_network = copy.deepcopy(self.network)
 
-        self.actor_optimizer = torch.optim.Adam(self.network.get_policy_params(), lr=self.cfg.p_lr)
-        self.critic_optimizer = torch.optim.Adam(self.network.get_value_params(), lr=self.cfg.v_lr)
+        self.actor_optimizer = torch.optim.Adam(self.network.get_policy_params(), lr=cfg.p_lr)
+        self.critic_optimizer = torch.optim.Adam(self.network.get_value_params(), lr=cfg.v_lr)
 
         self.total_steps = 0
         self.noise_std = torch.tensor(self.cfg.action_noise_level * self.action_high).to(self.device)
-        self.state = self.env.reset()
 
-    def sample(self, testing=False):
+    def step(self, testing=False):
+        if self.total_steps == 0:
+            self.state = self.env.reset()
+
         if self.total_steps < self.cfg.exploration_steps:
             action = self.env.action_space.sample()
         else:
@@ -51,24 +55,27 @@ class Agent:
             self.replay.add(self.state, action, reward, next_state, int(done))
 
         if 'real_reward' in info:
-            rs = [info['real_reward']]
+            rs = info['real_reward']
         else:
-            rs = []
+            rs = None
 
         self.state = next_state
         if done:
             self.state = self.env.reset()
 
-        return rs
+        if not testing and self.total_steps > self.cfg.exploration_steps:
+            vloss, ploss = self.train_step()
+        else:
+            vloss, ploss = None, None
+        return dict(rs=rs, ploss=ploss, vloss=vloss)
 
     def train_step(self):
-
-        data = self.replay.sample(self.cfg.batch_size)
-        states, actions, rewards, next_states, terminals = map(lambda x: torch.tensor(x).to(self.device).float(), data)
+        experiences = self.replay.sample(self.cfg.batch_size)
+        states, actions, rewards, next_states, terminals = map(lambda x: torch.tensor(x).to(self.device).float(),
+                                                               experiences)
 
         terminals = terminals.float().view(-1, 1)
         rewards = rewards.float().view(-1, 1)
-
         with torch.no_grad():
             target_q = self.target_network.action_value(next_states, self.target_network.p(next_states))
             target_q = rewards + (1.0 - terminals) * self.cfg.gamma * target_q.detach()
@@ -87,4 +94,27 @@ class Agent:
         for param, target_param in zip(self.network.parameters(), self.target_network.parameters()):
             target_param.data.copy_(self.cfg.tau * param.data + (1 - self.cfg.tau) * target_param.data)
 
-        return {'p_loss': policy_loss.item(), 'v_loss': value_loss.item()}
+        return value_loss.item(), policy_loss.item()
+
+
+if __name__ == '__main__':
+    agent = DDPGAgent()
+    rs, vloss, ploss = [], [], []
+    while True:
+        info = agent.step()
+        if info['rs'] is not None:
+            rs.append(info['rs'])
+        if info['vloss'] is not None:
+            rs.append(info['vloss'])
+        if info['ploss'] is not None:
+            rs.append(info['ploss'])
+
+        if agent.total_steps % 5000 == 0:
+            stream = ""
+            if len(rs) > 10:
+                stream += f"Rs: {np.mean(rs[-100:])}\t"
+            if len(vloss) > 10:
+                stream += f"VLoss: {np.mean(vloss[-100:])}\t"
+            if len(ploss) > 10:
+                stream += f"PLoss: {np.mean(ploss[-100:])}"
+            print(stream)
