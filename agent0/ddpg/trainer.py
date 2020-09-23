@@ -37,7 +37,7 @@ class Trainer(tune.Trainable, ABC):
 
     def step(self):
         tic = time.time()
-        data, rs = self.agent.sample(self.cfg.actor_steps, self.frame_count > self.cfg.exploration_steps)
+        data, rs = self.agent.sample(self.cfg.actor_steps, self.frame_count < self.cfg.exploration_steps)
         self.Rs += rs
         self.frame_count += self.cfg.actor_steps * self.cfg.num_envs
 
