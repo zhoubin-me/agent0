@@ -29,7 +29,7 @@ class Agent:
 
         self.noise_std = torch.tensor(self.cfg.action_noise_level * self.action_high).to(self.device)
         self.state = self.env.reset()
-        self.replay = ReplayDataset(self.env.observation_space, )
+        self.replay = ReplayDataset(self.env.observation_space, self.cfg.replay_size)
         self.data_fetcher = None
 
     def get_data_fetcher(self):
