@@ -1,5 +1,5 @@
 import gym
-import pybulletgym
+
 
 class RewardStatEnv(gym.Wrapper):
     def __init__(self, env):
@@ -12,7 +12,7 @@ class RewardStatEnv(gym.Wrapper):
         self.steps += 1
         self.real_reward += reward
         if done:
-            info.update(real_reward=self.real_reward, steps=self.steps, real_done=self.was_real_done)
+            info.update(real_reward=self.real_reward, steps=self.steps)
             self.steps = 0
             self.real_reward = 0
         return ob, reward, done, info
