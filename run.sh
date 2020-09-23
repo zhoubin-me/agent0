@@ -9,6 +9,8 @@
 # python -m agent0.deepq.run --algo gmm --game atari6 --exp_name atari_gmm_gaussian_reward
 
 
-python -m agent0.ddpg.run --algo ddpg --game mujoco7 --exp_name mujoco_ddpg
-python -m agent0.ddpg.run --algo sac --game mujoco7 --exp_name mujoco_sac
-python -m agent0.ddpg.run --algo td3 --game mujoco7 --exp_name mujoco_td3
+# python -m agent0.ddpg.run --algo ddpg --game mujoco7 --exp_name mujoco_ddpg
+# python -m agent0.ddpg.run --algo sac --game mujoco7 --exp_name mujoco_sac
+# python -m agent0.ddpg.run --algo td3 --game mujoco7 --exp_name mujoco_td3
+
+python -m agent0.ddpg.run --algo all --game mujoco7 --exp_name mujoco_bench
