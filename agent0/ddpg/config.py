@@ -15,7 +15,7 @@ class Config:
     actor_steps = 1
     test_episodes = 10
 
-    max_steps = int(1e6)
+    total_steps = int(1e6)
     exploration_steps = 25000
     action_noise_level = 0.1
 
