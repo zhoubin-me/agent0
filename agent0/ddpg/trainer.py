@@ -38,15 +38,15 @@ class Trainer(tune.Trainable, ABC):
 
     def step(self):
         tic = time.time()
-        rs, vloss, ploss = self.agent.step()
+        info = self.agent.step()
         self.frame_count += 1
 
-        if rs is not None:
-            self.Rs.append(rs)
-        if ploss is not None:
-            self.PLoss.append(ploss)
-        if vloss is not None:
-            self.VLoss.append(vloss)
+        if 'rs' in info:
+            self.Rs.append(info['rs'])
+        if 'ploss' in info:
+            self.PLoss.append(info['ploss'])
+        if 'vloss' in info:
+            self.VLoss.append(info['vloss'])
 
         toc = time.time()
         self.velocity.append(1.0 / (toc - tic))
