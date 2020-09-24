@@ -130,16 +130,14 @@ class Agent:
 
         current_q1, current_q2 = self.network.action_value(states, actions)
         value_loss = fx.mse_loss(current_q1, target_q) + fx.mse_loss(current_q2, target_q)
-
-        sampled_action, entropy, _ = self.network.act(states)
-        q1, q2 = self.network.action_value(states, sampled_action)
-        q = torch.min(q1, q2)
-        policy_loss = (q + self.log_alpha.exp() * entropy).mean().neg()
-
         self.critic_optimizer.zero_grad()
         value_loss.backward()
         self.critic_optimizer.step()
 
+        sampled_action, entropy, _ = self.network.act(states)
+        q1, q2 = self.network.action_value(states, sampled_action)
+        q = torch.min(q1, q2)
+        policy_loss = (q + self.log_alpha.exp().detach() * entropy).mean().neg()
         self.actor_optimizer.zero_grad()
         policy_loss.backward()
         self.actor_optimizer.step()

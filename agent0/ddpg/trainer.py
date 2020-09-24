@@ -70,9 +70,9 @@ class Trainer(tune.Trainable, ABC):
     def save_checkpoint(self, checkpoint_dir):
         rs = []
         while True:
-            r, ploss, vloss = self.agent.step(testing=True)
-            if r is not None:
-                rs.append(r)
+            info = self.agent.step(testing=True)
+            if 'rs' in info:
+                rs.append(info['rs'])
             if len(rs) > self.cfg.test_episodes:
                 break
 
