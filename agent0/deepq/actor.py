@@ -3,13 +3,12 @@ import time
 
 import numpy as np
 import torch
-from lz4.block import compress
-from torch.distributions import Categorical
-
 from agent0.common.atari_wrappers import make_deepq_env
 from agent0.common.vec_env import ShmemVecEnv
 from agent0.deepq.config import Config
 from agent0.deepq.model import DeepQNet
+from lz4.block import compress
+from torch.distributions import Categorical
 
 
 class Actor:
@@ -22,6 +21,7 @@ class Actor:
         self.envs = ShmemVecEnv([lambda: make_deepq_env(game=self.cfg.game, episode_life=True, clip_rewards=True,
                                                         frame_stack=4, transpose_image=True, n_step=self.cfg.n_step,
                                                         discount=self.cfg.discount, state_count=False,
+                                                        norm_reward=False,
                                                         gaussian_reward=False, seed=None)
                                  for _ in range(self.cfg.num_envs)], context='spawn')
         self.action_dim = self.envs.action_space.n
