@@ -263,12 +263,13 @@ class Agent:
         best_ep_loss = fx.cross_entropy(qs, at)
         return best_ep_loss
 
-    def train_step(self):
-        try:
-            data = self.data_fetcher.next()
-        except (StopIteration, AttributeError):
-            self.data_fetcher = self.get_data_fetcher()
-            data = self.data_fetcher.next()
+    def train_step(self, data=None):
+        if data is None:
+            try:
+                data = self.data_fetcher.next()
+            except (StopIteration, AttributeError):
+                self.data_fetcher = self.get_data_fetcher()
+                data = self.data_fetcher.next()
 
         frames, actions, rewards, terminals, weights, indices, best_frames, best_actions = data
         states = frames[:, :self.cfg.frame_stack, :, :].float().div(255.0)
@@ -290,10 +291,6 @@ class Agent:
         else:
             fraction_loss = None
 
-        if self.cfg.best_ep:
-            ce_loss = self.train_best_ep(best_frames, best_actions)
-            loss += ce_loss * self.cfg.best_ep_reg
-
         if self.cfg.prioritize:
             self.replay.update_priorities(indices.cpu(), loss.detach().cpu())
             weights /= weights.sum().add(1e-8)
@@ -302,6 +299,10 @@ class Agent:
         else:
             loss = loss.mean()
             fraction_loss = fraction_loss.mean() if fraction_loss is not None else None
+
+        if self.cfg.best_ep:
+            ce_loss = self.train_best_ep(best_frames, best_actions)
+            loss += ce_loss * self.cfg.best_ep_reg
 
         if fraction_loss is not None:
             self.fraction_optimizer.zero_grad()
@@ -325,3 +326,15 @@ class Agent:
             self.model_target.load_state_dict(self.model.state_dict())
         return {'loss': loss.detach(),
                 'fraction_loss': fraction_loss.detach() if fraction_loss is not None else 0}
+
+
+if __name__ == '__main__':
+    agent = Agent(game='Breakout')
+    st = torch.randn(512, 4, 84, 84).to(0)
+    at = torch.randint(0, 4, (512,)).to(0)
+    rt = torch.randn(512).to(0)
+    dt = torch.zeros(512).to(0)
+    # data = frames, actions, rewards, terminals, weights, indices, best_frames, best_actions
+    data = torch.cat((st, st), dim=1), at, rt, dt, rt, dt, st, at
+    loss = agent.train_step(data)
+    print(loss)
