@@ -35,8 +35,7 @@ class Agent:
                 alpha=0.95, eps=0.00001)
 
         self.update_steps = 0
-        self.replay = ReplayDataset(self.obs_shape, self.cfg.replay_size, self.cfg.batch_size, self.cfg.prioritize,
-                                    self.cfg.priority_beta0, self.cfg.priority_alpha, self.cfg.total_steps)
+        self.replay = ReplayDataset(self.obs_shape, **kwargs)
         self.data_fetcher = None
 
         self.step = {
