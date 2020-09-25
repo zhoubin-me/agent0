@@ -251,8 +251,12 @@ class Agent:
             q_target = rewards + self.cfg.discount ** self.cfg.n_step * (1 - terminals) * q_next
 
         q = self.model(states)[self.batch_indices, actions]
-        loss = fx.smooth_l1_loss(q, q_target, reduction='none')
-        return loss.view(-1)
+        loss = fx.smooth_l1_loss(q, q_target, reduction='none').view(-1)
+        if self.cfg.cor_loss:
+            diff = self.model.phi - self.model.phi.mean(dim=0, keepdim=True)
+            cor_loss = (diff.unsqueeze(1) * diff.unsqueeze(-1)).pow(2).mean(dim=-1).mean(dim=-1)
+            loss += cor_loss.view(-1) * self.cfg.cor_reg
+        return loss
 
     def train_step(self):
         try:
