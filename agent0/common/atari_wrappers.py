@@ -141,11 +141,9 @@ class MaxAndSkipEnv(gym.Wrapper):
 class NormReward(gym.RewardWrapper):
     def __init__(self, env):
         gym.RewardWrapper.__init__(self, env)
-        self.max_abs_reward = 1
 
     def reward(self, reward):
-        self.max_abs_reward = max(np.abs(reward), self.max_abs_reward)
-        return reward / self.max_abs_reward
+        return np.log1p(reward) if reward >= 0 else -np.log1p(-reward)
 
 
 class GaussianReward(gym.RewardWrapper):
