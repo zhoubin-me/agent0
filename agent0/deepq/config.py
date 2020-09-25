@@ -31,8 +31,8 @@ class Config:
     N_iqr: int = 64
     N_iqr_dash: int = 64
     N_fqf: int = 32
-    gmm_num_samples: int = 35000
-    gmm_max_std: float = 5.0
+    gmm_num_samples: int = 25000
+    gmm_max_std: float = 3.0
     num_cosines: int = 64
     clip_grad_norm: float = -1
 
