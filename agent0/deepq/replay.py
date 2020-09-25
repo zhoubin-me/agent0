@@ -4,30 +4,30 @@ from collections import deque
 import numpy as np
 import torch
 from agent0.common.utils import LinearSchedule
+from agent0.deepq.config import Config
 from lz4.block import decompress, compress
 from torch.utils.data import Dataset, Sampler
 
 
 class ReplayDataset(Dataset, Sampler):
-    def __init__(self, obs_shape, replay_size, batch_size=256, prioritize=False,
-                 priority_beta0=0.4, priority_alpha=0.5, total_steps=int(1e7)):
+    def __init__(self, obs_shape, **kwargs):
+        self.cfg = Config(**kwargs)
         self.obs_shape = obs_shape
-        self.prioritize = prioritize
-        self.replay_size = replay_size
-        self.batch_size = batch_size
-        self.priority_alpha = priority_alpha
+        self.replay_size = self.cfg.replay_size
+        self.batch_size = self.cfg.batch_size
+        self.prioritize = self.cfg.prioritize
 
         if len(obs_shape) > 1:
             self.frames_shape = (obs_shape[0] * 2, obs_shape[1], obs_shape[2])
-        self.data = deque(maxlen=replay_size)
-        self.best_ep = deque(maxlen=replay_size // 4)
+        self.data = deque(maxlen=self.cfg.replay_size)
+        self.best_ep = deque(maxlen=self.cfg.ep_best_len)
         self.top = 0
 
-        if self.prioritize:
-            self.beta_schedule = LinearSchedule(priority_beta0, 1.0, total_steps)
+        if self.cfg.prioritize:
+            self.beta_schedule = LinearSchedule(self.cfg.priority_beta0, 1.0, self.cfg.total_steps)
             # noinspection PyArgumentList
-            self.prob = torch.ones(self.replay_size)
-            self.beta = priority_beta0
+            self.prob = torch.ones(self.cfg.replay_size)
+            self.beta = self.cfg.priority_beta0
             self.max_p = 1.0
 
     def __len__(self):
@@ -74,9 +74,9 @@ class ReplayDataset(Dataset, Sampler):
 
         if self.prioritize:
             self.prob.roll(-num_entries, 0)
-            self.prob[-num_entries:] = self.max_p ** self.priority_alpha
+            self.prob[-num_entries:] = self.max_p ** self.cfg.priority_alpha
             self.beta = self.beta_schedule(num_entries)
 
     def update_priorities(self, idxes, priorities):
-        self.prob[idxes] = priorities.add(1e-8).pow(self.priority_alpha)
+        self.prob[idxes] = priorities.add(1e-8).pow(self.cfg.priority_alpha)
         self.max_p = max(priorities.max().item(), self.max_p)
