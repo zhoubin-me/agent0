@@ -38,7 +38,7 @@ class Config:
     cor_loss: bool = False
     cor_reg: float = 0.01
     best_ep: bool = False
-    ep_best_len: int = 10000
+    ep_best_len: int = 100000
     best_ep_reg: float = 0.01
 
     batch_size: int = 512
