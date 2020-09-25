@@ -1,9 +1,10 @@
+import random
 from collections import deque
 
 import numpy as np
 import torch
 from agent0.common.utils import LinearSchedule
-from lz4.block import decompress
+from lz4.block import decompress, compress
 from torch.utils.data import Dataset, Sampler
 
 
@@ -19,6 +20,7 @@ class ReplayDataset(Dataset, Sampler):
         if len(obs_shape) > 1:
             self.frames_shape = (obs_shape[0] * 2, obs_shape[1], obs_shape[2])
         self.data = deque(maxlen=replay_size)
+        self.best_ep = deque(maxlen=replay_size // 4)
         self.top = 0
 
         if self.prioritize:
@@ -38,16 +40,32 @@ class ReplayDataset(Dataset, Sampler):
         if len(self.obs_shape) > 1:
             frames = np.frombuffer(decompress(frames), dtype=np.uint8).reshape(self.frames_shape)
 
+        if len(self.best_ep) > 0:
+            st_best, at_best = random.sample(self.best_ep)
+            st_best = np.frombuffer(decompress(st_best), dtype=np.uint8).reshape(self.obs_shape)
+        else:
+            st_best = np.zeros(self.obs_shape)
+            at_best = 0
+
         if self.prioritize:
             weight = self.prob[idx]
         else:
             weight = 1.0
 
-        return np.array(frames), at, rt, dt, weight, idx
+        return np.array(frames), at, rt, dt, weight, idx, st_best, at_best
 
     def __iter__(self):
         for _ in range(self.top // self.batch_size):
             yield torch.multinomial(self.prob[:self.top], self.batch_size, False).tolist()
+
+    def extend_ep_best(self, ep_best):
+        for ep in ep_best:
+            frames, actions = ep
+            ep_len = len(actions)
+            frames_shape = (ep_len,) + self.obs_shape
+            frames = np.frombuffer(decompress(frames), dtype=np.uint8).reshape(frames_shape)
+            for st, at in zip(frames, actions):
+                self.best_ep.append((compress(st), at))
 
     def extend(self, transitions):
         self.data.extend(transitions)

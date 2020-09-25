@@ -37,6 +37,8 @@ class Config:
     clip_grad_norm: float = -1
     cor_loss: bool = False
     cor_reg: float = 0.01
+    best_ep: bool = False
+    best_ep_reg: float = 0.01
 
     batch_size: int = 512
     replay_size: int = int(1e6)

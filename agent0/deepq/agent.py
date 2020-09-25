@@ -258,6 +258,11 @@ class Agent:
             loss += cor_loss.view(-1) * self.cfg.cor_reg
         return loss
 
+    def train_best_ep(self, st, at):
+        qs = self.model(st)
+        best_ep_loss = fx.cross_entropy(qs, at)
+        return best_ep_loss
+
     def train_step(self):
         try:
             data = self.data_fetcher.next()
@@ -265,9 +270,11 @@ class Agent:
             self.data_fetcher = self.get_data_fetcher()
             data = self.data_fetcher.next()
 
-        frames, actions, rewards, terminals, weights, indices = data
+        frames, actions, rewards, terminals, weights, indices, best_frames, best_actions = data
         states = frames[:, :self.cfg.frame_stack, :, :].float().div(255.0)
         next_states = frames[:, -self.cfg.frame_stack:, :, :].float().div(255.0)
+        best_frames = best_frames.float().div(255.0)
+        best_actions = best_actions.long()
         actions = actions.long()
         terminals = terminals.float()
         rewards = rewards.float()
@@ -282,6 +289,10 @@ class Agent:
             loss, fraction_loss = loss
         else:
             fraction_loss = None
+
+        if self.cfg.best_ep:
+            ce_loss = self.train_best_ep(best_frames, best_actions)
+            loss += ce_loss * self.cfg.best_ep_reg
 
         if self.cfg.prioritize:
             self.replay.update_priorities(indices.cpu(), loss.detach().cpu())

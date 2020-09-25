@@ -52,10 +52,13 @@ class Trainer(tune.Trainable, ABC):
         tic = time.time()
         done_id, self.sample_ops = ray.wait(self.sample_ops)
         data = ray.get(done_id)
-        transitions, rs, qs, rank, fps = data[0]
+        transitions, rs, qs, rank, fps, best_ep = data[0]
         # Actors
         if len(transitions) > 0:
             self.agent.replay.extend(transitions)
+        if len(best_ep) > 0:
+            self.agent.replay.extend_ep_best(best_ep)
+
         self.epsilon = self.epsilon_schedule(self.cfg.actor_steps * self.cfg.num_envs)
         self.frame_count += self.cfg.actor_steps * self.cfg.num_envs
 
@@ -102,7 +105,7 @@ class Trainer(tune.Trainable, ABC):
                                           test_episodes=self.cfg.test_episode_per_actor) for a in self.actors])
 
         ckpt_rs = []
-        for _, rs, qs, rank, fps in output:
+        for _, rs, qs, rank, fps, _ in output:
             ckpt_rs += rs
 
         self.ITRs = ckpt_rs
