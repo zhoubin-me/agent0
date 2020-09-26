@@ -251,10 +251,6 @@ class Agent:
 
         q = self.model(states)[self.batch_indices, actions]
         loss = fx.smooth_l1_loss(q, q_target, reduction='none').view(-1)
-        if self.cfg.cor_loss:
-            diff = self.model.phi - self.model.phi.mean(dim=0, keepdim=True)
-            cor_loss = (diff.unsqueeze(1) * diff.unsqueeze(-1)).pow(2).mean(dim=-1).mean(dim=-1)
-            loss += cor_loss.view(-1) * self.cfg.cor_reg
         return loss
 
     def train_best_ep(self, st, at):
@@ -299,6 +295,13 @@ class Agent:
             loss = loss.mean()
             fraction_loss = fraction_loss.mean() if fraction_loss is not None else None
 
+        if self.cfg.cor_loss:
+            phi_norm = self.model.phi / (self.model.phi.max(dim=0, keepdim=True) + 1e-5)
+            cor_loss = (phi_norm.unsqueeze(1) * phi_norm.unsqueeze(-1)).pow(2).mean()
+            loss += cor_loss * self.cfg.cor_reg
+        else:
+            cor_loss = None
+
         if self.cfg.best_ep:
             ce_loss = self.train_best_ep(best_frames, best_actions)
             loss += ce_loss * self.cfg.best_ep_reg
@@ -326,6 +329,7 @@ class Agent:
         if self.update_steps % self.cfg.target_update_freq == 0:
             self.model_target.load_state_dict(self.model.state_dict())
         return {'loss': loss.detach(),
+                'cor_loss': cor_loss.detach() if cor_loss is not None else 0,
                 'ce_loss': ce_loss.detach() if ce_loss is not None else 0,
                 'fraction_loss': fraction_loss.detach() if fraction_loss is not None else 0}
 
