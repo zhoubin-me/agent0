@@ -361,7 +361,7 @@ class EpRecordEnv(gym.Wrapper):
 
     def step(self, action):
         ob, reward, done, info = self.env.step(action)
-        self.cur_ep.append((compress(self.obs), action))
+        self.cur_ep.append((compress(self.ob), action))
         if 'real_reward' in info and info['real_reward'] > self.best_return:
             self.best_return = info['real_reward']
             info.update(best_ep=copy.deepcopy(self.cur_ep))

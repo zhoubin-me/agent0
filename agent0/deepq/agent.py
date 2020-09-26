@@ -302,6 +302,8 @@ class Agent:
         if self.cfg.best_ep:
             ce_loss = self.train_best_ep(best_frames, best_actions)
             loss += ce_loss * self.cfg.best_ep_reg
+        else:
+            ce_loss = None
 
         if fraction_loss is not None:
             self.fraction_optimizer.zero_grad()
@@ -324,6 +326,7 @@ class Agent:
         if self.update_steps % self.cfg.target_update_freq == 0:
             self.model_target.load_state_dict(self.model.state_dict())
         return {'loss': loss.detach(),
+                'ce_loss': ce_loss.detach() if ce_loss is not None else 0,
                 'fraction_loss': fraction_loss.detach() if fraction_loss is not None else 0}
 
 
