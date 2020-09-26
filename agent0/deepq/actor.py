@@ -111,7 +111,7 @@ class Actor:
             self.obs = obs_next
 
             for inf in info:
-                if 'best_ep' in inf:
+                if not testing and 'best_ep' in inf:
                     best_ep.append(inf['best_ep'])
                 if 'real_reward' in inf:
                     rs.append(inf['real_reward'])
@@ -125,7 +125,7 @@ class Actor:
                 break
 
         toc = time.time()
-        return copy.deepcopy(data), rs, qs, self.rank, len(data) / (toc - tic), best_ep
+        return copy.deepcopy(data), rs, qs, self.rank, len(data) / (toc - tic), copy.deepcopy(best_ep)
 
     def close_envs(self):
         self.envs.close()

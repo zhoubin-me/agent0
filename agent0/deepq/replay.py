@@ -1,3 +1,4 @@
+import copy
 import random
 from collections import deque
 
@@ -5,7 +6,7 @@ import numpy as np
 import torch
 from agent0.common.utils import LinearSchedule
 from agent0.deepq.config import Config
-from lz4.block import decompress, compress
+from lz4.block import decompress
 from torch.utils.data import Dataset, Sampler
 
 
@@ -41,8 +42,9 @@ class ReplayDataset(Dataset, Sampler):
             frames = np.frombuffer(decompress(frames), dtype=np.uint8).reshape(self.frames_shape)
 
         if len(self.best_ep) > 0:
-            st_best, at_best = random.sample(self.best_ep)
+            st_best, at_best = random.sample(self.best_ep, 1)[0]
             st_best = np.frombuffer(decompress(st_best), dtype=np.uint8).reshape(self.obs_shape)
+            st_best = copy.deepcopy(st_best)
         else:
             st_best = np.zeros(self.obs_shape)
             at_best = 0
@@ -60,12 +62,7 @@ class ReplayDataset(Dataset, Sampler):
 
     def extend_ep_best(self, ep_best):
         for ep in ep_best:
-            frames, actions = ep
-            ep_len = len(actions)
-            frames_shape = (ep_len,) + self.obs_shape
-            frames = np.frombuffer(decompress(frames), dtype=np.uint8).reshape(frames_shape)
-            for st, at in zip(frames, actions):
-                self.best_ep.append((compress(st), at))
+            self.best_ep.extend(ep)
 
     def extend(self, transitions):
         self.data.extend(transitions)

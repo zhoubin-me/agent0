@@ -359,17 +359,13 @@ class EpRecordEnv(gym.Wrapper):
         self.ob = ob
         return ob
 
-    def obtain_ep(self):
-        ob = compress(np.concatenate([np.expand_dims(s, 0) for s, a in self.cur_ep], axis=0))
-        at = [a for s, a in self.cur_ep]
-        return ob, at
-
     def step(self, action):
         ob, reward, done, info = self.env.step(action)
-        self.cur_ep.append((self.ob, action))
+        self.cur_ep.append((compress(self.obs), action))
         if 'real_reward' in info and info['real_reward'] > self.best_return:
             self.best_return = info['real_reward']
-            info.update(best_ep=copy.deepcopy(self.obtain_ep()))
+            info.update(best_ep=copy.deepcopy(self.cur_ep))
+            self.cur_ep = []
         return ob, reward, done, info
 
 
