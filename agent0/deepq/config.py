@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from agent0.common.bench import atari6, atari10, atari47, atari_exp7, atari63
+from agent0.common.bench import atari7, atari11, atari47, atari_exp7, atari63
 
 
 @dataclass
@@ -105,8 +105,8 @@ class Config:
             self.game = "Breakout"
         if self.game not in atari63:
             game_dict = {
-                'atari6': atari6,
-                'atari10': atari10,
+                'atari7': atari7,
+                'atari11': atari11,
                 'atari47': atari47,
                 'atari_exp7': atari_exp7,
                 'atari63': atari63
