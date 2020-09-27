@@ -133,9 +133,9 @@ class Trainer(tune.Trainable, ABC):
 
         if np.mean(ckpt_rs) > self.best:
             self.best = np.mean(ckpt_rs)
-            torch.save(data_to_save, './best.pth')
+            torch.save(data_to_save, f'./{self.training_iteration}_best.pth')
 
-        return data_to_save
+        return dict()
 
     def load_checkpoint(self, checkpoint):
         self.agent.model.load_state_dict(checkpoint['model'])

@@ -80,7 +80,7 @@ class Config:
 
     # others
     max_record_ep_len: int = 100000
-    checkpoint_freq: int = 300
+    checkpoint_freq: int = 500
     test_episode_per_actor: int = 10
     pin_memory: bool = True
     fast_replay: bool = True
