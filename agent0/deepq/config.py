@@ -109,15 +109,13 @@ class Config:
             'mdqn': 1,
             'iqr': 1,
             'fqf': 1,
-            'gmm': 11,
+            'gmm': 33,
         }
 
         if self.num_atoms < 1:
             try:
                 if self.algo != 'all':
                     self.num_atoms = algo_num_atoms[self.algo]
-                    if self.algo == 'gmm':
-                        self.num_atoms *= 3
             except Exception as e:
                 print(e)
                 raise ValueError(f"Algo {self.algo} not implemented\n"
