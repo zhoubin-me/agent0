@@ -6,14 +6,6 @@ pip install torch===1.6.0 torchvision===0.7.0 -f https://download.pytorch.org/wh
 
 curl https://rclone.org/install.sh | bash
 
-git clone https://github.com/benelot/pybullet-gym.git
-
-cd pybullet-gym
-
-pip install -e .
-
-cd ..
-
 git clone https://zhoubinxyz@bitbucket.org/zhoubinxyz/agentzero.git
 
 cd agentzero

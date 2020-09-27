@@ -1,5 +1,5 @@
 import gym
-import pybulletgym
+
 
 class RewardStatEnv(gym.Wrapper):
     def __init__(self, env):
@@ -19,7 +19,7 @@ class RewardStatEnv(gym.Wrapper):
 
 
 def make_bullet_env(game, seed=None, **kwargs):
-    env = gym.make(f"{game}PyBulletEnv-v0")
+    env = gym.make(f"{game}BulletEnv-v0")
     env = RewardStatEnv(env)
     env.seed(seed)
     return env
