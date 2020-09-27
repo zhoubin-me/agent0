@@ -296,7 +296,7 @@ class Agent:
             fraction_loss = fraction_loss.mean() if fraction_loss is not None else None
 
         if self.cfg.cor_loss:
-            phi_norm = self.model.phi / (self.model.phi.max(dim=0, keepdim=True) + 1e-5)
+            phi_norm = self.model.phi / (self.model.phi.max(dim=0, keepdim=True)[0] + 1e-5)
             cor_loss = (phi_norm.unsqueeze(1) * phi_norm.unsqueeze(-1)).pow(2).mean()
             loss += cor_loss * self.cfg.cor_reg
         else:

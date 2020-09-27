@@ -36,7 +36,7 @@ class Config:
     num_cosines: int = 64
     clip_grad_norm: float = -1
     cor_loss: bool = False
-    cor_reg: float = 0.01
+    cor_reg: float = 0.05
     best_ep: bool = False
     ep_best_len: int = 100000
     best_ep_reg: float = 0.01
