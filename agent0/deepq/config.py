@@ -41,7 +41,7 @@ class Config:
     ep_best_len: int = 100000
     best_ep_reg: float = 0.01
 
-    batch_size: int = 512
+    batch_size: int = 400
     replay_size: int = int(1e6)
     discount: float = 0.99
     exploration_steps: int = int(1e6)
@@ -52,10 +52,10 @@ class Config:
     steps_per_epoch: int = 10000
     epochs: int = 1000
     start_training_step: int = int(1e5)
-    target_update_freq: int = 500
+    target_update_freq: int = 2500
 
-    agent_train_steps: int = 10
-    actor_steps: int = 80
+    agent_train_steps: int = 16
+    actor_steps: int = 50
 
     num_actors: int = 5
     num_envs: int = 16
