@@ -56,14 +56,13 @@ class Config:
 
     agent_train_steps: int = 16
     actor_steps: int = 50
-
-    num_actors: int = 5
+    num_actors: int = 4
     num_envs: int = 16
     num_data_workers: int = 4
     reset_noise_freq: int = 4
 
     max_record_ep_len: int = 100000
-    test_episode_per_actor: int = 20
+    test_episode_per_actor: int = 10
     pin_memory: bool = True
     fast_replay: bool = True
     restore_checkpoint: str = ""
