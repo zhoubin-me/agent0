@@ -78,6 +78,7 @@ class Config:
     num_data_workers: int = 4
     reset_noise_freq: int = 4
 
+    # others
     max_record_ep_len: int = 100000
     checkpoint_freq: int = 300
     test_episode_per_actor: int = 10
