@@ -133,7 +133,8 @@ class Trainer(tune.Trainable, ABC):
 
         if np.mean(ckpt_rs) > self.best:
             self.best = np.mean(ckpt_rs)
-            torch.save(data_to_save, f'./{self.training_iteration}_best.pth')
+            torch.save(data_to_save, f'./itr_{self.training_iteration}.pth')
+            torch.save(data_to_save, f'./best.pth')
 
         return dict()
 
