@@ -52,6 +52,9 @@ class Config:
 
     # others
     cor_loss: bool = False
+    cor_loss2: bool = False
+    cor_loss3: bool = False
+    cor_N: int = 256
     cor_reg: float = 0.05
     best_ep: bool = False
     ep_best_len: int = 100000

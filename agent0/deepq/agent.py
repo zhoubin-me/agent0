@@ -2,13 +2,14 @@ import copy
 
 import torch
 import torch.nn.functional as fx
+from torch.distributions import Normal, Categorical
+
 from agent0.common.MixtureSameFamily import MixtureSameFamily
 from agent0.common.atari_wrappers import make_deepq_env
 from agent0.common.utils import DataLoaderX, DataPrefetcher
 from agent0.deepq.config import Config
 from agent0.deepq.model import DeepQNet
 from agent0.deepq.replay import ReplayDataset
-from torch.distributions import Normal, Categorical
 
 
 class Agent:
@@ -296,9 +297,17 @@ class Agent:
             fraction_loss = fraction_loss.mean() if fraction_loss is not None else None
 
         if self.cfg.cor_loss:
-            phi_norm = self.model.phi / (self.model.phi.max(dim=0, keepdim=True)[0] + 1e-5)
-            cor_loss = (phi_norm.unsqueeze(1) * phi_norm.unsqueeze(-1)).pow(2).mean()
+            phi_norm = self.model.phi - self.model.phi.mean(dim=0, keepdim=True)
+            cor_loss = (phi_norm.unsqueeze(1) * phi_norm.unsqueeze(-1)).pow(2).triu(diagonal=1).mean()
             loss += cor_loss * self.cfg.cor_reg
+        elif self.cfg.cor_loss2:
+            phi_norm = self.model.phi / (self.model.phi.max(dim=0, keepdim=True) + 1e-5)
+            cor_loss = (phi_norm.unsqueeze(1) * phi_norm.unsqueeze(-1)).pow(2).triu(diagonal=1).mean()
+            loss += cor_loss * self.cfg.cor_reg
+        elif self.cfg.cor_loss3:
+            _, s, _ = torch.svd(self.model.phi)
+            cor_loss = s[:256].sum().div(s.sum())
+            loss += cor_loss
         else:
             cor_loss = None
 
