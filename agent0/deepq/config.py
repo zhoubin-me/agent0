@@ -57,6 +57,7 @@ class Config:
     num_data_workers: int = 4
     reset_noise_freq: int = 4
 
+    checkpoint_freq: int = 250
     max_record_ep_len: int = 100000
     test_episode_per_actor: int = 5
     pin_memory: bool = True
