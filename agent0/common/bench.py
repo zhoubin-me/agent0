@@ -1,12 +1,11 @@
 import atari_py
 import gym
-import pybulletgym
 
-atari6 = ['Breakout', 'Enduro', 'Qbert', 'Seaquest', 'SpaceInvaders', 'BeamRider']
+atari7 = ['Asterix', 'BeamRider', 'Breakout', 'Enduro', 'Qbert', 'Seaquest', 'SpaceInvaders']
 
 atari_exp7 = ['Freeway', 'Gravitar', 'MontezumaRevenge', 'Pitfall', 'PrivateEye', 'Solaris', 'Venture']
 
-atari10 = atari6 + ['MsPacman', 'Frostbite', 'Freeway', 'MontezumaRevenge']
+atari11 = atari7 + ['MsPacman', 'Frostbite', 'Freeway', 'MontezumaRevenge']
 
 atari47 = [  # actually 47
     'Alien', 'Amidar', 'Assault', 'Asterix', 'Asteroids',
