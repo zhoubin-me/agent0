@@ -1,10 +1,11 @@
 import git
 import ray
+from ray import tune
+from ray.tune import CLIReporter
+
 from agent0.common.utils import parse_arguments
 from agent0.deepq.config import Config
 from agent0.deepq.trainer import Trainer
-from ray import tune
-from ray.tune import CLIReporter
 
 
 def trial_str_creator(trial, sha_short):
@@ -51,7 +52,7 @@ if __name__ == '__main__':
         reuse_actors=True,
         restore=cfg.restore_checkpoint,
         stop=lambda trial_id, result: result['frames'] > cfg.total_steps,
-        checkpoint_freq=1000,
+        checkpoint_freq=250,
         trial_name_creator=tune.function(lambda trial: trial_str_creator(trial, sha)),
         progress_reporter=reporter,
         resources_per_trial={"gpu": 0.5 * cfg.gpu_mult, "extra_gpu": 0.1 * cfg.num_actors * cfg.gpu_mult},

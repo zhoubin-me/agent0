@@ -49,7 +49,7 @@ class Config:
     start_training_step: int = int(1e5)
     target_update_freq: int = 500
 
-    agent_train_steps: int = 10
+    agent_train_steps: int = 20
     actor_steps: int = 80
 
     num_actors: int = 5
@@ -58,7 +58,7 @@ class Config:
     reset_noise_freq: int = 4
 
     max_record_ep_len: int = 100000
-    test_episode_per_actor: int = 20
+    test_episode_per_actor: int = 5
     pin_memory: bool = True
     fast_replay: bool = True
     restore_checkpoint: str = ""
