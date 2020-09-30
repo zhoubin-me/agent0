@@ -44,22 +44,18 @@ class Config:
     test_eps: float = 0.001
 
     total_steps: int = int(1e7)
-    steps_per_epoch: int = 10000
-    epochs: int = 1000
     start_training_step: int = int(1e5)
     target_update_freq: int = 500
-
     agent_train_steps: int = 20
     actor_steps: int = 80
-
     num_actors: int = 5
     num_envs: int = 16
     num_data_workers: int = 4
     reset_noise_freq: int = 4
-
     checkpoint_freq: int = 250
     max_record_ep_len: int = 100000
     test_episode_per_actor: int = 5
+    
     pin_memory: bool = True
     fast_replay: bool = True
     restore_checkpoint: str = ""
