@@ -55,6 +55,6 @@ if __name__ == '__main__':
         checkpoint_freq=cfg.checkpoint_freq,
         trial_name_creator=tune.function(lambda trial: trial_str_creator(trial, sha)),
         progress_reporter=reporter,
-        resources_per_trial={"gpu": 0.5 * cfg.gpu_mult, "extra_gpu": 0.1 * cfg.num_actors * cfg.gpu_mult},
+        resources_per_trial={"gpu": 0.7 * cfg.gpu_mult, "extra_gpu": 0.3 * cfg.gpu_mult},
         config=vars(cfg),
     )
