@@ -3,13 +3,12 @@ import time
 
 import numpy as np
 import torch
-from lz4.block import compress
-from torch.distributions import Categorical
-
 from agent0.common.atari_wrappers import make_deepq_env
 from agent0.common.vec_env import ShmemVecEnv
 from agent0.deepq.config import Config
 from agent0.deepq.model import DeepQNet
+from lz4.block import compress
+from torch.distributions import Categorical
 
 
 class Actor:
@@ -22,6 +21,7 @@ class Actor:
         self.envs = ShmemVecEnv([lambda: make_deepq_env(game=self.cfg.game, episode_life=True, clip_rewards=True,
                                                         frame_stack=4, transpose_image=True, n_step=self.cfg.n_step,
                                                         discount=self.cfg.discount, state_count=False,
+                                                        norm_reward=False, record_best_ep=self.cfg.best_ep,
                                                         gaussian_reward=False, seed=None)
                                  for _ in range(self.cfg.num_envs)], context='spawn')
         self.action_dim = self.envs.action_space.n
@@ -72,7 +72,7 @@ class Actor:
 
     def sample(self, steps, epsilon, state_dict, testing=False, test_episodes=20, render=False):
         self.model.load_state_dict(state_dict)
-        rs, qs, data, ep_len = [], [], [], []
+        rs, qs, data, ep_len, best_ep = [], [], [], [], []
         tic = time.time()
         step = 0
         while True:
@@ -111,6 +111,8 @@ class Actor:
             self.obs = obs_next
 
             for inf in info:
+                if not testing and 'best_ep' in inf:
+                    best_ep.append(inf['best_ep'])
                 if 'real_reward' in inf:
                     rs.append(inf['real_reward'])
                     ep_len.append(inf['steps'])
@@ -123,7 +125,7 @@ class Actor:
                 break
 
         toc = time.time()
-        return copy.deepcopy(data), rs, qs, self.rank, len(data) / (toc - tic)
+        return copy.deepcopy(data), rs, qs, self.rank, len(data) / (toc - tic), copy.deepcopy(best_ep)
 
     def close_envs(self):
         self.envs.close()

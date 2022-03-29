@@ -70,6 +70,8 @@ class DeepQNet(nn.Module, ABC):
         self.p = dense(512, action_dim * self.cfg.num_atoms)
         self.p.apply(lambda m: init(m, 0.01))
 
+        self.phi = None
+
         if self.cfg.dueling:
             if self.cfg.algo == 'gmm':
                 self.v = dense(512, self.cfg.num_atoms // 3)
@@ -104,6 +106,7 @@ class DeepQNet(nn.Module, ABC):
         else:
             raise ValueError("No such input dim")
         features = self.first_dense(features)
+        self.phi = features
         adv = self.p(features).view(-1, self.action_dim, self.cfg.num_atoms)
 
         if self.cfg.dueling:
@@ -117,6 +120,7 @@ class DeepQNet(nn.Module, ABC):
 
     def forward_gmm(self, x):
         features = self.first_dense(self.convs(x))
+        self.phi = features
         adv = self.p(features).view(-1, self.action_dim, self.cfg.num_atoms)
         q_mean, q_logstd, q_weight = adv.split(dim=-1, split_size=self.cfg.num_atoms // 3)
         if self.cfg.dueling:
@@ -126,6 +130,7 @@ class DeepQNet(nn.Module, ABC):
 
     def forward(self, x):
         features = self.first_dense(self.convs(x))
+        self.phi = features
         adv = self.p(features).view(-1, self.action_dim, self.cfg.num_atoms)
         if self.cfg.dueling:
             v = self.v(features).view(-1, 1, self.cfg.num_atoms)

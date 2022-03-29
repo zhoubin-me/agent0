@@ -27,7 +27,7 @@ if __name__ == '__main__':
     cfg.update()
 
     if cfg.algo == 'all':
-        cfg.algo = tune.grid_search(['dqn', 'mdqn', 'c51', 'qr'])
+        cfg.algo = tune.grid_search(['dqn', 'c51', 'qr', 'iqr'])
 
     if isinstance(cfg.game, list):
         if cfg.reversed:
@@ -40,6 +40,8 @@ if __name__ == '__main__':
                       "ep_reward_train_max", "time_past", "time_remain", "speed", "velocity", "epsilon", "qmax"]
     if cfg.algo in ['fqf']:
         metric_columns.append('fraction_loss')
+    if cfg.best_ep:
+        metric_columns.append('ce_loss')
     reporter = CLIReporter(metric_columns=metric_columns)
 
     tune.run(

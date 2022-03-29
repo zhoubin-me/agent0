@@ -1,7 +1,9 @@
 import atari_py
 import gym
 
-atari7 = ['Asterix', 'BeamRider', 'Breakout', 'Enduro', 'Qbert', 'Seaquest', 'SpaceInvaders']
+
+atari7 = ['Asterix', 'Breakout', 'Enduro', 'Qbert', 'Seaquest', 'SpaceInvaders', 'BeamRider']
+
 
 atari_exp7 = ['Freeway', 'Gravitar', 'MontezumaRevenge', 'Pitfall', 'PrivateEye', 'Solaris', 'Venture']
 
@@ -21,6 +23,8 @@ atari47 = [  # actually 47
 ]
 
 atari63 = ["".join(list(map(lambda x: x.capitalize(), game.split('_')))) for game in atari_py.list_games()]
+mapper = {k: v for k, v in zip(atari_py.list_games(), atari63)}
+imapper = {v: k for k, v in zip(atari_py.list_games(), atari63)}
 
 mujoco7 = ['Reacher', 'Hopper', 'HalfCheetah', 'Walker2D', "Ant", "Pusher", "Humanoid"]
 bullet = [x.id[:-14] for x in gym.envs.registry.all() if 'BulletEnv' in x.id]

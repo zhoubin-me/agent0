@@ -1,9 +1,11 @@
+import copy
 from collections import deque, defaultdict
 
 import cv2
 import gym
 import numpy as np
 from gym import spaces
+from lz4.block import compress
 
 cv2.ocl.setUseOpenCL(False)
 
@@ -346,6 +348,27 @@ class RewardStatEnv(gym.Wrapper):
         return ob, reward, done, info
 
 
+class EpRecordEnv(gym.Wrapper):
+    def __init__(self, env):
+        gym.Wrapper.__init__(self, env)
+        self.cur_ep = []
+        self.best_return = float('-inf')
+
+    def reset(self, **kwargs):
+        ob = self.env.reset(**kwargs)
+        self.ob = ob
+        return ob
+
+    def step(self, action):
+        ob, reward, done, info = self.env.step(action)
+        self.cur_ep.append((compress(self.ob), action))
+        if 'real_reward' in info and info['real_reward'] > self.best_return:
+            self.best_return = info['real_reward']
+            info.update(best_ep=copy.deepcopy(self.cur_ep))
+            self.cur_ep = []
+        return ob, reward, done, info
+
+
 class ScaledFloatFrame(gym.ObservationWrapper):
     def __init__(self, env):
         gym.ObservationWrapper.__init__(self, env)
@@ -415,7 +438,7 @@ class NormalizedEnv(gym.ObservationWrapper):
 
 def make_deepq_env(game, episode_life=True, clip_rewards=True, frame_stack=4, transpose_image=True, norm_reward=False,
                    n_step=1, discount=0.99, scale=False, noop_num=None, seed=None, gaussian_reward=False,
-                   state_count=False):
+                   state_count=False, record_best_ep=False):
     assert not (clip_rewards and norm_reward)
     env = gym.make(f'{game}NoFrameskip-v4')
     env = NoopResetEnv(env, noop_max=30, noop_num=noop_num)
@@ -434,6 +457,8 @@ def make_deepq_env(game, episode_life=True, clip_rewards=True, frame_stack=4, tr
     if state_count:
         env = StateCountEnv(env)
     env = RewardStatEnv(env)
+    if record_best_ep:
+        env = EpRecordEnv(env)
 
     if clip_rewards:
         env = ClipRewardEnv(env)

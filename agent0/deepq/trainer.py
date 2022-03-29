@@ -49,13 +49,17 @@ class Trainer(tune.Trainable, ABC):
 
     def step(self):
         fraction_loss = None
+        ce_loss = None
         tic = time.time()
         done_id, self.sample_ops = ray.wait(self.sample_ops)
         data = ray.get(done_id)
-        transitions, rs, qs, rank, fps = data[0]
+        transitions, rs, qs, rank, fps, best_ep = data[0]
         # Actors
         if len(transitions) > 0:
             self.agent.replay.extend(transitions)
+        if len(best_ep) > 0:
+            self.agent.replay.extend_ep_best(best_ep)
+
         self.epsilon = self.epsilon_schedule(self.cfg.actor_steps * self.cfg.num_envs)
         self.frame_count += self.cfg.actor_steps * self.cfg.num_envs
 
@@ -68,6 +72,9 @@ class Trainer(tune.Trainable, ABC):
             data = [self.agent.train_step() for _ in range(self.cfg.agent_train_steps)]
             if self.cfg.algo in ['fqf']:
                 fraction_loss = torch.stack([x['fraction_loss'] for x in data]).mean().item()
+            if self.cfg.best_ep:
+                ce_loss = torch.stack([x['ce_loss'] for x in data]).mean().item()
+
             loss = [x['loss'] for x in data]
             loss = torch.stack(loss)
             self.Ls += loss.tolist()
@@ -81,6 +88,7 @@ class Trainer(tune.Trainable, ABC):
             adam_lr=self.cfg.adam_lr,
             frames=self.frame_count,
             fraction_loss=fraction_loss if fraction_loss is not None else 0,
+            ce_loss=ce_loss if ce_loss is not None else 0,
             velocity=np.mean(self.velocity[-20:]) if len(self.velocity) > 0 else 0,
             speed=self.frame_count / (self._time_total + 1),
             time_remain=(self.cfg.total_steps - self.frame_count) / ((self.frame_count + 1) / (self._time_total + 1)),
@@ -102,7 +110,7 @@ class Trainer(tune.Trainable, ABC):
                                           test_episodes=self.cfg.test_episode_per_actor) for a in self.actors])
 
         ckpt_rs = []
-        for _, rs, qs, rank, fps in output:
+        for _, rs, qs, rank, fps, _ in output:
             ckpt_rs += rs
 
         self.ITRs = ckpt_rs
@@ -125,9 +133,10 @@ class Trainer(tune.Trainable, ABC):
 
         if np.mean(ckpt_rs) > self.best:
             self.best = np.mean(ckpt_rs)
-            torch.save(data_to_save, './best.pth')
+            torch.save(data_to_save, f'./itr_{self.training_iteration}.pth')
+            torch.save(data_to_save, f'./best.pth')
 
-        return data_to_save
+        return dict()
 
     def load_checkpoint(self, checkpoint):
         self.agent.model.load_state_dict(checkpoint['model'])
