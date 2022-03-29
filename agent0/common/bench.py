@@ -1,7 +1,9 @@
 import atari_py
 import gym
 
+
 atari7 = ['Asterix', 'Breakout', 'Enduro', 'Qbert', 'Seaquest', 'SpaceInvaders', 'BeamRider']
+
 
 atari_exp7 = ['Freeway', 'Gravitar', 'MontezumaRevenge', 'Pitfall', 'PrivateEye', 'Solaris', 'Venture']
 

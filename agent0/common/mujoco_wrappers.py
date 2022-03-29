@@ -1,6 +1,7 @@
 import gym
 import pybullet_envs
 
+
 class RewardStatEnv(gym.Wrapper):
     def __init__(self, env):
         gym.Wrapper.__init__(self, env)
