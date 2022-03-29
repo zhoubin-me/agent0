@@ -67,7 +67,22 @@ Run like in rainbow:
 python -m agent0.deepq.run --double_q --dueling --noisy --priortize --n_step 3 --game atari47 --algo c51 --exp_name atari_rainbow
 ```
 
-## Sample Result
+## Sample Run Result
+
+![](imgs/Asterix.png)
+
+![](imgs/BeamRider.png)
+
+![](imgs/Breakout.png)
+
+![](imgs/Enduro.png)
+
+![](imgs/Qbert.png)
+
+![](imgs/Seaquest.png)
+
+![](imgs/SpaceInvaders.png)
+
 
 | exp_name        | commit | algo | game          | test_ep_reward_mean | max     | min     | ckpt_frame |
 |-----------------|--------|------|---------------|---------------------|---------|---------|------------|
