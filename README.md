@@ -67,7 +67,8 @@ Run like in rainbow:
 python -m agent0.deepq.run --double_q --dueling --noisy --priortize --n_step 3 --game atari47 --algo c51 --exp_name atari_rainbow
 ```
 
-## Sample Run Result
+## Sample Run Result @10M Frames
+
 
 ![](imgs/Asterix.png)
 
