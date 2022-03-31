@@ -57,7 +57,7 @@ python -m agent0.deepq.run --game atari6
 ```
 Specify algorithms:
 ```bash
-# Our current implementation includes: c51, qr, mdqn
+# Our current implementation includes: c51, qr, mdqn, iqr, fqf
 python -m agent0.deepq.run --algo c51
 ```
 
