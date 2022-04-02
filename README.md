@@ -35,9 +35,9 @@ Hardware Setting:
  - RAM: 32 GB
  - Game: Breakout
  - Algorithm: Rainbow
- - FPS: 700+ (2800+)
+ - FPS: 700+ x4 = 2800+
 
-Here FPS (frame per second) means frames collected and saved to replay buffer per second. With 4 frame skip, its FPS is 700+X4= **2800+** in deepmind's word. 
+Here FPS (frame per second) means frames collected and saved to replay buffer per second. With 4 frame skip, its FPS is 700+ x4= **2800+** in deepmind's word. 
 Other implementations usually fall below 100 FPS after exploration. The bottle net is actually at data transferring from CPU to GPU.
 
 ## Run
