@@ -69,22 +69,6 @@ python -m agent0.deepq.run --double_q --dueling --noisy --priortize --n_step 3 -
 
 ## Sample Run Result @10M Frames
 
-
-![](imgs/Asterix.png)
-
-![](imgs/BeamRider.png)
-
-![](imgs/Breakout.png)
-
-![](imgs/Enduro.png)
-
-![](imgs/Qbert.png)
-
-![](imgs/Seaquest.png)
-
-![](imgs/SpaceInvaders.png)
-
-
 | exp_name        | commit | algo | game          | test_ep_reward_mean | max     | min     | ckpt_frame |
 |-----------------|--------|------|---------------|---------------------|---------|---------|------------|
 | c51             | 3e3b70 | c51  | Asterix       | 30541.666666666668  | 39300.0 | 10700.0 | 10000640   |
@@ -141,4 +125,22 @@ python -m agent0.deepq.run --double_q --dueling --noisy --priortize --n_step 3 -
 | rainbow_fqf     | b328c5 | fqf  | Qbert         | 15888.809523809523  | 23075.0 | 11750.0 | 10000640   |
 | rainbow_fqf     | b328c5 | fqf  | Seaquest      | 33468.0             | 82550.0 | 4160.0  | 10000640   |
 | rainbow_fqf     | b328c5 | fqf  | SpaceInvaders | 3415.3333333333335  | 10790.0 | 575.0   | 10000640   |
+
+
+![](imgs/Asterix.png)
+
+![](imgs/BeamRider.png)
+
+![](imgs/Breakout.png)
+
+![](imgs/Enduro.png)
+
+![](imgs/Qbert.png)
+
+![](imgs/Seaquest.png)
+
+![](imgs/SpaceInvaders.png)
+
+
+
 
