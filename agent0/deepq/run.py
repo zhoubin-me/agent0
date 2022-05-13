@@ -35,6 +35,9 @@ if __name__ == '__main__':
         else:
             cfg.game = tune.grid_search(cfg.game)
 
+    if isinstance(cfg.random_seed, list):
+        cfg.random_seed = tune.grid_search(cfg.random_seed)
+
     ray.init(memory=10 * cfg.mem_mult * 2 ** 30, object_store_memory=20 * cfg.mem_mult * 2 ** 30, num_cpus=20)
     metric_columns = ["frames", "loss", "ep_reward_test", "ep_reward_train",
                       "ep_reward_train_max", "time_past", "time_remain", "speed", "velocity", "epsilon", "qmax"]

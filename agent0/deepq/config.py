@@ -86,11 +86,12 @@ class Config:
     fast_replay: bool = True
     restore_checkpoint: str = ""
     random_seed: int = 42
+    trials: int = 1
     exp_name: str = 'atari_deepq'
     frame_stack: int = 4
     sha: str = ""
     mem_mult: float = 2.0
-    gpu_mult: float = 0.5
+    gpu_mult: float = 0.25
     step_mult: int = 1
     num_samples: int = 1
     reversed: bool = False
@@ -99,6 +100,11 @@ class Config:
         self.actor_steps *= self.step_mult
         self.update_game()
         self.update_atoms()
+        self.update_seeds()
+
+    def update_seeds(self):
+        if self.trials > 1:
+            self.random_seed = list([self.random_seed+x for x in range(self.trials)])
 
     def update_game(self):
         if self.game == "":
