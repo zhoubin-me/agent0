@@ -7,7 +7,7 @@ AgentZero is a Ray & PyTorch based light-weight Distributed Fast Reinforcement L
 
 ## Installation
 ```bash
-git clone https://github.com/zmonoid/AgentZero
+git clone https://github.com/zhoubin-me/AgentZero
 cd AgentZero
 pip install -e .
 ```
