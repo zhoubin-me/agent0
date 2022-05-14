@@ -10,7 +10,7 @@ setup(name='agent0',
                 if package.startswith('agent0')],
       description="Ray & PyTorch based light-weight Distributed Fast Reinforcement Learning Framework",
       install_requires=[
-          "gym[atari]==0.15.7",
+          "gym[atari]>=0.15.7",
           "prefetch_generator==1.0.1",
           "dataclasses==0.6",
           "GitPython==3.1.7",

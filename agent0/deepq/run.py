@@ -38,7 +38,7 @@ if __name__ == '__main__':
     if isinstance(cfg.random_seed, list):
         cfg.random_seed = tune.grid_search(cfg.random_seed)
 
-    ray.init(memory=10 * cfg.mem_mult * 2 ** 30, object_store_memory=20 * cfg.mem_mult * 2 ** 30, num_cpus=20)
+    ray.init()
     metric_columns = ["frames", "loss", "ep_reward_test", "ep_reward_train",
                       "ep_reward_train_max", "time_past", "time_remain", "speed", "velocity", "epsilon", "qmax"]
     if cfg.algo in ['fqf']:
@@ -54,12 +54,13 @@ if __name__ == '__main__':
         checkpoint_at_end=True,
         num_samples=cfg.num_samples,
         fail_fast=True,
-        reuse_actors=True,
+        local_dir='/home/bzhou/ssd/ray_results',
         restore=cfg.restore_checkpoint,
         stop=lambda trial_id, result: result['frames'] > cfg.total_steps,
         checkpoint_freq=cfg.checkpoint_freq,
         trial_name_creator=tune.function(lambda trial: trial_str_creator(trial, sha)),
         progress_reporter=reporter,
-        resources_per_trial={"gpu": 0.7 * cfg.gpu_mult, "extra_gpu": 0.3 * cfg.gpu_mult},
+        # resources_per_trial={"gpu": 0.7 * cfg.gpu_mult, "extra_gpu": 0.3 * cfg.gpu_mult, 'cpu':3},
+        resources_per_trial=tune.PlacementGroupFactory([{"CPU": 2, "GPU": cfg.gpu_mult * 0.7}, {"CPU": 1, "GPU": cfg.gpu_mult * 0.15}, {"CPU": 1, "GPU": cfg.gpu_mult * 0.15}]),
         config=vars(cfg),
     )

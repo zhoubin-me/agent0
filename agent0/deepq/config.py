@@ -90,8 +90,7 @@ class Config:
     exp_name: str = 'atari_deepq'
     frame_stack: int = 4
     sha: str = ""
-    mem_mult: float = 2.0
-    gpu_mult: float = 0.25
+    gpu_mult: float = 1.0 / 4.0
     step_mult: int = 1
     num_samples: int = 1
     reversed: bool = False
