@@ -1,16 +1,21 @@
 apt update
 
-apt install -y git tmux fish vim htop libgl1-mesa-glx wget unzip libglib2.0-0 curl
+apt install -y git tmux fish vim htop libgl1-mesa-glx wget unzip libglib2.0-0 curl unrar
 
-pip install torch===1.6.0 torchvision===0.7.0 -f https://download.pytorch.org/whl/torch_stable.html
+pip install torch torchvision torchaudio
 
 curl https://rclone.org/install.sh | bash
 
-git clone https://zhoubinxyz@bitbucket.org/zhoubinxyz/agentzero.git
+git clone https://github.com/zhoubin-me/agent0.git
 
-cd agentzero
+cd agent0
 
 pip install -e .
 
-env CUDA_VISIBLE_DEVICES=0 python -m agent0.deepq.run --algo gmm --game atari6 --gpu_mult 1.0 &
-env CUDA_VISIBLE_DEVICES=1 python -m agent0.deepq.run --algo gmm --game atari6 --gpu_mult 1.0 --reversed &
+wget http://www.atarimania.com/roms/Roms.rar
+
+mkdir roms
+
+unrar e Roms.rar roms/
+
+python -m atari_py.import_roms roms
