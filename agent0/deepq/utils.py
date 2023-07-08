@@ -47,8 +47,8 @@ class EpisodicLifeEnv(gym.Wrapper):
         # so it's important to keep lives > 0, so that we only reset once
         # the environment advertises done.
         life_loss = old_lives > new_lives > 0
+        info['life_loss'] = True
         if life_loss:
-            info['life_loss'] = True
             obs, _, _, _, step_info = self.env.step(0)
             info.update(step_info)
         return obs, reward, done, trunc, info
