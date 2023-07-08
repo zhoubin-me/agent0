@@ -76,7 +76,7 @@ class Config:
     actor_steps: int = 80
     num_actors: int = 2
     num_envs: int = 16
-    num_data_workers: int = 4
+    num_data_workers: int = 2
     reset_noise_freq: int = 4
     checkpoint_freq: int = 250
     max_record_ep_len: int = 100000
@@ -90,7 +90,7 @@ class Config:
     exp_name: str = 'atari_deepq'
     frame_stack: int = 4
     sha: str = ""
-    gpu_mult: float = 1.0 / 4.0
+    gpu_mult: float = 1.0
     step_mult: int = 1
     num_samples: int = 1
     reversed: bool = False
