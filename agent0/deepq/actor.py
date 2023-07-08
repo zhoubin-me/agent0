@@ -104,11 +104,11 @@ class Actor:
             self.obs = obs_next
 
             if 'final_info' in info:
-                indices = info['_final_info']
-                rr = info['episode']['r'][indices]
-                ll = info['episode']['l'][indices]
-                rs.extend(rr)
-                ep_len.extend(ll)
+                final_infos = info['final_info'][info['_final_info']]
+                for stat in final_infos:
+                    rs.append(stat['episode']['r'][0])
+                    ep_len.append(stat['episode']['l'][0])
+
 
             if testing and (len(rs) > test_episodes or step > self.cfg.max_record_ep_len):
                 break

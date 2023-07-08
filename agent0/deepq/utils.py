@@ -1,5 +1,5 @@
 from gymnasium.core import Env
-from gymnasium.wrappers import AtariPreprocessing, FrameStack, RecordEpisodeStatistics
+from gymnasium.wrappers import FrameStack, RecordEpisodeStatistics, AtariPreprocessing
 import gymnasium as gym
 import numpy as np
 
@@ -35,7 +35,6 @@ class EpisodicLifeEnv(gym.Wrapper):
         Done by DeepMind for the DQN and co. since it helps value estimation.
         """
         gym.Wrapper.__init__(self, env)
-        self.lives = 0
 
     def step(self, action):
         old_lives = self.env.unwrapped.ale.lives()
@@ -44,14 +43,14 @@ class EpisodicLifeEnv(gym.Wrapper):
         # then update lives to handle bonus lives
         new_lives = self.env.unwrapped.ale.lives()
 
-        if old_lives > new_lives > 0:
-            # for Qbert sometimes we stay in lives == 0 condition for a few frames
-            # so it's important to keep lives > 0, so that we only reset once
-            # the environment advertises done.
+        # for Qbert sometimes we stay in lives == 0 condition for a few frames
+        # so it's important to keep lives > 0, so that we only reset once
+        # the environment advertises done.
+        life_loss = old_lives > new_lives > 0
+        if life_loss:
             info['life_loss'] = True
-            obs, _, _, _, _ = self.env.step(0)
-        else:
-            info['life_loss'] = False
+            obs, _, _, _, step_info = self.env.step(0)
+            info.update(step_info)
         return obs, reward, done, trunc, info
 
 
@@ -61,11 +60,11 @@ def make_atari(env_id, num_envs):
         FireResetEnv,
         lambda x: AtariPreprocessing(x, terminal_on_life_loss=False), 
         lambda x: FrameStack(x, 4, False),
+        RecordEpisodeStatistics,
         ClipRewardEnv,
-        EpisodicLifeEnv,
+        EpisodicLifeEnv
     ]
     envs = gym.make_vec(f'{env_id}NoFrameskip-v4', num_envs, wrappers=wrappers)
-    envs = RecordEpisodeStatistics(envs)
     return envs
     
 
