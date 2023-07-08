@@ -7,9 +7,16 @@ AgentZero is a Ray & PyTorch based light-weight Distributed Fast Reinforcement L
 
 ## Installation
 ```bash
+sudo apt install -y libgl1-mesa-glx wget unzip libglib2.0-0 curl unrar
 git clone https://github.com/zhoubin-me/AgentZero
 cd AgentZero
 pip install -e .
+pip install torch torchvision torchaudio
+wget http://www.atarimania.com/roms/Roms.rar
+mkdir roms
+unrar e Roms.rar roms/
+python -m atari_py.import_roms roms
+rm -rf roms
 ```
 
 Simple run
