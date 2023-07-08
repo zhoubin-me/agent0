@@ -2,7 +2,7 @@ import sys
 
 from setuptools import setup, find_packages
 
-if not sys.version.startswith('3.6'):
+if not sys.version.startswith('3'):
     raise Exception('Only Python 3.x is supported')
 
 setup(name='agent0',
