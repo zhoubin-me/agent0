@@ -2,7 +2,7 @@ import sys
 
 from setuptools import setup, find_packages
 
-if not sys.version.startswith('3'):
+if not sys.version.startswith('3.6'):
     raise Exception('Only Python 3.x is supported')
 
 setup(name='agent0',
@@ -15,7 +15,7 @@ setup(name='agent0',
           "dataclasses==0.6",
           "GitPython==3.1.7",
           "lz4==3.1.0",
-          "ray[tune]==0.8.7",
+          "ray[tune]==1.13.0",
           'pybullet==2.7.1',
       ],
       author="Zhou Bin",
