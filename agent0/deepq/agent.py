@@ -5,12 +5,11 @@ import torch.nn.functional as fx
 from torch.distributions import Normal, Categorical
 
 from agent0.common.MixtureSameFamily import MixtureSameFamily
-from agent0.common.atari_wrappers import make_deepq_env
 from agent0.common.utils import DataLoaderX, DataPrefetcher
 from agent0.deepq.config import Config
 from agent0.deepq.model import DeepQNet
 from agent0.deepq.replay import ReplayDataset
-
+from agent0.common.atari_wrappers import make_atari
 
 class Agent:
     def __init__(self, **kwargs):
@@ -18,7 +17,7 @@ class Agent:
         self.cfg = Config(**kwargs)
         self.cfg.update_atoms()
 
-        env = make_deepq_env(self.cfg.game, frame_stack=self.cfg.frame_stack, transpose_image=True)
+        env = make_atari(self.cfg.game, 1)
         self.obs_shape = env.observation_space.shape
         self.action_dim = env.action_space.n
         self.device = torch.device('cuda:0')

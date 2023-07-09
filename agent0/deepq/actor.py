@@ -3,15 +3,11 @@ import time
 
 import numpy as np
 import torch
-from agent0.common.atari_wrappers import make_deepq_env
-from agent0.common.vec_env import ShmemVecEnv
 from agent0.deepq.config import Config
 from agent0.deepq.model import DeepQNet
+from agent0.common.atari_wrappers import make_atari
 from lz4.block import compress
 from torch.distributions import Categorical
-
-
-from agent0.deepq.utils import make_atari
 
 class Actor:
     def __init__(self, rank, **kwargs):
@@ -20,13 +16,7 @@ class Actor:
         self.cfg = Config(**kwargs)
         self.cfg.update_atoms()
         self.envs = make_atari(self.cfg.game, self.cfg.num_envs)
-        # Training
-        # self.envs = ShmemVecEnv([lambda: make_deepq_env(game=self.cfg.game, episode_life=True, clip_rewards=True,
-        #                                                 frame_stack=4, transpose_image=True, n_step=self.cfg.n_step,
-        #                                                 discount=self.cfg.discount, state_count=False,
-        #                                                 norm_reward=False, record_best_ep=self.cfg.best_ep,
-        #                                                 gaussian_reward=False, seed=None)
-        #                          for _ in range(self.cfg.num_envs)], context='spawn')
+
         self.action_dim = self.envs.action_space[0].n
         self.device = torch.device('cuda:0')
         self.model = DeepQNet(self.action_dim, **kwargs).to(self.device)
