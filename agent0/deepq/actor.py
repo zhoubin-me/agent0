@@ -3,13 +3,11 @@ import time
 
 import numpy as np
 import torch
-from agent0.common.atari_wrappers import make_deepq_env
-from agent0.common.vec_env import ShmemVecEnv
 from agent0.deepq.config import Config
 from agent0.deepq.model import DeepQNet
+from agent0.common.atari_wrappers import make_atari
 from lz4.block import compress
 from torch.distributions import Categorical
-
 
 class Actor:
     def __init__(self, rank, **kwargs):
@@ -17,17 +15,12 @@ class Actor:
         self.rank = rank
         self.cfg = Config(**kwargs)
         self.cfg.update_atoms()
-        # Training
-        self.envs = ShmemVecEnv([lambda: make_deepq_env(game=self.cfg.game, episode_life=True, clip_rewards=True,
-                                                        frame_stack=4, transpose_image=True, n_step=self.cfg.n_step,
-                                                        discount=self.cfg.discount, state_count=False,
-                                                        norm_reward=False, record_best_ep=self.cfg.best_ep,
-                                                        gaussian_reward=False, seed=None)
-                                 for _ in range(self.cfg.num_envs)], context='spawn')
-        self.action_dim = self.envs.action_space.n
+        self.envs = make_atari(self.cfg.game, self.cfg.num_envs)
+
+        self.action_dim = self.envs.action_space[0].n
         self.device = torch.device('cuda:0')
         self.model = DeepQNet(self.action_dim, **kwargs).to(self.device)
-        self.obs = self.envs.reset()
+        self.obs, _ = self.envs.reset()
 
         self.act = {
             'epsilon_greedy': self.act_epsilon_greedy,
@@ -85,39 +78,25 @@ class Actor:
                 action, qt_max = self.act[self.cfg.policy](st, epsilon)
 
             qs.append(qt_max)
-            obs_next, reward, done, info = self.envs.step(action)
+            obs_next, reward, terminal, truncated, info = self.envs.step(action)
             if render:
                 self.envs.render()
                 time.sleep(0.001)
 
             if not testing:
                 self.steps += self.cfg.num_envs
-                if self.cfg.n_step > 1:
-                    for inf, st_next in zip(info, obs_next):
-                        st = inf['prev_obs']
-                        at = inf['prev_action']
-                        rt = inf['prev_reward']
-                        dt = inf['prev_done']
-                        if inf['prev_bad_transit']:
-                            dt = not dt
-                        data.append((compress(np.concatenate((st, st_next), axis=0)), at, rt, dt))
-                else:
-                    for st, at, rt, dt, st_next, inf in zip(self.obs, action, reward, done, obs_next, info):
-                        if 'counter' in inf and dt:
-                            # print('bad transit')
-                            dt = not dt
-                        data.append((compress(np.concatenate((st, st_next), axis=0)), at, rt, dt))
+                done = np.logical_and(terminal, np.logical_not(truncated))
+                for st, at, rt, dt, st_next in zip(self.obs, action, reward, done, obs_next):
+                    data.append((compress(np.concatenate((st, st_next), axis=0)), at, rt, dt))
 
             self.obs = obs_next
 
-            for inf in info:
-                if not testing and 'best_ep' in inf:
-                    best_ep.append(inf['best_ep'])
-                if 'real_reward' in inf:
-                    rs.append(inf['real_reward'])
-                    ep_len.append(inf['steps'])
-                    if render:
-                        print(rs[-1], ep_len[-1], len(rs), np.mean(rs), np.max(rs), inf)
+            if 'final_info' in info:
+                final_infos = info['final_info'][info['_final_info']]
+                for stat in final_infos:
+                    rs.append(stat['episode']['r'][0])
+                    ep_len.append(stat['episode']['l'][0])
+
 
             if testing and (len(rs) > test_episodes or step > self.cfg.max_record_ep_len):
                 break

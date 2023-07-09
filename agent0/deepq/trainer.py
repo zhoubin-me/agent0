@@ -37,7 +37,7 @@ class Trainer(tune.Trainable, ABC):
 
         self.agent = Agent(**config)
         self.epsilon_schedule = LinearSchedule(1.0, self.cfg.min_eps, self.cfg.exploration_steps)
-        self.actors = [ray.remote(Actor).options(num_gpus=0.1 * self.cfg.gpu_mult).remote(rank=rank, **config)
+        self.actors = [ray.remote(Actor).options(num_gpus=0.15 * self.cfg.gpu_mult).remote(rank=rank, **config)
                        for rank in range(self.cfg.num_actors)]
 
         self.frame_count = 0
@@ -133,10 +133,10 @@ class Trainer(tune.Trainable, ABC):
 
         if np.mean(ckpt_rs) > self.best:
             self.best = np.mean(ckpt_rs)
-            torch.save(data_to_save, f'./itr_{self.training_iteration}.pth')
+            # torch.save(data_to_save, f'./itr_{self.training_iteration}.pth')
             torch.save(data_to_save, f'./best.pth')
 
-        return dict()
+        return data_to_save
 
     def load_checkpoint(self, checkpoint):
         self.agent.model.load_state_dict(checkpoint['model'])
