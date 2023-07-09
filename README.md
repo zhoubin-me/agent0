@@ -2,7 +2,7 @@
 
 ## Introduction
 
-AgentZero is a Ray & PyTorch based light-weight Distributed Fast Reinforcement Learning Framework.
+AgentZero is a Lightweight PyTorch Reinforcement Learning Framework.
 
 
 ## Installation
@@ -15,7 +15,7 @@ pip install torch torchvision torchaudio
 
 Simple run
 ```
-python -m agent0.deepq.run
+python -m agent0.deepq.main
 ```
 
 ## Hardware Requirements:
