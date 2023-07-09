@@ -17,9 +17,11 @@ class Agent:
         self.cfg = Config(**kwargs)
         self.cfg.update_atoms()
 
-        env = make_atari(self.cfg.game, 1)
-        self.obs_shape = env.observation_space.shape
-        self.action_dim = env.action_space.n
+        dummy_env = make_atari(self.cfg.game, 1)
+        self.obs_shape = dummy_env.observation_space.shape
+        self.action_dim = dummy_env.action_space.n
+        dummy_env.close()
+        
         self.device = torch.device('cuda:0')
         # noinspection PyArgumentList
         self.batch_indices = torch.arange(self.cfg.batch_size).to(self.device)
