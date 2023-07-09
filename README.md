@@ -9,8 +9,8 @@ AgentZero is a Lightweight PyTorch Reinforcement Learning Framework.
 ```bash
 git clone https://github.com/zhoubin-me/AgentZero
 cd AgentZero
-pip install -e .
-pip install torch torchvision torchaudio
+conda env create -f environment.yml
+conda activate py3x
 ```
 
 Simple run
