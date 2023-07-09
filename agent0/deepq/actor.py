@@ -95,9 +95,7 @@ class Actor:
 
             if not testing:
                 self.steps += self.cfg.num_envs
-                terminal = np.logical_and(terminal, np.logical_not(truncated))
-                done = np.logical_and(info['life_loss'], truncated)
-                done = np.logical_or(terminal, done)
+                done = np.logical_and(terminal, np.logical_not(truncated))
                 for st, at, rt, dt, st_next in zip(self.obs, action, reward, done, obs_next):
                     data.append((compress(np.concatenate((st, st_next), axis=0)), at, rt, dt))
 
