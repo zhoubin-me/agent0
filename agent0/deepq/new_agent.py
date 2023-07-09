@@ -31,8 +31,9 @@ class Actor:
         action = np.where(np.random.rand(self.cfg.actor.num_envs) > epsilon, action_greedy, action_random)
         return action, qt_max.mean().item()
 
-    def sample(self, steps, epsilon, model):
-        self.model = model
+    def sample(self, steps, epsilon, model=None):
+        if model is not None:
+                self.model = model
         rs, qs, data = [], [], []
         step = 0
         while True:
@@ -72,6 +73,7 @@ class Learner:
         self.action_dim = dummy_env.action_space[0].n
         self.obs_shape = dummy_env.observation_space.shape
         dummy_env.close()
+        del dummy_env
 
         self.model = DeepQNet(self.action_dim, self.obs_shape[1]).to(self.device)
         self.model_target = deepcopy(self.model)

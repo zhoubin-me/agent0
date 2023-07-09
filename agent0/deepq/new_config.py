@@ -46,6 +46,7 @@ class ReplayConfig:
 class ExpConfig:
     game: str = "Breakout"
     env: GameEnum = GameEnum.atari
+    num_actors: int = 2
     seed: int = 42
     name: str = ""
     mode: ModeEnum = ModeEnum.train

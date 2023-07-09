@@ -20,7 +20,7 @@ class Trainer:
 
         self.frame_count = 0
         self.epsilon = 1.0
-        self.writer = SummaryWriter('output2')
+        self.writer = SummaryWriter('tblog')
         self.num_transitions = self.cfg.actor.actor_steps * self.cfg.actor.num_envs
         self.Ls, self.Rs, self.Qs = [], [], []
 
@@ -67,3 +67,5 @@ class Trainer:
                     if k in ['frames', 'loss', 'qmax'] or 'return' in k:
                         msg += f"{k}: {v:.2f} | "
                 t.set_description(msg)
+        
+        self.actor.close()
