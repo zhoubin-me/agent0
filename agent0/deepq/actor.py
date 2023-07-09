@@ -63,8 +63,8 @@ class Actor:
         qt_max = qt_mean.gather(1, action.unsqueeze(-1))
         return action.tolist(), qt_max.mean().item()
 
-    def sample(self, steps, epsilon, state_dict, testing=False, test_episodes=20, render=False):
-        self.model.load_state_dict(state_dict)
+    def sample(self, steps, epsilon, model, testing=False, test_episodes=20, render=False):
+        self.model = model
         rs, qs, data, ep_len, best_ep = [], [], [], [], []
         tic = time.time()
         step = 0
