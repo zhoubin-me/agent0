@@ -62,13 +62,7 @@ def make_atari(env_id, num_envs):
         lambda x: FrameStack(x, 4, False),
         RecordEpisodeStatistics,
         ClipRewardEnv,
-        EpisodicLifeEnv
     ]
-    if num_envs > 1:
-        envs = gym.make_vec(f'{env_id}NoFrameskip-v4', num_envs, wrappers=wrappers)
-    else:
-        envs = gym.make(f'{env_id}NoFrameskip-v4')
-        for wrapper in wrappers:
-            envs = wrapper(envs)
+    envs = gym.make_vec(f'{env_id}NoFrameskip-v4', num_envs, wrappers=wrappers)
     return envs
     
