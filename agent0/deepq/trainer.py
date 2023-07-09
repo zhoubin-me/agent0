@@ -37,23 +37,18 @@ class Trainer(tune.Trainable, ABC):
 
         self.agent = Agent(**config)
         self.epsilon_schedule = LinearSchedule(1.0, self.cfg.min_eps, self.cfg.exploration_steps)
-        self.actors = [ray.remote(Actor).options(num_gpus=0.15 * self.cfg.gpu_mult).remote(rank=rank, **config)
-                       for rank in range(self.cfg.num_actors)]
+        self.actor = Actor(rank=0, **config)
 
         self.frame_count = 0
         self.best = float('-inf')
         self.epsilon = 1.0
 
-        self.sample_ops = [a.sample.remote(self.cfg.actor_steps, 1.0, self.agent.model.state_dict()) for a in
-                           self.actors]
-
     def step(self):
         fraction_loss = None
         ce_loss = None
         tic = time.time()
-        done_id, self.sample_ops = ray.wait(self.sample_ops)
-        data = ray.get(done_id)
-        transitions, rs, qs, rank, fps, best_ep = data[0]
+
+        transitions, rs, qs, rank, fps, best_ep = self.actor.sample(self.cfg.actor_steps, self.epsilon, self.agent.model)
         # Actors
         if len(transitions) > 0:
             self.agent.replay.extend(transitions)
@@ -63,8 +58,6 @@ class Trainer(tune.Trainable, ABC):
         self.epsilon = self.epsilon_schedule(self.cfg.actor_steps * self.cfg.num_envs)
         self.frame_count += self.cfg.actor_steps * self.cfg.num_envs
 
-        self.sample_ops.append(
-            self.actors[rank].sample.remote(self.cfg.actor_steps, self.epsilon, self.agent.model.state_dict()))
         self.Rs += rs
         self.Qs += qs
         # Start training at
@@ -103,15 +96,13 @@ class Trainer(tune.Trainable, ABC):
 
     def save_checkpoint(self, checkpoint_dir):
         print(f"Iteration {self.training_iteration} testing started")
-        output = ray.get([a.sample.remote(self.cfg.actor_steps,
-                                          self.cfg.test_eps,
-                                          self.agent.model.state_dict(),
-                                          testing=True,
-                                          test_episodes=self.cfg.test_episode_per_actor) for a in self.actors])
-
-        ckpt_rs = []
-        for _, rs, qs, rank, fps, _ in output:
-            ckpt_rs += rs
+        _, rs, qs, rank, fps, _ = self.actor.sample(
+            self.cfg.actor_steps, 
+            self.cfg.test_eps, 
+            self.agent.model, 
+            testing=True, 
+            test_episodes=self.cfg.test_episode_per_actor * 2)
+        ckpt_rs = rs
 
         self.ITRs = ckpt_rs
         self.TRs += ckpt_rs

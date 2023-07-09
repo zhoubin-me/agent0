@@ -60,7 +60,6 @@ if __name__ == '__main__':
         checkpoint_freq=cfg.checkpoint_freq,
         trial_name_creator=lambda trial: trial_str_creator(trial, sha),
         progress_reporter=reporter,
-        # resources_per_trial={'GPU': 1, 'CPU': 8},
-        resources_per_trial=tune.PlacementGroupFactory([{"CPU": 2, "GPU": cfg.gpu_mult * 0.7}, {"CPU": 1, "GPU": cfg.gpu_mult * 0.15}, {"CPU": 1, "GPU": cfg.gpu_mult * 0.15}]),
+        resources_per_trial={'gpu': 1, 'cpu': 16},
         config=vars(cfg),
     )
