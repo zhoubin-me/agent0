@@ -37,6 +37,7 @@ dependencies:
   - cuda-nvtx=11.8.86=0
   - cuda-runtime=11.8.0=0
   - ffmpeg=4.3=hf484d3e_0
+  - filelock=3.9.0=py310h06a4308_0
   - freetype=2.12.1=h4a9f257_0
   - frozenlist=1.3.3=py310h5764c6d_0
   - giflib=5.2.1=h5eee18b_3
@@ -44,7 +45,6 @@ dependencies:
   - gmpy2=2.1.2=py310heeb90bb_0
   - gnutls=3.6.15=he1e5248_0
   - google-auth=2.21.0=pyh1a96a4e_0
-  - google-auth-oauthlib=1.0.0=pyhd8ed1ab_1
   - grpc-cpp=1.48.2=h5bf31a4_0
   - idna=3.4=py310h06a4308_0
   - importlib-metadata=6.7.0=pyha770c72_0
@@ -95,8 +95,6 @@ dependencies:
   - ncurses=6.4=h6a678d5_0
   - nettle=3.7.3=hbbd107a_1
   - networkx=2.8.4=py310h06a4308_1
-  - numpy=1.25.0=py310h5f9d8c6_0
-  - numpy-base=1.25.0=py310hb5e798b_0
   - oauthlib=3.2.2=pyhd8ed1ab_0
   - openh264=2.1.1=h4ff587b_0
   - openmpi=4.1.5=external_1
@@ -131,15 +129,12 @@ dependencies:
   - sqlite=3.41.1=h5eee18b_0
   - sympy=1.11.1=py310h06a4308_0
   - tbb=2021.8.0=hdb19cb5_0
-  - tensorboard=2.13.0=pyhd8ed1ab_0
-  - tensorboard-data-server=0.7.0=py310h52d8a92_0
   - tk=8.6.12=h1ccaba5_0
   - toolz=0.12.0=py310h06a4308_0
   - torchaudio=2.0.2=py310_cu118
   - torchtriton=2.0.0=py310
   - torchvision=0.15.2=py310_cu118
   - tqdm=4.65.0=py310h2f386ee_0
-  - typing_extensions=4.6.3=py310h06a4308_0
   - urllib3=1.26.15=py310h06a4308_0
   - werkzeug=2.3.6=pyhd8ed1ab_0
   - wheel=0.38.4=py310h06a4308_0
@@ -157,6 +152,7 @@ dependencies:
       - argon2-cffi-bindings==21.2.0
       - arrow==1.2.3
       - asttokens==2.2.1
+      - astunparse==1.6.3
       - async-lru==2.0.2
       - atari-py==0.2.9
       - autorom==0.4.2
@@ -178,6 +174,7 @@ dependencies:
       - crashtest==0.4.1
       - cycler==0.11.0
       - cython==0.29.36
+      - dacite==1.8.1
       - dataclasses==0.6
       - debugpy==1.6.7
       - decorator==4.4.2
@@ -193,19 +190,23 @@ dependencies:
       - farama-notifications==0.0.4
       - fasteners==0.18
       - fastjsonschema==2.17.1
-      - filelock==3.12.2
       - fire==0.5.0
+      - flatbuffers==23.5.26
       - fonttools==4.40.0
       - fqdn==1.5.1
       - fsspec==2023.6.0
       - future==0.18.3
+      - gast==0.4.0
       - gitdb==4.0.10
       - gitpython==3.1.7
       - glfw==2.6.2
+      - google-auth-oauthlib==0.4.6
+      - google-pasta==0.2.0
       - grpcio==1.51.3
       - gym==0.15.7
       - gym-notices==0.0.8
       - gymnasium==0.28.1
+      - h5py==3.9.0
       - hiq-python==1.1.12
       - html5lib==1.1
       - huggingface-hub==0.15.1
@@ -236,8 +237,11 @@ dependencies:
       - jupyterlab==4.0.2
       - jupyterlab-pygments==0.2.2
       - jupyterlab-server==2.23.0
+      - keras==2.8.0
+      - keras-preprocessing==1.1.2
       - keyring==23.13.1
       - kiwisolver==1.4.4
+      - libclang==16.0.0
       - lockfile==0.12.2
       - lz4==3.1.0
       - markdown-it-py==3.0.0
@@ -259,6 +263,7 @@ dependencies:
       - nest-asyncio==1.5.6
       - notebook-shim==0.2.3
       - ntlm-auth==1.5.0
+      - numpy==1.24.3
       - omegaconf==2.3.0
       - opencv-python==4.8.0.74
       - opt-einsum==3.3.0
@@ -279,7 +284,7 @@ dependencies:
       - proglog==0.1.10
       - prometheus-client==0.17.0
       - prompt-toolkit==3.0.39
-      - protobuf==4.23.3
+      - protobuf==4.23.4
       - psutil==5.9.5
       - ptyprocess==0.7.0
       - pure-eval==0.2.2
@@ -319,7 +324,13 @@ dependencies:
       - soupsieve==2.4.1
       - stack-data==0.6.2
       - swig==4.1.1
+      - tensorboard==2.8.0
+      - tensorboard-data-server==0.6.1
+      - tensorboard-plugin-wit==1.8.1
       - tensorboardx==2.6.1
+      - tensorflow==2.8.4
+      - tensorflow-estimator==2.8.0
+      - tensorflow-io-gcs-filesystem==0.32.0
       - termcolor==2.3.0
       - terminado==0.17.1
       - tinycss2==1.2.1
@@ -331,6 +342,7 @@ dependencies:
       - traitlets==5.9.0
       - transformers==4.30.2
       - trove-classifiers==2023.7.6
+      - typing-extensions==4.5.0
       - tzdata==2023.3
       - uri-template==1.3.0
       - virtualenv==20.23.1
@@ -338,4 +350,5 @@ dependencies:
       - webcolors==1.13
       - webencodings==0.5.1
       - websocket-client==1.6.1
-prefix: /home/bzhou/miniconda3
+      - wrapt==1.15.0
+prefix: /home/bzhou/miniconda3/envs/py3x
