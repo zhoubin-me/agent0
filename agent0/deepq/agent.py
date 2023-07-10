@@ -18,8 +18,8 @@ class Agent:
         self.cfg.update_atoms()
 
         dummy_env = make_atari(self.cfg.game, 1)
-        self.obs_shape = dummy_env.observation_space.shape
-        self.action_dim = dummy_env.action_space.n
+        self.obs_shape = dummy_env.observation_space.shape[1:]
+        self.action_dim = dummy_env.action_space[0].n
         dummy_env.close()
 
         self.device = torch.device("cuda:0")
@@ -41,7 +41,7 @@ class Agent:
             )
 
         self.update_steps = 0
-        self.replay = ReplayDataset(self.obs_shape, **kwargs)
+        self.replay = ReplayDataset(self.cfg.batch_size, self.cfg.replay_size)
         self.data_fetcher = None
 
         self.step = {

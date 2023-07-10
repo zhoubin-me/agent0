@@ -2,7 +2,7 @@
 
 ## Introduction
 
-AgentZero is a Lightweight PyTorch and Launchpad based Reinforcement Learning Framework.
+AgentZero is a Lightweight Distributed Reinforcement Learning Framework based on Pytorch and DeepMind Launchpad.
 
 
 ## Installation
@@ -43,16 +43,13 @@ python -m agent0.deepq.launch
 
 Specify game:
 ```bash
-python -m agent0.deepq.run env_id=enduro
+python -m agent0.deepq.launch env_id=enduro
 ```
-Or run over a list of games as defined in ```src/common/bench.py```
-```
-python -m agent0.deepq.run --game atari6
-```
+
 Specify algorithms:
 ```bash
 # Our current implementation includes: c51, qr, mdqn, iqr, fqf
-python -m agent0.deepq.run --algo c51
+python -m agent0.deepq.launch learner.algo=dqn
 ```
 
 Run like in rainbow:

@@ -24,10 +24,10 @@ class Trainer:
         self.act_dim = dummy_env.action_space[0].n
         dummy_env.close()
 
-        self.model = DeepQNet(self.act_dim, self.obs_shape[0]).to(cfg.device.value)
+        self.model = DeepQNet(cfg).to(cfg.device.value)
         self.learner = Learner(cfg, self.model)
         self.actor = Actor(cfg, self.model)
-        self.replay = ReplayDataset(cfg)
+        self.replay = ReplayDataset(cfg.learner.batch_size, cfg.replay.size)
 
         self.epsilon_fn = (
             lambda step: cfg.actor.min_eps

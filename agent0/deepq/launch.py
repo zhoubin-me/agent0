@@ -28,15 +28,9 @@ class TrainerNode:
         self.actors = actors
 
         set_random_seed(cfg.seed)
-
-        dummy_env = make_atari(cfg.env_id, 1)
-        self.obs_shape = dummy_env.observation_space.shape[1:]
-        self.act_dim = dummy_env.action_space[0].n
-        dummy_env.close()
-
-        self.model = DeepQNet(self.act_dim, self.obs_shape[0]).to(cfg.device.value)
-        self.replay = ReplayDataset(cfg)
-        self.learner = Learner(cfg, self.model)
+        self.replay = ReplayDataset(cfg.learner.batch_size, cfg.replay.size)
+        self.learner = Learner(cfg)
+        self.model = self.learner.model
 
         self.epsilon_fn = (
             lambda step: cfg.actor.min_eps
@@ -77,9 +71,9 @@ class TrainerNode:
                     data = self.data_fetcher.next()
                 frames, actions, rewards, terminals = map(lambda x: x.float(), data)
                 frames = frames.reshape(
-                    self.cfg.learner.batch_size, -1, *self.obs_shape[1:]
+                    self.cfg.learner.batch_size, -1, *self.cfg.obs_shape[1:]
                 ).div(255.0)
-                obs, next_obs = torch.split(frames, self.obs_shape[0], 1)
+                obs, next_obs = torch.split(frames, self.cfg.obs_shape[0], 1)
                 actions = actions.long()
                 loss = self.learner.train_step(
                     obs, actions, rewards, terminals, next_obs
@@ -184,6 +178,12 @@ def make_program(cfg: ExpConfig):
 def main(cfg: ExpConfig):
     cfg = OmegaConf.to_container(cfg)
     cfg = from_dict(ExpConfig, cfg)
+    print(cfg)
+
+    dummy_env = make_atari(cfg.env_id, num_envs=1)
+    cfg.obs_shape = dummy_env.observation_space.shape[1:]
+    cfg.action_dim = dummy_env.action_space[0].n
+    dummy_env.close()
     program = make_program(cfg)
     lp.launch(program, launch_type="local_mp", terminal="tmux_session")
 
