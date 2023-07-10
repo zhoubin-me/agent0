@@ -1,8 +1,7 @@
 import gymnasium as gym
 import numpy as np
 from gymnasium.core import Env
-from gymnasium.wrappers import (AtariPreprocessing, FrameStack,
-                                RecordEpisodeStatistics)
+from gymnasium.wrappers import AtariPreprocessing, FrameStack, RecordEpisodeStatistics
 
 
 class ClipRewardEnv(gym.RewardWrapper):

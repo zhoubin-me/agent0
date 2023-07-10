@@ -1,25 +1,26 @@
 # from tensorboardX import SummaryWriter
 import time
+from concurrent import futures
 from typing import List
 
 import hydra
 import launchpad as lp
 import numpy as np
+import torch
 from absl import logging
 from dacite import from_dict
 from hydra.core.config_store import ConfigStore
 from omegaconf import OmegaConf
-from tqdm import tqdm
-import torch
-from concurrent import futures
-
-from agent0.deepq.new_agent import Actor, Learner
-from agent0.deepq.new_model import DeepQNet
-from agent0.deepq.new_config import ExpConfig
-from agent0.deepq.replay import ReplayDataset
-from agent0.common.atari_wrappers import make_atari
-from agent0.common.utils import set_random_seed, DataLoaderX, DataPrefetcher
 from tensorboardX import SummaryWriter
+from tqdm import tqdm
+
+from agent0.common.atari_wrappers import make_atari
+from agent0.common.utils import DataLoaderX, DataPrefetcher, set_random_seed
+from agent0.deepq.new_agent import Actor, Learner
+from agent0.deepq.new_config import ExpConfig
+from agent0.deepq.new_model import DeepQNet
+from agent0.deepq.replay import ReplayDataset
+
 
 class TrainerNode:
     def __init__(self, cfg: ExpConfig, actors):
@@ -37,7 +38,6 @@ class TrainerNode:
         self.replay = ReplayDataset(cfg)
         self.learner = Learner(cfg, self.model)
 
-
         self.epsilon_fn = (
             lambda step: cfg.actor.min_eps
             if step > cfg.trainer.exploration_steps
@@ -46,7 +46,7 @@ class TrainerNode:
 
         self.frame_count = 0
         self.num_transitions = cfg.actor.actor_steps * cfg.actor.num_envs
-        self.Ls, self.Rs, self.Qs, self.RTs= [], [], [], []
+        self.Ls, self.Rs, self.Qs, self.RTs = [], [], [], []
         self.data_fetcher = None
         self.writer = SummaryWriter(cfg.logdir)
 
@@ -97,15 +97,20 @@ class TrainerNode:
 
     def run(self):
         sample_eps = self.epsilon_fn(self.frame_count)
-        tasks = [actor.futures.sample(sample_eps, self.model.state_dict()) for actor in self.actors]
+        tasks = [
+            actor.futures.sample(sample_eps, self.model.state_dict())
+            for actor in self.actors
+        ]
         num_steps = self.cfg.trainer.total_steps // self.num_transitions + 1
-        training_start_step = self.cfg.trainer.training_start_steps // self.num_transitions + 1
+        training_start_step = (
+            self.cfg.trainer.training_start_steps // self.num_transitions + 1
+        )
         start_time = None
 
         for step in range(num_steps):
             if step == training_start_step:
                 start_time = time.time()
-            
+
             dones, not_dones = futures.wait(tasks, return_when=futures.FIRST_COMPLETED)
             tasks = list(dones) + list(not_dones)
             rank, (transitions, returns, qmax) = tasks.pop(0).result()
@@ -123,17 +128,21 @@ class TrainerNode:
                         msg += f"{k}: {v:7d} | "
 
             msg += f"epsilon: {sample_eps:.4f} | "
-            self.writer.add_scalar('train/epsilon', sample_eps, self.frame_count)
+            self.writer.add_scalar("train/epsilon", sample_eps, self.frame_count)
 
             if start_time is not None:
-                avg_speed = (self.frame_count - self.cfg.trainer.training_start_steps) / (time.time() - start_time)
+                avg_speed = (
+                    self.frame_count - self.cfg.trainer.training_start_steps
+                ) / (time.time() - start_time)
                 msg += f"avg speed: {avg_speed:.2f}"
-                self.writer.add_scalar('train/avg_speed', avg_speed, self.frame_count)
-            
+                self.writer.add_scalar("train/avg_speed", avg_speed, self.frame_count)
+
             logging.info(msg)
 
             sample_eps = self.epsilon_fn(self.frame_count)
-            tasks.append(self.actors[rank].futures.sample(sample_eps, self.model.state_dict()))
+            tasks.append(
+                self.actors[rank].futures.sample(sample_eps, self.model.state_dict())
+            )
 
 
 class ActorNode:
@@ -149,7 +158,9 @@ class ActorNode:
         toc = time.time()
         fps = len(transition) / (toc - tic)
         self.step_count += 1
-        logging.info(f"Rank {self.rank} -- Step: {self.step_count:7d} | FPS: {fps:.2f} | Avg Return: {np.mean(returns):.2f}")
+        logging.info(
+            f"Rank {self.rank} -- Step: {self.step_count:7d} | FPS: {fps:.2f} | Avg Return: {np.mean(returns):.2f}"
+        )
         return self.rank, (transition, returns, qmax)
 
     def close(self):
@@ -159,7 +170,10 @@ class ActorNode:
 def make_program(cfg: ExpConfig):
     program = lp.Program("dqn")
     with program.group("actors"):
-        actors = [program.add_node(lp.CourierNode(ActorNode, rank, cfg)) for rank in range(cfg.num_actors)]
+        actors = [
+            program.add_node(lp.CourierNode(ActorNode, rank, cfg))
+            for rank in range(cfg.num_actors)
+        ]
 
     node = lp.CourierNode(TrainerNode, cfg=cfg, actors=actors)
     program.add_node(node, label="trainer")
@@ -171,11 +185,7 @@ def main(cfg: ExpConfig):
     cfg = OmegaConf.to_container(cfg)
     cfg = from_dict(ExpConfig, cfg)
     program = make_program(cfg)
-    lp.launch(
-        program,
-        launch_type='local_mp',
-        terminal='tmux_session'
-    )
+    lp.launch(program, launch_type="local_mp", terminal="tmux_session")
 
 
 if __name__ == "__main__":

@@ -10,6 +10,7 @@ from agent0.common.atari_wrappers import make_atari
 from agent0.deepq.new_config import ExpConfig
 from agent0.deepq.new_model import DeepQNet
 
+
 class Actor:
     def __init__(self, cfg: ExpConfig):
         self.cfg = cfg
