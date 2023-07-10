@@ -9,16 +9,8 @@ setup(name='agent0',
       packages=[package for package in find_packages()
                 if package.startswith('agent0')],
       description="PyTorch based light-weight async fast Reinforcement Learning Framework",
-      install_requires=[
-          "gymnasium[atari,accept-rom-license,other]==0.28.1",
-          "prefetch_generator==1.0.1",
-          "lz4==3.1.0",
-          "tensorboardX==2.6.1",
-          "tqdm==4.65.0",
-          "hydra-core==1.3.2"
-      ],
       author="Zhou Bin",
       url='https://github.com/zhoubin-me/agent0',
       author_email="zhoubin.me@gmail.com",
       license='LICENSE.txt',
-      version="0.51")
+      version="0.6.0")

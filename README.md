@@ -2,7 +2,7 @@
 
 ## Introduction
 
-AgentZero is a Lightweight PyTorch Reinforcement Learning Framework.
+AgentZero is a Lightweight PyTorch and Launchpad based Reinforcement Learning Framework.
 
 
 ## Installation
@@ -15,7 +15,7 @@ conda activate py3x
 
 Simple run
 ```
-python -m agent0.deepq.main
+python -m agent0.deepq.launch
 ```
 
 ## Hardware Requirements:
@@ -25,26 +25,25 @@ python -m agent0.deepq.main
 
 ## Speed Test
 Hardware Setting:
- - CPU: AMD EPYC 7251 8-Core Processor
- - GPU: RTX 2080 Ti
+ - CPU: Intel i9-13900KF
+ - GPU: RTX 4090
  - RAM: 32 GB
  - Game: Breakout
- - Algorithm: Rainbow
- - FPS: 700+ x4 = **2800+**
+ - Algorithm: dqn
+ - FPS: 5000++ x 4 = **20000++**
 
-Here FPS (frame per second) means frames collected and saved to replay buffer per second. With 4 frame skip, its FPS is 700+ x4= **2800+** in deepmind's word. 
+Here FPS (frame per second) means frames collected and saved to replay buffer per second. With 4 frame skip, its FPS is 5000x4= **20000++** in deepmind's word. 
 Other implementations usually fall below 100 FPS after exploration. The bottle net is actually at data transferring from CPU to GPU.
 
 ## Run
-
 Basic DQN:
 ```bash
-python -m agent0.deepq.run
+python -m agent0.deepq.launch
 ```
 
 Specify game:
 ```bash
-python -m agent0.deepq.run --game enduro
+python -m agent0.deepq.run env_id=enduro
 ```
 Or run over a list of games as defined in ```src/common/bench.py```
 ```
