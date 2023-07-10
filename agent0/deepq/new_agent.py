@@ -11,12 +11,14 @@ from agent0.deepq.new_config import ExpConfig
 from agent0.deepq.new_model import DeepQNet
 
 class Actor:
-    def __init__(self, cfg: ExpConfig, model: nn.Module = None):
+    def __init__(self, cfg: ExpConfig):
         self.cfg = cfg
+
         self.envs = make_atari(cfg.env_id, cfg.actor.num_envs)
         self.act_dim = self.envs.action_space[0].n
+        self.obs_shape = self.envs.observation_space.shape[1:]
         self.obs, _ = self.envs.reset()
-        self.model = model if model is not None else DeepQNet(4, 4)
+        self.model = DeepQNet(self.act_dim, self.obs_shape[0]).to(cfg.device.value)
 
     def act(self, st, epsilon):
         qt = self.model(st)
@@ -30,11 +32,11 @@ class Actor:
         )
         return action, qt_max.mean().item()
 
-    def sample(self, epsilon):
+    def sample(self, epsilon, state_dict=None):
+        if state_dict is not None:
+            self.model.load_state_dict(state_dict)
         rs, qs, data = [], [], []
-        step = 0
-        while True:
-            step += 1
+        for _ in range(self.cfg.actor.actor_steps):
             with torch.no_grad():
                 st = (
                     torch.from_numpy(self.obs)
@@ -61,10 +63,6 @@ class Actor:
                 final_infos = info["final_info"][info["_final_info"]]
                 for stat in final_infos:
                     rs.append(stat["episode"]["r"][0])
-
-            if step > self.cfg.actor.actor_steps:
-                break
-
         return data, rs, qs
 
     def close(self):
@@ -72,9 +70,9 @@ class Actor:
 
 
 class Learner:
-    def __init__(self, cfg: ExpConfig, model: nn.Module = None):
+    def __init__(self, cfg: ExpConfig, model: nn.Module):
         self.cfg = cfg
-        self.model = model if model is not None else DeepQNet(4, 4)
+        self.model = model
         self.model_target = deepcopy(self.model)
 
         self.optimizer = torch.optim.Adam(
