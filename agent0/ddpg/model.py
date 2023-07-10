@@ -18,15 +18,20 @@ class DDPGMLP(nn.Module):
 
         self.max_action = max_action
         self.v = nn.Sequential(
-            nn.Linear(num_inputs + action_dim, hidden_size), nn.Tanh(),
-            nn.Linear(hidden_size, hidden_size), nn.Tanh(),
-            nn.Linear(hidden_size, 1)
+            nn.Linear(num_inputs + action_dim, hidden_size),
+            nn.Tanh(),
+            nn.Linear(hidden_size, hidden_size),
+            nn.Tanh(),
+            nn.Linear(hidden_size, 1),
         )
 
         self.p = nn.Sequential(
-            nn.Linear(num_inputs, hidden_size), nn.Tanh(),
-            nn.Linear(hidden_size, hidden_size), nn.Tanh(),
-            nn.Linear(hidden_size, action_dim), nn.Tanh()
+            nn.Linear(num_inputs, hidden_size),
+            nn.Tanh(),
+            nn.Linear(hidden_size, hidden_size),
+            nn.Tanh(),
+            nn.Linear(hidden_size, action_dim),
+            nn.Tanh(),
         )
 
         self.apply(lambda m: init(m, np.sqrt(2)))
@@ -53,21 +58,27 @@ class SACMLP(nn.Module):
         super(SACMLP, self).__init__()
         self.max_action = max_action
         self.v = nn.Sequential(
-            nn.Linear(num_inputs + action_dim, hidden_size), nn.Tanh(),
-            nn.Linear(hidden_size, hidden_size), nn.Tanh(),
-            nn.Linear(hidden_size, 1)
+            nn.Linear(num_inputs + action_dim, hidden_size),
+            nn.Tanh(),
+            nn.Linear(hidden_size, hidden_size),
+            nn.Tanh(),
+            nn.Linear(hidden_size, 1),
         )
 
         self.v2 = nn.Sequential(
-            nn.Linear(num_inputs + action_dim, hidden_size), nn.Tanh(),
-            nn.Linear(hidden_size, hidden_size), nn.Tanh(),
-            nn.Linear(hidden_size, 1)
+            nn.Linear(num_inputs + action_dim, hidden_size),
+            nn.Tanh(),
+            nn.Linear(hidden_size, hidden_size),
+            nn.Tanh(),
+            nn.Linear(hidden_size, 1),
         )
 
         self.p = nn.Sequential(
-            nn.Linear(num_inputs, hidden_size), nn.Tanh(),
-            nn.Linear(hidden_size, hidden_size), nn.Tanh(),
-            nn.Linear(hidden_size, action_dim * 2)
+            nn.Linear(num_inputs, hidden_size),
+            nn.Tanh(),
+            nn.Linear(hidden_size, hidden_size),
+            nn.Tanh(),
+            nn.Linear(hidden_size, action_dim * 2),
         )
 
         self.apply(lambda m: init(m, np.sqrt(2)))
@@ -101,21 +112,28 @@ class TD3MLP(nn.Module):
         super(TD3MLP, self).__init__()
         self.max_action = max_action
         self.v = nn.Sequential(
-            nn.Linear(num_inputs + action_dim, hidden_size), nn.Tanh(),
-            nn.Linear(hidden_size, hidden_size), nn.Tanh(),
-            nn.Linear(hidden_size, 1)
+            nn.Linear(num_inputs + action_dim, hidden_size),
+            nn.Tanh(),
+            nn.Linear(hidden_size, hidden_size),
+            nn.Tanh(),
+            nn.Linear(hidden_size, 1),
         )
 
         self.v2 = nn.Sequential(
-            nn.Linear(num_inputs + action_dim, hidden_size), nn.Tanh(),
-            nn.Linear(hidden_size, hidden_size), nn.Tanh(),
-            nn.Linear(hidden_size, 1)
+            nn.Linear(num_inputs + action_dim, hidden_size),
+            nn.Tanh(),
+            nn.Linear(hidden_size, hidden_size),
+            nn.Tanh(),
+            nn.Linear(hidden_size, 1),
         )
 
         self.p = nn.Sequential(
-            nn.Linear(num_inputs, hidden_size), nn.Tanh(),
-            nn.Linear(hidden_size, hidden_size), nn.Tanh(),
-            nn.Linear(hidden_size, action_dim), nn.Tanh()
+            nn.Linear(num_inputs, hidden_size),
+            nn.Tanh(),
+            nn.Linear(hidden_size, hidden_size),
+            nn.Tanh(),
+            nn.Linear(hidden_size, action_dim),
+            nn.Tanh(),
         )
 
         self.apply(lambda m: init(m, np.sqrt(2)))

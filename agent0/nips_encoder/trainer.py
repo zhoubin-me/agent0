@@ -14,7 +14,7 @@ from torch.utils.data import Dataset
 from tqdm import tqdm
 
 from agent0.common.atari_wrappers import make_atari
-from agent0.common.utils import DataPrefetcher, DataLoaderX
+from agent0.common.utils import DataLoaderX, DataPrefetcher
 from agent0.common.vec_env import ShmemVecEnv
 from agent0.nips_encoder.model import ModelEncoder
 
@@ -49,13 +49,18 @@ class EncoderDataset(Dataset):
             st_next = self.data[idx][0]
         else:
             st_next = self.data[idx + 1][0]
-        st_next = np.frombuffer(decompress(st_next), dtype=np.uint8).reshape(*self.state_shape)
+        st_next = np.frombuffer(decompress(st_next), dtype=np.uint8).reshape(
+            *self.state_shape
+        )
         return np.array(st), at, rt, dt, np.array(st_next)
+
 
 @ray.remote
 def sample(cfg):
-    envs = ShmemVecEnv([lambda: make_atari(f"{cfg.game}NoFrameskip-v4")
-                        for _ in range(cfg.num_envs)], context='fork')
+    envs = ShmemVecEnv(
+        [lambda: make_atari(f"{cfg.game}NoFrameskip-v4") for _ in range(cfg.num_envs)],
+        context="fork",
+    )
     action_dim = envs.action_space.n
     print("Sampling replay")
     obs = envs.reset()
@@ -91,8 +96,8 @@ class Trainer(tune.Trainable, ABC):
     def setup(self, config):
         self.cfg = Config(**config)
 
-        self.device = torch.device('cuda:0')
-        self.env = gym.make(f'{self.cfg.game}NoFrameskip-v4')
+        self.device = torch.device("cuda:0")
+        self.env = gym.make(f"{self.cfg.game}NoFrameskip-v4")
         self.obs_shape = self.env.observation_space.shape
         self.action_dim = self.env.action_space.n
 
@@ -111,8 +116,13 @@ class Trainer(tune.Trainable, ABC):
 
     def get_data_fetcher(self):
         dataset = EncoderDataset(self.replay, self.obs_shape)
-        data_loader = DataLoaderX(dataset, batch_size=self.cfg.batch_size, shuffle=True,
-                                  num_workers=self.cfg.num_data_workers, pin_memory=self.cfg.pin_memory)
+        data_loader = DataLoaderX(
+            dataset,
+            batch_size=self.cfg.batch_size,
+            shuffle=True,
+            num_workers=self.cfg.num_data_workers,
+            pin_memory=self.cfg.pin_memory,
+        )
 
         data_fetcher = DataPrefetcher(data_loader, self.device)
         return data_fetcher
@@ -138,23 +148,29 @@ class Trainer(tune.Trainable, ABC):
         result = dict(
             loss=loss.item(),
             adam_lr=self.cfg.adam_lr,
-            epoch=(self.training_iteration * self.cfg.batch_size) // self.cfg.replay_size,
-            speed=self.training_iteration * self.cfg.batch_size / (self._time_total + 1),
+            epoch=(self.training_iteration * self.cfg.batch_size)
+            // self.cfg.replay_size,
+            speed=self.training_iteration
+            * self.cfg.batch_size
+            / (self._time_total + 1),
             time_past=self._time_total,
-            time_remain=(self.cfg.epochs * self.cfg.replay_size - self.training_iteration * self.cfg.batch_size) / (
-                    (self.training_iteration * self.cfg.batch_size + 1) / (self._time_total + 1)),
+            time_remain=(
+                self.cfg.epochs * self.cfg.replay_size
+                - self.training_iteration * self.cfg.batch_size
+            )
+            / (
+                (self.training_iteration * self.cfg.batch_size + 1)
+                / (self._time_total + 1)
+            ),
         )
         return result
 
     def cleanup(self):
         epoch = (self._iteration * self.cfg.batch_size) / len(self.replay)
         if epoch >= self.cfg.epochs:
-            torch.save({
-                'model': self.model.state_dict()
-            }, './final.pth')
+            torch.save({"model": self.model.state_dict()}, "./final.pth")
 
     def save_checkpoint(self, checkpoint_dir):
-
         try:
             data = self.data_fetcher.next()
         except (StopIteration, AttributeError):
@@ -171,20 +187,20 @@ class Trainer(tune.Trainable, ABC):
         img = tv.utils.make_grid(obs).mul(255.0).permute(1, 2, 0).byte().numpy()
 
         return {
-            'img': img,
-            'model': self.model.state_dict(),
-            'optim': self.optimizer.state_dict()
+            "img": img,
+            "model": self.model.state_dict(),
+            "optim": self.optimizer.state_dict(),
         }
 
     def load_checkpoint(self, checkpoint):
-        self.model.load_state_dict(checkpoint['model'])
-        self.optimizer.load_state_dict(checkpoint['optim'])
+        self.model.load_state_dict(checkpoint["model"])
+        self.optimizer.load_state_dict(checkpoint["optim"])
 
     def reset_config(self, new_config):
         if "adam_lr" in new_config:
-            self.cfg.adam_lr = new_config['adam_lr']
+            self.cfg.adam_lr = new_config["adam_lr"]
             for param_group in self.optimizer.param_groups:
-                param_group['lr'] = new_config['adam_lr']
+                param_group["lr"] = new_config["adam_lr"]
 
         self.config = new_config
         return True

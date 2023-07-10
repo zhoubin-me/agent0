@@ -25,7 +25,7 @@ class Config:
     batch_size: int = 256
 
     # Optimizer related
-    optimizer: str = 'adam'
+    optimizer: str = "adam"
     gamma: float = 0.99
     p_lr: float = 3e-4
     v_lr: float = 3e-4
@@ -40,21 +40,25 @@ class Config:
             self.game = "HalfCheetah"
 
         if self.game not in bullet:
-            if self.game == 'mujoco7':
+            if self.game == "mujoco7":
                 self.game = mujoco7
-            elif self.game == 'bullet15':
+            elif self.game == "bullet15":
                 self.game = bullet
             else:
-                raise ValueError(f"No such atari games as {self.game}\n"
-                                 f"available games[list] are [mujoco7, bullet15] and:\n"
-                                 f"{bullet}")
+                raise ValueError(
+                    f"No such atari games as {self.game}\n"
+                    f"available games[list] are [mujoco7, bullet15] and:\n"
+                    f"{bullet}"
+                )
 
         if self.algo == "":
             self.algo = "ddpg"
 
-        if self.algo not in ['ddpg', 'sac', 'td3']:
-            if self.algo == 'all':
-                self.algo = ['ddpg', 'sac', 'td3']
+        if self.algo not in ["ddpg", "sac", "td3"]:
+            if self.algo == "all":
+                self.algo = ["ddpg", "sac", "td3"]
             else:
-                raise ValueError(f"No such algo as {self.algo}\n"
-                                 f"available algos are [ddpg, sac, td3']")
+                raise ValueError(
+                    f"No such algo as {self.algo}\n"
+                    f"available algos are [ddpg, sac, td3']"
+                )

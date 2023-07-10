@@ -1,12 +1,15 @@
 from dataclasses import dataclass, field
 from enum import Enum
 
-AlgoEnum = Enum('Algo', {k: i for i, k in enumerate(['dqn', 'c51'])})
-ActorEnum = Enum('Actor', {k: i for i, k in enumerate(['greedy', 'random', 'eps-greedy'])})
-ReplayEnum = Enum('Replay', {k: i for i, k in enumerate(['uniform', 'prior'])})
-ModeEnum = Enum('Mode', {k: i for i, k in enumerate(['train', 'finetune', 'play'])})
-EnvEnum = Enum('Env', {k: i for i, k in enumerate(['atari', 'mujoco'])})
-DeviceEnum = Enum('Device', {'cuda': 'cuda', 'cpu': 'cpu'})
+AlgoEnum = Enum("Algo", {k: i for i, k in enumerate(["dqn", "c51"])})
+ActorEnum = Enum(
+    "Actor", {k: i for i, k in enumerate(["greedy", "random", "eps-greedy"])}
+)
+ReplayEnum = Enum("Replay", {k: i for i, k in enumerate(["uniform", "prior"])})
+ModeEnum = Enum("Mode", {k: i for i, k in enumerate(["train", "finetune", "play"])})
+EnvEnum = Enum("Env", {k: i for i, k in enumerate(["atari", "mujoco"])})
+DeviceEnum = Enum("Device", {"cuda": "cuda", "cpu": "cpu"})
+
 
 @dataclass
 class LearnerConfig:
@@ -17,13 +20,14 @@ class LearnerConfig:
     target_update_freq: int = 500
     learner_steps: int = 20
 
+
 @dataclass
 class TrainerConfig:
     total_steps: int = int(1e7)
     training_start_steps: int = int(1e5)
     exploration_steps: int = int(1e6)
     log_freq: int = 100
-    
+
 
 @dataclass
 class ActorConfig:
@@ -32,11 +36,13 @@ class ActorConfig:
     actor_steps: int = 80
     min_eps: float = 0.01
     test_eps: float = 0.001
-    
+
+
 @dataclass
 class ReplayConfig:
     size: int = int(1e6)
     policy: ReplayEnum = ReplayEnum.uniform
+
 
 @dataclass
 class ExpConfig:

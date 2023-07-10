@@ -4,10 +4,11 @@ from collections import deque
 
 import numpy as np
 import torch
-from agent0.common.utils import LinearSchedule
-from agent0.deepq.new_config import ExpConfig
 from lz4.block import decompress
 from torch.utils.data import Dataset, Sampler
+
+from agent0.common.utils import LinearSchedule
+from agent0.deepq.new_config import ExpConfig
 
 
 class ReplayDataset(Dataset, Sampler):
@@ -29,12 +30,13 @@ class ReplayDataset(Dataset, Sampler):
         frames, at, rt, dt = self.data[idx]
         frames = np.frombuffer(decompress(frames), dtype=np.uint8)
 
-
         return np.array(frames), at, rt, dt
 
     def __iter__(self):
         for _ in range(self.top // self.batch_size):
-            yield torch.multinomial(self.prob[:self.top], self.batch_size, False).tolist()
+            yield torch.multinomial(
+                self.prob[: self.top], self.batch_size, False
+            ).tolist()
 
     def extend(self, transitions):
         self.data.extend(transitions)

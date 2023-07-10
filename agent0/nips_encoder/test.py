@@ -6,7 +6,7 @@ import torchvision as tv
 from PIL import Image
 from torch.utils.data import Dataset
 
-from agent0.common.utils import DataPrefetcher, DataLoaderX, parse_arguments
+from agent0.common.utils import DataLoaderX, DataPrefetcher, parse_arguments
 from agent0.nips_encoder.model import ModelEncoder
 from agent0.nips_encoder.trainer import Config
 
@@ -24,11 +24,11 @@ class EncoderDataset(Dataset):
         return st, at, rt, dt, st_next
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     cfg = Config()
     args = parse_arguments(cfg)
     cfg = Config(**vars(args))
-    env = gym.make('{cfg.game}NoFrameskip-v4')
+    env = gym.make("{cfg.game}NoFrameskip-v4")
 
     transit = []
     obs = env.reset()
@@ -41,14 +41,15 @@ if __name__ == '__main__':
             break
 
     dataset = EncoderDataset(transit, env.observation_space.shape)
-    data_loader = DataLoaderX(dataset, batch_size=32, shuffle=True,
-                              num_workers=4, pin_memory=True)
+    data_loader = DataLoaderX(
+        dataset, batch_size=32, shuffle=True, num_workers=4, pin_memory=True
+    )
 
-    data_fetcher = DataPrefetcher(data_loader, torch.device('cuda:0'))
+    data_fetcher = DataPrefetcher(data_loader, torch.device("cuda:0"))
     model = ModelEncoder(env.action_space.n)
-    with open(cfg.restore_checkpoint, 'rb') as f:
+    with open(cfg.restore_checkpoint, "rb") as f:
         data = pickle.load(f)
-        model.load_state_dict(data['model'])
+        model.load_state_dict(data["model"])
 
     model = model.cuda()
 
@@ -70,4 +71,4 @@ if __name__ == '__main__':
     outs_ = torch.cat(outs, dim=0)
     img_ = tv.utils.make_grid(outs_).mul(255.0).permute(1, 2, 0).byte().numpy()
     img = Image.fromarray(img_)
-    img.save('out.png')
+    img.save("out.png")

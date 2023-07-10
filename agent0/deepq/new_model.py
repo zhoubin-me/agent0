@@ -20,14 +20,18 @@ class DeepQNet(nn.Module):
         super(DeepQNet, self).__init__()
 
         self.convs = nn.Sequential(
-            nn.Conv2d(chan_dim, 32, 8, stride=4), nn.ReLU(),
-            nn.Conv2d(32, 64, 4, stride=2), nn.ReLU(),
-            nn.Conv2d(64, 64, 3, stride=1), nn.ReLU(), nn.Flatten())
-        self.convs.apply(lambda m: init(m, nn.init.calculate_gain('relu')))
-
+            nn.Conv2d(chan_dim, 32, 8, stride=4),
+            nn.ReLU(),
+            nn.Conv2d(32, 64, 4, stride=2),
+            nn.ReLU(),
+            nn.Conv2d(64, 64, 3, stride=1),
+            nn.ReLU(),
+            nn.Flatten(),
+        )
+        self.convs.apply(lambda m: init(m, nn.init.calculate_gain("relu")))
 
         self.first_dense = nn.Sequential(nn.Linear(64 * 7 * 7, 512), nn.ReLU())
-        self.first_dense.apply(lambda m: init(m, nn.init.calculate_gain('relu')))
+        self.first_dense.apply(lambda m: init(m, nn.init.calculate_gain("relu")))
 
         self.p = nn.Linear(512, action_dim)
         self.p.apply(lambda m: init(m, 0.01))
