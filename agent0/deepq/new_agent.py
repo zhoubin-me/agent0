@@ -2,6 +2,7 @@ from copy import deepcopy
 
 import numpy as np
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 from lz4.block import compress
 
@@ -9,14 +10,13 @@ from agent0.common.atari_wrappers import make_atari
 from agent0.deepq.new_config import ExpConfig
 from agent0.deepq.new_model import DeepQNet
 
-
 class Actor:
-    def __init__(self, cfg: ExpConfig, model):
+    def __init__(self, cfg: ExpConfig, model: nn.Module = None):
         self.cfg = cfg
         self.envs = make_atari(cfg.env_id, cfg.actor.num_envs)
         self.act_dim = self.envs.action_space[0].n
         self.obs, _ = self.envs.reset()
-        self.model = model
+        self.model = model if model is not None else DeepQNet(4, 4)
 
     def act(self, st, epsilon):
         qt = self.model(st)
@@ -72,9 +72,9 @@ class Actor:
 
 
 class Learner:
-    def __init__(self, cfg: ExpConfig, model):
+    def __init__(self, cfg: ExpConfig, model: nn.Module = None):
         self.cfg = cfg
-        self.model = model
+        self.model = model if model is not None else DeepQNet(4, 4)
         self.model_target = deepcopy(self.model)
 
         self.optimizer = torch.optim.Adam(
