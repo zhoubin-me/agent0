@@ -139,11 +139,10 @@ class Learner:
 
 
     def train_step(self, obs, actions, rewards, terminals, next_obs):
-        algo = self.cfg.learner.algo.value
-
-        if algo == AlgoEnum.dqn.value:
+        algo = self.cfg.learner.algo
+        if algo == AlgoEnum.dqn:
             loss_fn = self.train_step_dqn
-        elif algo == AlgoEnum.c51.value:
+        elif algo == AlgoEnum.c51:
             loss_fn = self.train_step_c51
         else:
             raise NotImplementedError(algo)
