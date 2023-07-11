@@ -7,7 +7,7 @@ import numpy as np
 import ray
 import torch
 from ray import tune
-from ray.tune.experiment.trial import ExportFormat
+from ray.tune.trial import ExportFormat
 
 from agent0.common.utils import LinearSchedule, set_random_seed
 from agent0.deepq.actor import Actor
