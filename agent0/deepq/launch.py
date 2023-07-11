@@ -28,7 +28,7 @@ class TrainerNode:
         self.actors = actors
 
         set_random_seed(cfg.seed)
-        self.replay = ReplayDataset(cfg.learner.batch_size, cfg.replay.size)
+        self.replay = ReplayDataset(cfg)
         self.learner = Learner(cfg)
         self.model = self.learner.model
 
@@ -60,7 +60,6 @@ class TrainerNode:
         self.Rs.extend(returns)
         self.replay.extend(transitions)
         self.frame_count += self.num_transitions
-
         # Start training at
         if len(self.replay) > self.cfg.trainer.training_start_steps:
             for _ in range(self.cfg.learner.learner_steps):

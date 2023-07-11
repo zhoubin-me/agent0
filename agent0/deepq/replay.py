@@ -12,9 +12,9 @@ from agent0.deepq.new_config import ExpConfig
 
 
 class ReplayDataset(Dataset, Sampler):
-    def __init__(self, batch_size, replay_size):
-        self.replay_size = batch_size
-        self.batch_size = replay_size
+    def __init__(self, cfg: ExpConfig):
+        self.replay_size = cfg.replay.size
+        self.batch_size = cfg.learner.batch_size
 
         self.data = deque(maxlen=self.replay_size)
         self.top = 0
