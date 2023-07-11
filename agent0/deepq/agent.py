@@ -10,7 +10,7 @@ from agent0.common.utils import DataLoaderX, DataPrefetcher
 from agent0.deepq.config import Config
 from agent0.deepq.model import DeepQNet
 from agent0.deepq.replay import ReplayDataset
-
+from agent0.deepq.new_config import ExpConfig
 
 class Agent:
     def __init__(self, **kwargs):
@@ -41,7 +41,7 @@ class Agent:
             )
 
         self.update_steps = 0
-        self.replay = ReplayDataset(self.cfg.batch_size, self.cfg.replay_size)
+        self.replay = ReplayDataset(ExpConfig())
         self.data_fetcher = None
 
         self.step = {
@@ -328,25 +328,16 @@ class Agent:
                 self.data_fetcher = self.get_data_fetcher()
                 data = self.data_fetcher.next()
 
-        (
-            frames,
-            actions,
-            rewards,
-            terminals,
-            weights,
-            indices,
-            best_frames,
-            best_actions,
-        ) = data
+        frames, actions, rewards, terminals = data
+        frames = frames.reshape(self.cfg.batch_size, -1, *self.obs_shape[1:])
         states = frames[:, : self.cfg.frame_stack, :, :].float().div(255.0)
         next_states = frames[:, -self.cfg.frame_stack :, :, :].float().div(255.0)
-        best_frames = best_frames.float().div(255.0)
-        best_actions = best_actions.long()
         actions = actions.long()
         terminals = terminals.float()
         rewards = rewards.float()
-        weights = weights.float()
-
+        # weights = weights.float()
+        # indices = indices.long()
+        
         if self.cfg.noisy:
             self.model.reset_noise()
             self.model_target.reset_noise()
@@ -395,11 +386,6 @@ class Agent:
         else:
             cor_loss = None
 
-        if self.cfg.best_ep:
-            ce_loss = self.train_best_ep(best_frames, best_actions)
-            loss += ce_loss * self.cfg.best_ep_reg
-        else:
-            ce_loss = None
 
         if fraction_loss is not None:
             self.fraction_optimizer.zero_grad()
@@ -428,7 +414,6 @@ class Agent:
         return {
             "loss": loss.detach(),
             "cor_loss": cor_loss.detach() if cor_loss is not None else 0,
-            "ce_loss": ce_loss.detach() if ce_loss is not None else 0,
             "fraction_loss": fraction_loss.detach() if fraction_loss is not None else 0,
         }
 
