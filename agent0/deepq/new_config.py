@@ -12,6 +12,7 @@ ModeEnum = Enum("Mode", {k: i for i, k in enumerate(["train", "finetune", "play"
 EnvEnum = Enum("Env", {k: i for i, k in enumerate(["atari", "mujoco"])})
 DeviceEnum = Enum("Device", {"cuda": "cuda", "cpu": "cpu"})
 
+
 @dataclass
 class C51Config:
     atoms: int = 51
