@@ -10,12 +10,10 @@ from dacite import from_dict
 @hydra.main(version_base=None, config_name="config")
 def main(cfg: ExpConfig):
     cfg = from_dict(ExpConfig, cfg)
-    print(cfg)
     dummy_env = make_atari(cfg.env_id, num_envs=1)
     cfg.obs_shape = dummy_env.observation_space.shape[1:]
     cfg.action_dim = dummy_env.action_space[0].n
     dummy_env.close()
-    print(cfg)
     Trainer(cfg).run()
 
 
