@@ -10,6 +10,8 @@ from agent0.deepq.config import Config
 from agent0.deepq.model import DeepQNet
 from agent0.deepq.replay import ReplayDataset
 from agent0.common.atari_wrappers import make_atari
+from agent0.deepq.new_config import ExpConfig
+from einops import rearrange
 
 class Agent:
     def __init__(self, **kwargs):
@@ -18,8 +20,8 @@ class Agent:
         self.cfg.update_atoms()
 
         dummy_env = make_atari(self.cfg.game, 1)
-        self.obs_shape = dummy_env.observation_space.shape
-        self.action_dim = dummy_env.action_space.n
+        self.obs_shape = dummy_env.observation_space.shape[1:]
+        self.action_dim = dummy_env.action_space[0].n
         dummy_env.close()
         
         self.device = torch.device('cuda:0')
@@ -37,7 +39,7 @@ class Agent:
                 alpha=0.95, eps=0.00001)
 
         self.update_steps = 0
-        self.replay = ReplayDataset(self.obs_shape, **kwargs)
+        self.replay = ReplayDataset(ExpConfig())
         self.data_fetcher = None
 
         self.step = {
@@ -268,15 +270,13 @@ class Agent:
                 self.data_fetcher = self.get_data_fetcher()
                 data = self.data_fetcher.next()
 
-        frames, actions, rewards, terminals, weights, indices, best_frames, best_actions = data
+        frames, actions, rewards, terminals = data
+        frames = rearrange(frames, 'b (c h w) -> b c h w', c=8, h=84, w=84)
         states = frames[:, :self.cfg.frame_stack, :, :].float().div(255.0)
         next_states = frames[:, -self.cfg.frame_stack:, :, :].float().div(255.0)
-        best_frames = best_frames.float().div(255.0)
-        best_actions = best_actions.long()
         actions = actions.long()
         terminals = terminals.float()
         rewards = rewards.float()
-        weights = weights.float()
 
         if self.cfg.noisy:
             self.model.reset_noise()
@@ -288,14 +288,7 @@ class Agent:
         else:
             fraction_loss = None
 
-        if self.cfg.prioritize:
-            self.replay.update_priorities(indices.cpu(), loss.detach().cpu())
-            weights /= weights.sum().add(1e-8)
-            loss = loss.mul(weights).sum()
-            fraction_loss = fraction_loss.mul(weights).sum() if fraction_loss is not None else None
-        else:
-            loss = loss.mean()
-            fraction_loss = fraction_loss.mean() if fraction_loss is not None else None
+        loss = loss.mean()
 
         if self.cfg.cor_loss:
             phi_norm = self.model.phi - self.model.phi.mean(dim=0, keepdim=True)
@@ -312,11 +305,6 @@ class Agent:
         else:
             cor_loss = None
 
-        if self.cfg.best_ep:
-            ce_loss = self.train_best_ep(best_frames, best_actions)
-            loss += ce_loss * self.cfg.best_ep_reg
-        else:
-            ce_loss = None
 
         if fraction_loss is not None:
             self.fraction_optimizer.zero_grad()
@@ -338,10 +326,7 @@ class Agent:
 
         if self.update_steps % self.cfg.target_update_freq == 0:
             self.model_target.load_state_dict(self.model.state_dict())
-        return {'loss': loss.detach(),
-                'cor_loss': cor_loss.detach() if cor_loss is not None else 0,
-                'ce_loss': ce_loss.detach() if ce_loss is not None else 0,
-                'fraction_loss': fraction_loss.detach() if fraction_loss is not None else 0}
+        return {'loss': loss.detach()}
 
 
 if __name__ == '__main__':

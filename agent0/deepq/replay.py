@@ -25,11 +25,8 @@ class ReplayDataset(Dataset, Sampler):
 
     def __getitem__(self, idx):
         idx = idx % self.top
-
         frames, at, rt, dt = self.data[idx]
         frames = np.frombuffer(decompress(frames), dtype=np.uint8)
-
-
         return np.array(frames), at, rt, dt
 
     def __iter__(self):

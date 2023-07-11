@@ -11,7 +11,7 @@ from agent0.deepq.actor import Actor
 from agent0.deepq.agent import Agent
 from agent0.deepq.config import Config
 from ray import tune
-from ray.tune.trial import ExportFormat
+from ray.tune.experiment.trial import ExportFormat
 
 
 class Trainer(tune.Trainable, ABC):

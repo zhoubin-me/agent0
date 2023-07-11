@@ -1,7 +1,5 @@
 from dataclasses import dataclass
 
-from agent0.common.bench import atari7, atari11, atari47, atari_exp7, atari63
-
 
 @dataclass
 class Config:
@@ -108,22 +106,6 @@ class Config:
     def update_game(self):
         if self.game == "":
             self.game = "Breakout"
-        if self.game not in atari63:
-            game_dict = {
-                'atari7': atari7,
-                'atari11': atari11,
-                'atari47': atari47,
-                'atari_exp7': atari_exp7,
-                'atari63': atari63
-            }
-
-            try:
-                self.game = game_dict[self.game.lower()]
-            except Exception as e:
-                print(e)
-                raise ValueError(f"No such atari games as {self.game}\n"
-                                 f"available games[list] are {game_dict.keys()} and:\n"
-                                 f"{atari63}")
 
     def update_atoms(self):
         algo_num_atoms = {
