@@ -24,10 +24,9 @@ class Trainer:
         self.act_dim = dummy_env.action_space[0].n
         dummy_env.close()
 
-        self.model = DeepQNet(cfg).to(cfg.device.value)
-        self.learner = Learner(cfg, self.model)
-        self.actor = Actor(cfg, self.model)
-        self.replay = ReplayDataset(cfg.learner.batch_size, cfg.replay.size)
+        self.learner = Learner(cfg)
+        self.actor = Actor(cfg)
+        self.replay = ReplayDataset(cfg)
 
         self.epsilon_fn = (
             lambda step: cfg.actor.min_eps
@@ -55,7 +54,7 @@ class Trainer:
     def step(self):
         tic = time.time()
         epsilon = self.epsilon_fn(self.frame_count)
-        transitions, returns, qmax = self.actor.sample(epsilon)
+        transitions, returns, qmax = self.actor.sample(epsilon, self.learner.model.state_dict())
         self.Qs.extend(qmax)
         self.Rs.extend(returns)
         # Actors
