@@ -169,28 +169,28 @@ class Learner:
         with torch.no_grad():
             q_next_convs = self.model_target.encoder(next_obs)
             if self.cfg.learner.double_q:
-                q_next_convs_online = self.model.encoder(next_obs)
-                q_next_online = self.model.head.qval(q_next_convs_online, n=cfg.K)
+                q_next_online = self.model.head.qval(self.model.encoder(next_obs), n=cfg.K)
                 a_next = q_next_online.argmax(dim=-1)
             else:
-                q_next = self.model_target.head.qval(q_next_convs, n=cfg.K)
-                a_next = q_next.argmax(dim=-1)
+                q_next_dummy = self.model_target.head.qval(q_next_convs, n=cfg.K)
+                a_next = q_next_dummy.argmax(dim=-1)
 
-            q_next_dash, _ = self.model_target.head(q_next_convs, n=cfg.N_dash)
-            q_next_dash = q_next_dash[self.batch_indices, :, a_next]
+            q_next, _ = self.model_target.head(q_next_convs, n=cfg.N_dash)
+            q_next = q_next[self.batch_indices, :, a_next]
 
-            q_target = rewards.view(-1, 1) + self.cfg.learner.discount * (1 - terminals.view(-1 ,1)) * q_next_dash
+            q_target = rewards.view(-1, 1) + self.cfg.learner.discount * (1 - terminals.view(-1 ,1)) * q_next
 
 
         q, taus = self.model.head(self.model.encoder(obs), n=cfg.N)
         q = q[self.batch_indices, :, actions]
-        q = rearrange(q, 'b a -> b 1 a')
-        q_target = rearrange(q_target, 'b a -> b a 1')
+        q = rearrange(q, 'b n -> b 1 n')
+        q_target = rearrange(q_target, 'b n -> b n 1')
         taus = rearrange(taus, 'b n 1 -> b 1 n')
 
         huber_loss = F.smooth_l1_loss(q, q_target, reduction="none")
         loss = huber_loss * (taus - q_target.lt(q).detach().float()).abs()
-        return loss.view(-1)
+        return loss.sum(-1).mean(-1).view(-1)
+
 
     def train_step_fqf(self, obs, actions, rewards, terminals, next_obs):
         q_convs = self.model.encoder(obs)

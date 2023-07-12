@@ -260,5 +260,22 @@ class DeepQNet(nn.Module):
     
     def params(self):
         return chain(v for k, v in self.named_parameters() if 'fraction' not in k)
+    
 
+if __name__ == '__main__':
+    from agent0.common.utils import set_random_seed
+    out = []
+    for seed in range(20, 50):
+        print(seed)
+        set_random_seed(seed)
+        x = torch.randn(512, 4, 84, 84)
+        cfg = ExpConfig()
+        cfg.action_dim = 4
+        cfg.obs_shape = (4, 84, 84)
+        cfg.learner.algo = AlgoEnum.iqn
+        model = DeepQNet(cfg)
+        q, taus = model.head.forward(model.encoder(x), taus=None, n=32)
+        out.append([q.mean().item(), taus.sum().item()])
+    print(np.array(out).mean(axis=0))
+    print(np.array(out).std(axis=0))
 
