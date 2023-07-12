@@ -12,11 +12,8 @@ cd AgentZero
 conda env create -f environment.yml
 conda activate agent0
 ```
+**Note**: DO NOT use ```pip install -r requirements.txt``` which will create a very slow version. Package version match for these two, but reason unknown for slow version.
 
-Simple run
-```
-python -m agent0.deepq.launch
-```
 
 ## Hardware Requirements:
 - A GPU
@@ -49,14 +46,14 @@ python -m agent0.deepq.launch env_id=enduro
 Specify algorithms:
 ```bash
 # Our current implementation includes: c51, qr, mdqn, iqr, fqf
-python -m agent0.deepq.launch learner.algo=dqn
+python -m agent0.deepq.launch learner.algo=c51
 ```
-
+<!-- 
 Run like in rainbow:
 ```bash
 # exp_name will specify checkpoint directory under $HOME/ray_results
 python -m agent0.deepq.run --double_q --dueling --noisy --priortize --n_step 3 --game atari47 --algo c51 --exp_name atari_rainbow
-```
+``` -->
 
 ## Sample Run Result @10M Frames
 | exp_name                 | commit | algo | game          | mean     | std      | max   | min  | size | frames   |
