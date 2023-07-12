@@ -2,8 +2,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from agent0.deepq.new_config import ExpConfig, AlgoEnum, C51Config, QRConfig
+from agent0.deepq.new_config import ExpConfig, AlgoEnum, C51Config, QRConfig, IQNConfig
 from einops import rearrange
+import numpy as np
 
 def init(m, gain=1.0):
     if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
@@ -33,9 +34,9 @@ class ConvEncoder(nn.Module):
     def forward(self, x):
         return self.convs(x)
 
-class DeepQHead(nn.Module):
+class QHead(nn.Module):
     def __init__(self, act_dim: int, feat_dim: int, dueling: bool):
-        super(DeepQHead, self).__init__()
+        super(QHead, self).__init__()
 
         self.first_dense = nn.Linear(feat_dim, 512)
         self.first_dense.apply(lambda m: init(m, nn.init.calculate_gain("relu")))
@@ -53,13 +54,11 @@ class DeepQHead(nn.Module):
         x = F.relu(self.first_dense(x))
         q = self.q_head(x)
 
-        if self.value_head is None:
-            return q
-        else:
+        if self.value_head is not None:
             value = self.value_head(x)
             advantage = q - q.mean(dim=-1, keepdim=True)
             q = value + advantage
-            return q
+        return q
         
     def qval(self, x):
         return self.forward(x)
@@ -91,14 +90,12 @@ class C51Head(nn.Module):
         q = self.q_head(x)
         q = rearrange(q, 'b (a n) -> b a n', a=self.action_dim)
 
-        if self.value_head is None:
-            return q
-        else:
+        if self.value_head is not None:
             value = self.value_head(x)
             value = rearrange(value, 'b n -> b 1 n')
             advantage = q - q.mean(dim=1, keepdim=True)
             q = value + advantage
-            return q        
+        return q        
 
     def qval(self, x):
         q_dist = self.forward(x)
@@ -131,19 +128,74 @@ class QRHead(nn.Module):
         q = self.q_head(x)
         q = rearrange(q, 'b (a n) -> b a n', a=self.action_dim)
 
-        if self.value_head is None:
-            return q
-        else:
+        if self.value_head is not None:
             value = self.value_head(x)
             value = rearrange(value, 'b n -> b 1 n')
             advantage = q - q.mean(dim=1, keepdim=True)
             q = value + advantage
-            return q
+        return q
 
     def qval(self, x):
         qs = self.forward(x)
         return qs.mean(dim=-1)
 
+class IQNHead(nn.Module):
+    def __init__(self, act_dim: int, feat_dim: int, dueling: bool, cfg: IQNConfig):
+        super(IQNHead, self).__init__()
+        self.cfg = cfg
+        self.first_dense = nn.Linear(feat_dim, 512)
+        self.first_dense.apply(lambda m: init(m, nn.init.calculate_gain("relu")))
+
+        self.q_head = nn.Linear(512, act_dim)
+        self.q_head.apply(lambda m: init(m, 0.01))
+
+        if dueling:
+            self.value_head = nn.Linear(512, 1)
+            self.value_head.apply(lambda m: init(m, 1.0))
+        else:
+            self.value_head = None
+
+        self.cosine_emb = nn.Sequential(
+            nn.Linear(self.cfg.num_cosines, feat_dim), nn.ReLU()
+        )
+        self.cosine_emb.apply(lambda m: init(m, nn.init.calculate_gain("relu")))
+
+    def forward(self, x, n):
+        # x: b d
+        # featues: (b n) d 
+        # taus: b n 1
+        features, taus, n = self.feature_emb(x, n=n)
+        features = F.relu(self.first_dense(features))
+        # q: (b n) a
+        q = self.q_head(features)
+
+        if self.value_head is not None:
+            value = self.value_head(x)
+            advantage = q - q.mean(dim=-1, keepdim=True)
+            q = value + advantage
+        q = rearrange(q, '(b n) a -> b n a', n=n)
+        return q, taus
+
+    def feature_emb(self, x, n):
+        batch_size = x.size(0)
+        taus = torch.rand(batch_size, n, 1).to(x)
+
+        ipi = np.pi * torch.arange(1, self.cfg.num_cosines + 1).to(x)
+        ipi = rearrange(ipi, 'd -> 1 1 d')
+        cosine = ipi.mul(taus).cos()
+        cosine = rearrange(cosine, 'b n d -> (b n) d')
+
+        tau_embed = self.cosine_emb(cosine)
+        tau_embed = rearrange(tau_embed, '(b n) d -> b n d', b=batch_size)
+        state_embed = rearrange(x, 'b d -> b 1 d')
+        features = rearrange(tau_embed * state_embed, 'b n d -> (b n) d')
+        return features, taus, n
+
+    def qval(self, x, n=None):
+        if n is None:
+            n = self.cfg.K
+        qs, _ = self.forward(x, n)
+        return qs.mean(dim=1)
 
 class DeepQNet(nn.Module):
     def __init__(self, cfg: ExpConfig):
@@ -154,28 +206,34 @@ class DeepQNet(nn.Module):
         dummy_y = self.encoder(dummy_x)
         feat_dim = dummy_y.shape[-1]
 
-        self.algo = cfg.learner.algo
 
-        if self.algo == AlgoEnum.dqn:
-            self.head = DeepQHead(
+        if cfg.learner.algo == AlgoEnum.dqn:
+            self.head = QHead(
                 cfg.action_dim, 
                 feat_dim, 
                 cfg.learner.dueling_head)
-        elif self.algo == AlgoEnum.c51:
+        elif cfg.learner.algo == AlgoEnum.c51:
             self.head = C51Head(
                 cfg.action_dim, 
                 feat_dim, 
                 cfg.learner.dueling_head, 
                 cfg.learner.c51)
-        elif self.algo == AlgoEnum.qr:
+        elif cfg.learner.algo == AlgoEnum.qr:
             self.head = QRHead(
                 cfg.action_dim,
                 feat_dim,
                 cfg.learner.dueling_head,
                 cfg.learner.qr
             )
+        elif cfg.learner.algo == AlgoEnum.iqn:
+            self.head = IQNHead(
+                cfg.action_dim,
+                feat_dim,
+                cfg.learner.dueling_head,
+                cfg.learner.iqn
+            )
         else:
-            raise NotImplementedError(self.algo)
+            raise NotImplementedError(cfg.learner.algo)
 
     def forward(self, x):
         x = self.encoder(x)

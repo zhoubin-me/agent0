@@ -7,6 +7,7 @@ class AlgoEnum(Enum):
     dqn = 0
     c51 = 1
     qr = 2
+    iqn = 3
 
 class ActorEnum(Enum):
     greedy = 0
@@ -42,6 +43,14 @@ class QRConfig:
     num_quantiles: int = 200
 
 @dataclass
+class IQNConfig:
+    K: int = 32
+    N: int = 64
+    N_dash: int = 64
+    num_cosines: int = 64
+
+
+@dataclass
 class LearnerConfig:
     algo: AlgoEnum = AlgoEnum.dqn
     discount: float = 0.99
@@ -54,7 +63,7 @@ class LearnerConfig:
 
     c51: C51Config = field(default_factory=C51Config)
     qr: QRConfig = field(default=QRConfig)
-
+    iqn: IQNConfig = field(default=IQNConfig)
 
     
 @dataclass

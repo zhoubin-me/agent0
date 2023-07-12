@@ -117,7 +117,7 @@ class Learner:
 
             lo, up = base.floor().long(), base.ceil().long()
             lo[(up > 0) * (lo == up)] -= 1
-            up[(lo < (cfg.atoms - 1)) * (lo == up)] += 1
+            up[(lo < (cfg.num_atoms - 1)) * (lo == up)] += 1
 
             target_prob = torch.zeros_like(prob_next)
             offset = torch.linspace(
@@ -138,8 +138,6 @@ class Learner:
         loss = target_prob.mul(log_prob).sum(-1).neg()
         return loss.view(-1)
 
-
-
     def train_step_qr(self, obs, actions, rewards, terminals, next_obs):
         with torch.no_grad():
             q_next = self.model_target(next_obs)
@@ -148,8 +146,7 @@ class Learner:
             else:
                 a_next = q_next.mean(dim=-1).argmax(dim=-1)
             q_next = q_next[self.batch_indices, a_next, :]
-            q_target = rewards.view(-1, 1) + self.cfg.learner.discount * (1 -  terminals.view(-1, 1)) \
-                * q_next
+            q_target = rewards.view(-1, 1) + self.cfg.learner.discount * (1 - terminals.view(-1, 1)) * q_next
 
         q = self.model(obs)[self.batch_indices, actions, :]
         q = rearrange(q, 'b n -> b 1 n')
@@ -159,6 +156,35 @@ class Learner:
         loss = huber_loss * (taus - q_target.lt(q).detach().float()).abs()
         return loss.sum(-1).mean(-1).view(-1)
 
+    def train_step_iqn(self, obs, actions, rewards, terminals, next_obs):
+        cfg = self.cfg.learner.iqn
+        with torch.no_grad():
+            q_next_convs = self.model_target.encoder(next_obs)
+            if self.cfg.learner.double_q:
+                q_next_convs_online = self.model.encoder(next_obs)
+                q_next_online = self.model.head.qval(q_next_convs_online, n=cfg.K)
+                a_next = q_next_online.argmax(dim=-1)
+            else:
+                q_next = self.model_target.head.qval(q_next_convs, n=cfg.K)
+                a_next = q_next.argmax(dim=-1)
+
+            q_next_dash, _ = self.model_target.head(q_next_convs, n=cfg.N_dash)
+            q_next_dash = q_next_dash[self.batch_indices, :, a_next]
+
+            q_target = rewards.view(-1, 1) + self.cfg.learner.discount * (1 - terminals.view(-1 ,1)) * q_next_dash
+
+
+        q, taus = self.model.head(self.model.encoder(obs), n=cfg.N)
+        q = q[self.batch_indices, :, actions]
+        q = rearrange(q, 'b a -> b 1 a')
+        q_target = rearrange(q_target, 'b a -> b a 1')
+        taus = rearrange(taus, 'b n 1 -> b 1 n')
+
+        huber_loss = F.smooth_l1_loss(q, q_target, reduction="none")
+        loss = huber_loss * (taus - q_target.lt(q).detach().float()).abs()
+        return loss.view(-1)
+
+
     def train_step(self, obs, actions, rewards, terminals, next_obs):
         algo = self.cfg.learner.algo
         if algo == AlgoEnum.dqn:
@@ -167,6 +193,8 @@ class Learner:
             loss_fn = self.train_step_c51
         elif algo == AlgoEnum.qr:
             loss_fn = self.train_step_qr
+        elif algo == AlgoEnum.iqn:
+            loss_fn = self.train_step_iqn
         else:
             raise NotImplementedError(algo)
         
