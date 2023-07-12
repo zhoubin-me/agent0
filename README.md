@@ -10,7 +10,7 @@ AgentZero is a Lightweight Distributed Reinforcement Learning Framework based on
 git clone https://github.com/zhoubin-me/AgentZero
 cd AgentZero
 conda env create -f environment.yml
-conda activate py3x
+conda activate agent0
 ```
 
 Simple run
