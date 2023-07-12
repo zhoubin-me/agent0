@@ -68,6 +68,11 @@ class Actor:
         self.envs.close()
 
 
+def huber_qr_loss(q, q_target, taus):
+    huber_loss = F.smooth_l1_loss(q, q_target, reduction="none")
+    loss = huber_loss * (taus - q_target.lt(q).detach().float()).abs()
+    return loss.sum(-1).mean(-1).view(-1)
+    
 class Learner:
     def __init__(self, cfg: ExpConfig):
         self.cfg = cfg
@@ -160,10 +165,9 @@ class Learner:
         q = rearrange(q, 'b n -> b 1 n')
         q_target = rearrange(q_target, 'b n -> b n 1')
         taus = self.model.head.cumulative_density.view(1, 1, -1)
-        huber_loss = F.smooth_l1_loss(q, q_target, reduction="none")
-        loss = huber_loss * (taus - q_target.lt(q).detach().float()).abs()
-        return loss.sum(-1).mean(-1).view(-1)
-
+        loss = huber_qr_loss(q, q_target, taus)
+        return loss
+    
     def train_step_iqn(self, obs, actions, rewards, terminals, next_obs):
         cfg = self.cfg.learner.iqn
         with torch.no_grad():
@@ -186,11 +190,8 @@ class Learner:
         q = rearrange(q, 'b n -> b 1 n')
         q_target = rearrange(q_target, 'b n -> b n 1')
         taus = rearrange(taus, 'b n 1 -> b 1 n')
-
-        huber_loss = F.smooth_l1_loss(q, q_target, reduction="none")
-        loss = huber_loss * (taus - q_target.lt(q).detach().float()).abs()
-        return loss.sum(-1).mean(-1).view(-1)
-
+        loss = huber_qr_loss(q, q_target, taus)
+        return loss
 
     def train_step_fqf(self, obs, actions, rewards, terminals, next_obs):
         q_convs = self.model.encoder(obs)
@@ -203,12 +204,11 @@ class Learner:
         with torch.no_grad():
             q_next_convs = self.model_target.encoder(next_obs)
             if self.cfg.learner.double_q:
-                q_next_convs_online = self.model.encoder(next_obs)
-                q_next_online = self.model.head.qval(q_next_convs_online)
+                q_next_online = self.model.head.qval(self.model.encoder(next_obs))
                 a_next = q_next_online.argmax(dim=-1)
             else:
-                q_next_ = self.model_target.head.qval(q_next_convs)
-                a_next = q_next_.argmax(dim=-1)
+                q_next_dummy = self.model_target.head.qval(q_next_convs)
+                a_next = q_next_dummy.argmax(dim=-1)
 
             q_next, _ = self.model_target.head(q_next_convs, taus=taus_hat)
             q_next = q_next[self.batch_indices, :, a_next]
@@ -218,10 +218,10 @@ class Learner:
         q_hat = rearrange(q_hat, 'b n -> b 1 n')
         q_target = rearrange(q_target, 'b n -> b n 1')
         tau_hats = rearrange(taus_hat, 'b n 1 -> b 1 n')
-        huber_loss = F.smooth_l1_loss(q_hat, q_target, reduction="none")
-        huber_loss = huber_loss * (tau_hats - q_target.lt(q_hat).detach().float()).abs()
+        loss = huber_qr_loss(q_hat, q_target, tau_hats)
 
         q_hat = rearrange(q_hat, 'b 1 n -> b n')
+        
         with torch.no_grad():
             # q: B X (N-1) X A
             q, _ = self.model.head(q_convs, taus=taus[:, 1:-1])
@@ -234,8 +234,9 @@ class Learner:
 
         # gradients: B X (N-1)
         gradients_of_taus = torch.where(signs_1, values_1, -values_1) + torch.where(signs_2, values_2, -values_2)
+        gradients_of_taus = gradients_of_taus.view(-1, self.cfg.learner.iqn.F - 1)
         fraction_loss = (gradients_of_taus * taus[:, 1:-1, 0]).sum(dim=1).view(-1)
-        return huber_loss, fraction_loss
+        return loss, fraction_loss
 
 
     def train_step(self, obs, actions, rewards, terminals, next_obs):
@@ -255,6 +256,7 @@ class Learner:
         loss = loss_fn(obs, actions, rewards, terminals, next_obs)
 
         result = {}
+
         if algo == AlgoEnum.fqf:
             loss, fraction_loss = loss
             fraction_loss = fraction_loss.mean()
@@ -263,7 +265,8 @@ class Learner:
             if self.cfg.learner.max_grad_norm > 0:
                 nn.utils.clip_grad_norm_(self.model.head.fraction_net.parameters(),
                 self.cfg.learner.max_grad_norm)
-            
+            self.fqf_optimizer.step()
+
             result['fraction_loss'] = fraction_loss.item()
 
 

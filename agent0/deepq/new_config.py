@@ -10,6 +10,7 @@ class AlgoEnum(Enum):
     iqn = 3
     fqf = 4
 
+
 class ActorEnum(Enum):
     greedy = 0
     random = 1
@@ -56,15 +57,23 @@ class IQNConfig:
 @dataclass
 class LearnerConfig:
     algo: AlgoEnum = AlgoEnum.dqn
+
     discount: float = 0.99
     batch_size: int = 512
     learning_rate: float = 5e-4
+    fraction_lr: float = 2.5e-8
     max_grad_norm: float = -1.0
 
     target_update_freq: int = 500
     learner_steps: int = 20
+
     double_q: bool = False
     dueling_head: bool = False
+    noisy_net: bool = False
+    prioritize_replay: bool = False
+    n_step_q: int = 1
+
+
 
     c51: C51Config = field(default_factory=C51Config)
     qr: QRConfig = field(default=QRConfig)
