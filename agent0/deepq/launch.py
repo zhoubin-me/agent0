@@ -98,10 +98,11 @@ class TrainerNode:
             self.cfg.trainer.training_start_steps // self.num_transitions + 1
         )
         start_time = None
-
+        
         for step in range(num_steps):
             if step == training_start_step:
                 start_time = time.time()
+                start_frames = self.frame_count
 
             dones, not_dones = futures.wait(tasks, return_when=futures.FIRST_COMPLETED)
             tasks = list(dones) + list(not_dones)
@@ -124,7 +125,7 @@ class TrainerNode:
 
             if start_time is not None:
                 avg_speed = (
-                    self.frame_count - self.cfg.trainer.training_start_steps
+                    self.frame_count - start_frames
                 ) / (time.time() - start_time)
                 msg += f"avg speed: {avg_speed:.2f}"
                 self.writer.add_scalar("train/avg_speed", avg_speed, self.frame_count)
