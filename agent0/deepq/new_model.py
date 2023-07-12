@@ -170,7 +170,7 @@ class IQNHead(nn.Module):
         q = self.q_head(features)
 
         if self.value_head is not None:
-            value = self.value_head(x)
+            value = self.value_head(features)
             advantage = q - q.mean(dim=-1, keepdim=True)
             q = value + advantage
         q = rearrange(q, '(b n) a -> b n a', n=n)
