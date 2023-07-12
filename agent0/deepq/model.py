@@ -321,20 +321,3 @@ class NoisyLinear(nn.Module, ABC):
         return x.sign().mul(x.abs().sqrt())
 
 
-if __name__ == "__main__":
-    from agent0.common.utils import set_random_seed
-    import numpy as np
-    out = []
-    for seed in range(30, 60):
-        print(seed)
-        set_random_seed(seed)
-        x = torch.randn(512, 4, 84, 84)
-        model = DeepQNet(4, algo="iqr")
-        q, taus = model.forward_iqr(model.convs(x), taus=None, n=32)
-        out.append([q.mean().item(), taus.sum().item()])
-    print(np.array(out).mean(axis=0))
-    print(np.array(out).std(axis=0))
-    # y = model.calc_c51_q(x)
-    # print(
-    #     model.forward(x).softmax(dim=-1).mul(model.atoms).sum(-1),
-    # )

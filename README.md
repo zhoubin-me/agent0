@@ -35,9 +35,14 @@ Here FPS (frame per second) means frames collected and saved to replay buffer pe
 Other implementations usually fall below 100 FPS after exploration. The bottle net is actually at data transferring from CPU to GPU.
 
 ## Run
-Basic DQN:
+Single thread run:
 ```bash
-python -m agent0.deepq.launch
+python -m agent0.deepq.main
+```
+
+Launchpad mulit-thread run:
+```bash
+python -m agent.deepq.launch
 ```
 
 Specify game:
@@ -50,6 +55,7 @@ Specify algorithms:
 # Our current implementation includes: c51, qr, mdqn, iqr, fqf
 python -m agent0.deepq.launch learner.algo=c51
 ```
+
 <!-- 
 Run like in rainbow:
 ```bash
