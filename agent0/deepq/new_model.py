@@ -74,7 +74,7 @@ class C51Head(nn.Module):
         self.q_head.apply(lambda m: init(m, 0.01))
         self.register_buffer(
             "atoms",
-            torch.linspace(cfg.vmax, cfg.vmin, cfg.atoms),
+            torch.linspace(cfg.vmin, cfg.vmax, cfg.atoms),
         )
         self.atoms = self.atoms.view(1, 1, -1)
 
