@@ -1,11 +1,12 @@
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Tuple, List, Any
+from typing import Any
 import gymnasium as gym
 
 class AlgoEnum(Enum):
     dqn = 0
     c51 = 1
+    qr = 2
 
 class ActorEnum(Enum):
     greedy = 0
@@ -32,9 +33,13 @@ class DeviceEnum(Enum):
 
 @dataclass
 class C51Config:
-    atoms: int = 51
+    num_atoms: int = 51
     vmax: float = 10
     vmin: float = -10
+
+@dataclass
+class QRConfig:
+    num_quantiles: int = 200
 
 @dataclass
 class LearnerConfig:
@@ -48,6 +53,7 @@ class LearnerConfig:
     dueling_head: bool = False
 
     c51: C51Config = field(default_factory=C51Config)
+    qr: QRConfig = field(default=QRConfig)
 
 
     

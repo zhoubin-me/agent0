@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from agent0.deepq.new_config import ExpConfig, AlgoEnum, C51Config
+from agent0.deepq.new_config import ExpConfig, AlgoEnum, C51Config, QRConfig
 from einops import rearrange
 
 def init(m, gain=1.0):
@@ -70,17 +70,17 @@ class C51Head(nn.Module):
         self.first_dense = nn.Linear(feat_dim, 512)
         self.first_dense.apply(lambda m: init(m, nn.init.calculate_gain("relu")))
 
-        self.q_head = nn.Linear(512, act_dim * cfg.atoms)
+        self.q_head = nn.Linear(512, act_dim * cfg.num_atoms)
         self.q_head.apply(lambda m: init(m, 0.01))
         self.register_buffer(
             "atoms",
-            torch.linspace(cfg.vmin, cfg.vmax, cfg.atoms),
+            torch.linspace(cfg.vmin, cfg.vmax, cfg.num_atoms),
         )
         self.atoms = self.atoms.view(1, 1, -1)
 
-        self.delta = (cfg.vmax - cfg.vmin) / (cfg.atoms - 1)
+        self.delta = (cfg.vmax - cfg.vmin) / (cfg.num_atoms - 1)
         if dueling:
-            self.value_head = nn.Linear(512, cfg.atoms)
+            self.value_head = nn.Linear(512, cfg.num_atoms)
             self.value_head.apply(lambda m: init(m, 1.0))
         else:
             self.value_head = None
@@ -105,6 +105,46 @@ class C51Head(nn.Module):
         return q_dist.softmax(dim=-1).mul(self.atoms).sum(dim=-1)
 
 
+class QRHead(nn.Module):
+    def __init__(self, act_dim: int, feat_dim: int, dueling: bool, cfg: QRConfig):
+        super(QRHead, self).__init__()
+        self.first_dense = nn.Linear(feat_dim, 512)
+        self.first_dense.apply(lambda m: init(m, nn.init.calculate_gain("relu")))
+
+        self.q_head = nn.Linear(512, act_dim * cfg.num_quantiles)
+        self.q_head.apply(lambda m: init(m, 0.01))
+        self.register_buffer(
+            "cumulative_density",
+            (2 * torch.arange(cfg.num_quantiles) + 1) / (2.0 * cfg.num_quantiles),
+        )
+        self.action_dim = act_dim
+        if dueling:
+            self.value_head = nn.Linear(512, cfg.num_quantiles)
+            self.value_head.apply(lambda m: init(m, 1.0))
+        else:
+            self.value_head = None
+        self.action_dim = act_dim
+
+
+    def forward(self, x):
+        x = F.relu(self.first_dense(x))
+        q = self.q_head(x)
+        q = rearrange(q, 'b (a n) -> b a n', a=self.action_dim)
+
+        if self.value_head is None:
+            return q
+        else:
+            value = self.value_head(x)
+            value = rearrange(value, 'b n -> b 1 n')
+            advantage = q - q.mean(dim=1, keepdim=True)
+            q = value + advantage
+            return q
+
+    def qval(self, x):
+        qs = self.forward(x)
+        return qs.mean(dim=-1)
+
+
 class DeepQNet(nn.Module):
     def __init__(self, cfg: ExpConfig):
         super(DeepQNet, self).__init__()
@@ -127,6 +167,13 @@ class DeepQNet(nn.Module):
                 feat_dim, 
                 cfg.learner.dueling_head, 
                 cfg.learner.c51)
+        elif self.algo == AlgoEnum.qr:
+            self.head = QRHead(
+                cfg.action_dim,
+                feat_dim,
+                cfg.learner.dueling_head,
+                cfg.learner.qr
+            )
         else:
             raise NotImplementedError(self.algo)
 
