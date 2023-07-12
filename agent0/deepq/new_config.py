@@ -74,7 +74,7 @@ class LearnerConfig:
 @dataclass
 class TrainerConfig:
     total_steps: int = int(1e7)
-    training_start_steps: int = int(1e4)
+    training_start_steps: int = int(1e5)
     exploration_steps: int = int(1e6)
     log_freq: int = 100
 
