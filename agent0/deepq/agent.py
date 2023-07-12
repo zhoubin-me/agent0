@@ -9,8 +9,8 @@ from agent0.common.MixtureSameFamily import MixtureSameFamily
 from agent0.common.utils import DataLoaderX, DataPrefetcher
 from agent0.deepq.config import Config
 from agent0.deepq.model import DeepQNet
-from agent0.deepq.replay import ReplayDataset
 from agent0.deepq.new_config import ExpConfig
+from agent0.deepq.replay import ReplayDataset
 
 
 class Agent:
@@ -338,7 +338,6 @@ class Agent:
         rewards = rewards.float()
         # weights = weights.float()
         # indices = indices.long()
-        
 
         if self.cfg.noisy:
             self.model.reset_noise()
@@ -362,7 +361,6 @@ class Agent:
         else:
             loss = loss.mean()
             fraction_loss = fraction_loss.mean() if fraction_loss is not None else None
-
 
         if self.cfg.cor_loss:
             phi_norm = self.model.phi - self.model.phi.mean(dim=0, keepdim=True)
@@ -388,7 +386,6 @@ class Agent:
             loss += cor_loss
         else:
             cor_loss = None
-
 
         if fraction_loss is not None:
             self.fraction_optimizer.zero_grad()

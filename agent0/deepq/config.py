@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from agent0.common.bench import atari7, atari11, atari47, atari63, atari_exp7
 
+
 @dataclass
 class Config:
     # algo setting

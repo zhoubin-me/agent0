@@ -319,5 +319,3 @@ class NoisyLinear(nn.Module, ABC):
     @staticmethod
     def transform_noise(x):
         return x.sign().mul(x.abs().sqrt())
-
-

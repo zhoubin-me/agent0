@@ -54,7 +54,9 @@ class Trainer:
     def step(self):
         tic = time.time()
         epsilon = self.epsilon_fn(self.frame_count)
-        transitions, returns, qmax = self.actor.sample(epsilon, self.learner.model.state_dict())
+        transitions, returns, qmax = self.actor.sample(
+            epsilon, self.learner.model.state_dict()
+        )
         self.Qs.extend(qmax)
         self.Rs.extend(returns)
         # Actors
@@ -79,8 +81,8 @@ class Trainer:
                     obs, actions, rewards, terminals, next_obs
                 )
                 self.Ls.append(loss["loss"])
-                if 'fraction_loss' in loss:
-                    self.FLs.append(loss['fraction_loss'])
+                if "fraction_loss" in loss:
+                    self.FLs.append(loss["fraction_loss"])
 
         toc = time.time()
 
