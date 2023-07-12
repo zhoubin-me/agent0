@@ -3,14 +3,31 @@ from enum import Enum
 from typing import Tuple, List, Any
 import gymnasium as gym
 
-AlgoEnum = Enum("Algo", {k: i for i, k in enumerate(["dqn", "c51"])})
-ActorEnum = Enum(
-    "Actor", {k: i for i, k in enumerate(["greedy", "random", "eps-greedy"])}
-)
-ReplayEnum = Enum("Replay", {k: i for i, k in enumerate(["uniform", "prior"])})
-ModeEnum = Enum("Mode", {k: i for i, k in enumerate(["train", "finetune", "play"])})
-EnvEnum = Enum("Env", {k: i for i, k in enumerate(["atari", "mujoco"])})
-DeviceEnum = Enum("Device", {"cuda": "cuda", "cpu": "cpu"})
+class AlgoEnum(Enum):
+    dqn = 0
+    c51 = 1
+
+class ActorEnum(Enum):
+    greedy = 0
+    random = 1
+    epsilon = 2
+
+class ReplayEnum(Enum):
+    uniform = 0
+    prior = 1
+
+class ModeEnum(Enum):
+    train = 0
+    finetune = 1
+    play = 2
+
+class EnvEnum(Enum):
+    atari = 0
+    mujoco = 1
+
+class DeviceEnum(Enum):
+    cuda = 'cuda'
+    cpu = 'cpu'
 
 
 @dataclass

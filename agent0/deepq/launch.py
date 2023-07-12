@@ -18,7 +18,6 @@ from agent0.common.atari_wrappers import make_atari
 from agent0.common.utils import DataLoaderX, DataPrefetcher, set_random_seed
 from agent0.deepq.new_agent import Actor, Learner
 from agent0.deepq.new_config import ExpConfig
-from agent0.deepq.new_model import DeepQNet
 from agent0.deepq.replay import ReplayDataset
 
 
@@ -175,10 +174,9 @@ def make_program(cfg: ExpConfig):
 
 @hydra.main(version_base=None, config_name="config")
 def main(cfg: ExpConfig):
+    print(cfg)
     cfg = OmegaConf.to_container(cfg)
     cfg = from_dict(ExpConfig, cfg)
-    print(cfg)
-
     dummy_env = make_atari(cfg.env_id, num_envs=1)
     cfg.obs_shape = dummy_env.observation_space.shape[1:]
     cfg.action_dim = dummy_env.action_space[0].n
