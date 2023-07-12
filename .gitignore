@@ -129,3 +129,6 @@ dmypy.json
 *.pth
 aaa.ipynb
 *.ipynb
+
+tblog
+outputs

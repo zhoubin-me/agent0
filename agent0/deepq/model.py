@@ -4,9 +4,10 @@ from itertools import chain
 import numpy as np
 import torch
 import torch.nn as nn
+from torch.distributions import Categorical, Normal
+
 from agent0.common.MixtureSameFamily import MixtureSameFamily
 from agent0.deepq.config import Config
-from torch.distributions import Normal, Categorical
 
 
 def init(m, gain=1.0):
@@ -39,33 +40,47 @@ class DeepQNet(nn.Module, ABC):
             dense = nn.Linear
 
         self.convs = nn.Sequential(
-            nn.Conv2d(self.cfg.frame_stack, 32, 8, stride=4), nn.ReLU(),
-            nn.Conv2d(32, 64, 4, stride=2), nn.ReLU(),
-            nn.Conv2d(64, 64, 3, stride=1), nn.ReLU(), nn.Flatten())
-        self.convs.apply(lambda m: init(m, nn.init.calculate_gain('relu')))
+            nn.Conv2d(self.cfg.frame_stack, 32, 8, stride=4),
+            nn.ReLU(),
+            nn.Conv2d(32, 64, 4, stride=2),
+            nn.ReLU(),
+            nn.Conv2d(64, 64, 3, stride=1),
+            nn.ReLU(),
+            nn.Flatten(),
+        )
+        self.convs.apply(lambda m: init(m, nn.init.calculate_gain("relu")))
 
-        if self.cfg.algo == 'c51':
-            self.register_buffer('atoms', torch.linspace(self.cfg.v_min, self.cfg.v_max, self.cfg.num_atoms))
-            self.delta_atom = (self.cfg.v_max - self.cfg.v_min) / (self.cfg.num_atoms - 1)
-
-        if self.cfg.algo == 'qr':
+        if self.cfg.algo == "c51":
             self.register_buffer(
-                'cumulative_density', (2 * torch.arange(self.cfg.num_atoms) + 1) / (2.0 * self.cfg.num_atoms))
+                "atoms",
+                torch.linspace(self.cfg.v_min, self.cfg.v_max, self.cfg.num_atoms),
+            )
+            self.delta_atom = (self.cfg.v_max - self.cfg.v_min) / (
+                self.cfg.num_atoms - 1
+            )
 
-        if self.cfg.algo in ['iqr', 'fqf']:
-            self.cosine_emb = nn.Sequential(dense(self.cfg.num_cosines, 64 * 7 * 7), nn.ReLU())
-            self.cosine_emb.apply(lambda m: init(m, nn.init.calculate_gain('relu')))
+        if self.cfg.algo == "qr":
+            self.register_buffer(
+                "cumulative_density",
+                (2 * torch.arange(self.cfg.num_atoms) + 1) / (2.0 * self.cfg.num_atoms),
+            )
+
+        if self.cfg.algo in ["iqr", "fqf"]:
+            self.cosine_emb = nn.Sequential(
+                dense(self.cfg.num_cosines, 64 * 7 * 7), nn.ReLU()
+            )
+            self.cosine_emb.apply(lambda m: init(m, nn.init.calculate_gain("relu")))
         else:
             self.cosine_emb = None
 
-        if self.cfg.algo in ['fqf']:
+        if self.cfg.algo in ["fqf"]:
             self.fraction_net = dense(64 * 7 * 7, self.cfg.N_fqf)
             self.fraction_net.apply(lambda m: init_xavier(m, 0.01))
         else:
             self.fraction_net = None
 
         self.first_dense = nn.Sequential(dense(64 * 7 * 7, 512), nn.ReLU())
-        self.first_dense.apply(lambda m: init(m, nn.init.calculate_gain('relu')))
+        self.first_dense.apply(lambda m: init(m, nn.init.calculate_gain("relu")))
 
         self.p = dense(512, action_dim * self.cfg.num_atoms)
         self.p.apply(lambda m: init(m, 0.01))
@@ -73,7 +88,7 @@ class DeepQNet(nn.Module, ABC):
         self.phi = None
 
         if self.cfg.dueling:
-            if self.cfg.algo == 'gmm':
+            if self.cfg.algo == "gmm":
                 self.v = dense(512, self.cfg.num_atoms // 3)
             else:
                 self.v = dense(512, self.cfg.num_atoms)
@@ -82,13 +97,13 @@ class DeepQNet(nn.Module, ABC):
             self.v = None
 
         self.qvals = {
-            'c51': lambda x: self.calc_c51_q(x),
-            'qr': lambda x: self.forward(x).mean(-1),
-            'iqr': lambda x: self.forward_iqr(x, n=self.cfg.K_iqr)[0].mean(1),
-            'dqn': lambda x: self.forward(x),
-            'mdqn': lambda x: self.forward(x),
-            'fqf': lambda x: self.calc_fqf_q(x),
-            'gmm': lambda x: self.calc_gmm_q(x),
+            "c51": lambda x: self.calc_c51_q(x),
+            "qr": lambda x: self.forward(x).mean(-1),
+            "iqr": lambda x: self.forward_iqr(x, n=self.cfg.K_iqr)[0].mean(1),
+            "dqn": lambda x: self.forward(x),
+            "mdqn": lambda x: self.forward(x),
+            "fqf": lambda x: self.calc_fqf_q(x),
+            "gmm": lambda x: self.calc_gmm_q(x),
         }
 
         assert self.cfg.algo in self.qvals
@@ -122,11 +137,19 @@ class DeepQNet(nn.Module, ABC):
         features = self.first_dense(self.convs(x))
         self.phi = features
         adv = self.p(features).view(-1, self.action_dim, self.cfg.num_atoms)
-        q_mean, q_logstd, q_weight = adv.split(dim=-1, split_size=self.cfg.num_atoms // 3)
+        q_mean, q_logstd, q_weight = adv.split(
+            dim=-1, split_size=self.cfg.num_atoms // 3
+        )
         if self.cfg.dueling:
             v = self.v(features).view(-1, 1, self.cfg.num_atoms // 3)
-            q_mean = v.expand_as(q_mean) + (q_mean - q_mean.mean(dim=1, keepdim=True).expand_as(q_mean))
-        return q_mean, q_logstd.tanh().mul(self.cfg.gmm_max_std).exp(), q_weight.softmax(-1)
+            q_mean = v.expand_as(q_mean) + (
+                q_mean - q_mean.mean(dim=1, keepdim=True).expand_as(q_mean)
+            )
+        return (
+            q_mean,
+            q_logstd.tanh().mul(self.cfg.gmm_max_std).exp(),
+            q_weight.softmax(-1),
+        )
 
     def forward(self, x):
         features = self.first_dense(self.convs(x))
@@ -183,7 +206,9 @@ class DeepQNet(nn.Module, ABC):
         else:
             n = taus.size(1)
 
-        ipi = np.pi * torch.arange(1, self.cfg.num_cosines + 1).to(x).view(1, 1, self.cfg.num_cosines)
+        ipi = np.pi * torch.arange(1, self.cfg.num_cosines + 1).to(x).view(
+            1, 1, self.cfg.num_cosines
+        )
         cosine = ipi.mul(taus).cos().view(batch_size * n, self.cfg.num_cosines)
 
         tau_embed = self.cosine_emb(cosine).view(batch_size, n, -1)
@@ -198,7 +223,9 @@ class DeepQNet(nn.Module, ABC):
 
 
 class GMMLinear(nn.Module, ABC):
-    def __init__(self, in_features, out_features, max_std=3.0, num_gmm=5, num_samples=3):
+    def __init__(
+        self, in_features, out_features, max_std=3.0, num_gmm=5, num_samples=3
+    ):
         super(GMMLinear, self).__init__()
 
         self.in_features = in_features
@@ -208,9 +235,15 @@ class GMMLinear(nn.Module, ABC):
         self.num_samples = 3
 
         in_features += 1
-        self.mean = nn.Parameter(torch.randn((in_features * out_features, num_gmm)), requires_grad=True)
-        self.logstd = nn.Parameter(torch.randn((in_features * out_features, num_gmm)), requires_grad=True)
-        self.weight = nn.Parameter(torch.randn((in_features * out_features, num_gmm)), requires_grad=True)
+        self.mean = nn.Parameter(
+            torch.randn((in_features * out_features, num_gmm)), requires_grad=True
+        )
+        self.logstd = nn.Parameter(
+            torch.randn((in_features * out_features, num_gmm)), requires_grad=True
+        )
+        self.weight = nn.Parameter(
+            torch.randn((in_features * out_features, num_gmm)), requires_grad=True
+        )
 
     def forward(self, x):
         comp = Normal(self.mean, self.logstd.tanh().mul(self.max_std).exp())
@@ -218,8 +251,10 @@ class GMMLinear(nn.Module, ABC):
         gmm = MixtureSameFamily(mix, comp)
 
         weight_bias = gmm.sample()
-        bias = weight_bias[:self.out_features].view(-1)
-        weight = weight_bias[self.out_features:].view(self.out_features, self.in_features)
+        bias = weight_bias[: self.out_features].view(-1)
+        weight = weight_bias[self.out_features :].view(
+            self.out_features, self.in_features
+        )
         return nn.functional.linear(x, weight, bias)
 
 
@@ -232,16 +267,20 @@ class NoisyLinear(nn.Module, ABC):
         self.out_features = out_features
         self.std_init = std_init
         self.noisy_layer_std = noisy_layer_std
-        self.weight_mu = nn.Parameter(torch.zeros((out_features, in_features)), requires_grad=True)
-        self.weight_sigma = nn.Parameter(torch.zeros((out_features, in_features)), requires_grad=True)
-        self.register_buffer('weight_epsilon', torch.zeros((out_features, in_features)))
+        self.weight_mu = nn.Parameter(
+            torch.zeros((out_features, in_features)), requires_grad=True
+        )
+        self.weight_sigma = nn.Parameter(
+            torch.zeros((out_features, in_features)), requires_grad=True
+        )
+        self.register_buffer("weight_epsilon", torch.zeros((out_features, in_features)))
         self.bias_mu = nn.Parameter(torch.zeros(out_features), requires_grad=True)
         self.bias_sigma = nn.Parameter(torch.zeros(out_features), requires_grad=True)
-        self.register_buffer('bias_epsilon', torch.zeros(out_features))
+        self.register_buffer("bias_epsilon", torch.zeros(out_features))
 
-        self.register_buffer('noise_in', torch.zeros(in_features))
-        self.register_buffer('noise_out_weight', torch.zeros(out_features))
-        self.register_buffer('noise_out_bias', torch.zeros(out_features))
+        self.register_buffer("noise_in", torch.zeros(in_features))
+        self.register_buffer("noise_out_weight", torch.zeros(out_features))
+        self.register_buffer("noise_out_bias", torch.zeros(out_features))
 
         self.reset_parameters()
         self.reset_noise()
@@ -270,8 +309,11 @@ class NoisyLinear(nn.Module, ABC):
         self.noise_out_weight.normal_(std=self.noisy_layer_std)
         self.noise_out_bias.normal_(std=self.noisy_layer_std)
 
-        self.weight_epsilon.copy_(self.transform_noise(self.noise_out_weight).ger(
-            self.transform_noise(self.noise_in)))
+        self.weight_epsilon.copy_(
+            self.transform_noise(self.noise_out_weight).ger(
+                self.transform_noise(self.noise_in)
+            )
+        )
         self.bias_epsilon.copy_(self.transform_noise(self.noise_out_bias))
 
     @staticmethod
@@ -279,8 +321,10 @@ class NoisyLinear(nn.Module, ABC):
         return x.sign().mul(x.abs().sqrt())
 
 
-if __name__ == '__main__':
-    model = DeepQNet(4, algo='c51')
+if __name__ == "__main__":
+    model = DeepQNet(4, algo="c51")
     x = torch.randn(512, 4, 84, 84)
     y = model.calc_c51_q(x)
-    print(model.forward(x).softmax(dim=-1).mul(model.atoms).sum(-1), )
+    print(
+        model.forward(x).softmax(dim=-1).mul(model.atoms).sum(-1),
+    )

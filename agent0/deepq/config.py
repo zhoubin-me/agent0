@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+from agent0.common.bench import atari7, atari11, atari47, atari63, atari_exp7
 
 @dataclass
 class Config:
@@ -11,9 +12,9 @@ class Config:
     prioritize: bool = False
     n_step: int = 1
     # support: dqn, mdqn, c51, qr, iqr, fqf, gmm
-    algo: str = 'dqn'
+    algo: str = "dqn"
     # support: epsilon_greedy, soft_explore
-    policy: str = 'epsilon_greedy'
+    policy: str = "epsilon_greedy"
 
     # replace noisy layer to gmm layer. not working
     gmm_layer: bool = False
@@ -85,7 +86,7 @@ class Config:
     restore_checkpoint: str = ""
     random_seed: int = 42
     trials: int = 1
-    exp_name: str = 'atari_deepq'
+    exp_name: str = "atari_deepq"
     frame_stack: int = 4
     sha: str = ""
     gpu_mult: float = 1.0
@@ -101,7 +102,7 @@ class Config:
 
     def update_seeds(self):
         if self.trials > 1:
-            self.random_seed = list([self.random_seed+x for x in range(self.trials)])
+            self.random_seed = list([self.random_seed + x for x in range(self.trials)])
 
     def update_game(self):
         if self.game == "":
@@ -109,21 +110,23 @@ class Config:
 
     def update_atoms(self):
         algo_num_atoms = {
-            'dqn': 1,
-            'c51': 51,
-            'qr': 200,
-            'mdqn': 1,
-            'iqr': 1,
-            'fqf': 1,
-            'gmm': 33,
+            "dqn": 1,
+            "c51": 51,
+            "qr": 200,
+            "mdqn": 1,
+            "iqr": 1,
+            "fqf": 1,
+            "gmm": 33,
         }
 
         if self.num_atoms < 1:
             try:
-                if self.algo != 'all':
+                if self.algo != "all":
                     self.num_atoms = algo_num_atoms[self.algo]
             except Exception as e:
                 print(e)
-                raise ValueError(f"Algo {self.algo} not implemented\n"
-                                 f"available algorithms are:\n"
-                                 f"{algo_num_atoms.keys()}")
+                raise ValueError(
+                    f"Algo {self.algo} not implemented\n"
+                    f"available algorithms are:\n"
+                    f"{algo_num_atoms.keys()}"
+                )

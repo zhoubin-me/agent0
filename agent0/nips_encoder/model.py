@@ -20,15 +20,13 @@ class ModelEncoder(nn.Module, ABC):
             nn.Flatten(),
             nn.Linear(128 * 10 * 7, 2048),
             nn.ReLU(),
-            nn.Linear(2048, 2048)
+            nn.Linear(2048, 2048),
         )
 
         self.action_embed = nn.Embedding(action_dim, 2048)
 
         self.linear_decoder = nn.Sequential(
-            nn.Linear(2048, 2048), nn.ReLU(),
-            nn.Linear(2048, 128 * 10 * 7),
-            nn.ReLU()
+            nn.Linear(2048, 2048), nn.ReLU(), nn.Linear(2048, 128 * 10 * 7), nn.ReLU()
         )
 
         self.decoder = nn.Sequential(
@@ -56,4 +54,3 @@ class ModelEncoder(nn.Module, ABC):
         h = self.encode(states, actions)
         h = self.decode(h)
         return h
-

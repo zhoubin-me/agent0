@@ -42,7 +42,9 @@ class DataPrefetcher:
 
         # noinspection PyTypeChecker
         with torch.cuda.stream(self.stream):
-            self.next_data = (x.to(self.device, non_blocking=True) for x in self.next_data)
+            self.next_data = (
+                x.to(self.device, non_blocking=True) for x in self.next_data
+            )
 
     def next(self):
         # noinspection PyTypeChecker
@@ -61,8 +63,8 @@ def parse_arguments(config):
     parser = argparse.ArgumentParser()
     for k, v in vars(config).items():
         if type(v) == bool:
-            parser.add_argument(f'--{k}', dest=k, action='store_true')
-            parser.add_argument(f'--no_{k}', dest=k, action='store_false')
+            parser.add_argument(f"--{k}", dest=k, action="store_true")
+            parser.add_argument(f"--no_{k}", dest=k, action="store_false")
             parser.set_defaults(**{k: v})
         else:
             parser.add_argument(f"--{k}", type=type(v), default=v)

@@ -2,7 +2,7 @@
 
 ## Introduction
 
-AgentZero is a Lightweight PyTorch Reinforcement Learning Framework.
+AgentZero is a Lightweight Distributed Reinforcement Learning Framework based on Pytorch and DeepMind Launchpad.
 
 
 ## Installation
@@ -10,13 +10,12 @@ AgentZero is a Lightweight PyTorch Reinforcement Learning Framework.
 git clone https://github.com/zhoubin-me/AgentZero
 cd AgentZero
 conda env create -f environment.yml
-conda activate py3x
+conda activate agent0
+pip install tensorflow==2.8.4
+pip install protobuf==3.20.3
 ```
+**Note**: DO NOT use ```pip install -r requirements.txt``` which will create a very slow version. Package version match for these two, but reason unknown for slow version.
 
-Simple run
-```
-python -m agent0.deepq.main
-```
 
 ## Hardware Requirements:
 - A GPU
@@ -25,42 +24,38 @@ python -m agent0.deepq.main
 
 ## Speed Test
 Hardware Setting:
- - CPU: AMD EPYC 7251 8-Core Processor
- - GPU: RTX 2080 Ti
+ - CPU: Intel i9-13900KF
+ - GPU: RTX 4090
  - RAM: 32 GB
  - Game: Breakout
- - Algorithm: Rainbow
- - FPS: 700+ x4 = **2800+**
+ - Algorithm: dqn
+ - FPS: 5000++ x 4 = **20000++**
 
-Here FPS (frame per second) means frames collected and saved to replay buffer per second. With 4 frame skip, its FPS is 700+ x4= **2800+** in deepmind's word. 
+Here FPS (frame per second) means frames collected and saved to replay buffer per second. With 4 frame skip, its FPS is 5000x4= **20000++** in deepmind's word. 
 Other implementations usually fall below 100 FPS after exploration. The bottle net is actually at data transferring from CPU to GPU.
 
 ## Run
-
 Basic DQN:
 ```bash
-python -m agent0.deepq.run
+python -m agent0.deepq.launch
 ```
 
 Specify game:
 ```bash
-python -m agent0.deepq.run --game enduro
+python -m agent0.deepq.launch env_id=enduro
 ```
-Or run over a list of games as defined in ```src/common/bench.py```
-```
-python -m agent0.deepq.run --game atari6
-```
+
 Specify algorithms:
 ```bash
 # Our current implementation includes: c51, qr, mdqn, iqr, fqf
-python -m agent0.deepq.run --algo c51
+python -m agent0.deepq.launch learner.algo=c51
 ```
-
+<!-- 
 Run like in rainbow:
 ```bash
 # exp_name will specify checkpoint directory under $HOME/ray_results
 python -m agent0.deepq.run --double_q --dueling --noisy --priortize --n_step 3 --game atari47 --algo c51 --exp_name atari_rainbow
-```
+``` -->
 
 ## Sample Run Result @10M Frames
 | exp_name                 | commit | algo | game          | mean     | std      | max   | min  | size | frames   |
