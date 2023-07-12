@@ -2,7 +2,6 @@ from dataclasses import dataclass
 
 from agent0.common.bench import atari7, atari11, atari47, atari63, atari_exp7
 
-
 @dataclass
 class Config:
     # algo setting
@@ -108,7 +107,7 @@ class Config:
     def update_game(self):
         if self.game == "":
             self.game = "Breakout"
-            
+
     def update_atoms(self):
         algo_num_atoms = {
             "dqn": 1,

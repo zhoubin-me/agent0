@@ -12,6 +12,7 @@ from agent0.deepq.model import DeepQNet
 from agent0.deepq.replay import ReplayDataset
 from agent0.deepq.new_config import ExpConfig
 
+
 class Agent:
     def __init__(self, **kwargs):
         self.cfg = Config(**kwargs)
@@ -338,6 +339,7 @@ class Agent:
         # weights = weights.float()
         # indices = indices.long()
         
+
         if self.cfg.noisy:
             self.model.reset_noise()
             self.model_target.reset_noise()
@@ -360,6 +362,7 @@ class Agent:
         else:
             loss = loss.mean()
             fraction_loss = fraction_loss.mean() if fraction_loss is not None else None
+
 
         if self.cfg.cor_loss:
             phi_norm = self.model.phi - self.model.phi.mean(dim=0, keepdim=True)
