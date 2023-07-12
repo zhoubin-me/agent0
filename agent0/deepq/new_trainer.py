@@ -37,7 +37,7 @@ class Trainer:
         self.frame_count = 0
         self.writer = SummaryWriter(cfg.logdir)
         self.num_transitions = cfg.actor.actor_steps * cfg.actor.num_envs
-        self.Ls, self.Rs, self.Qs = [], [], []
+        self.Ls, self.Rs, self.Qs, self.FLs = [], [], [], []
         self.data_fetcher = None
 
     def get_data_fetcher(self):
@@ -79,6 +79,8 @@ class Trainer:
                     obs, actions, rewards, terminals, next_obs
                 )
                 self.Ls.append(loss["loss"])
+                if 'fraction_loss' in loss:
+                    self.FLs.append(loss['fraction_loss'])
 
         toc = time.time()
 
@@ -86,6 +88,7 @@ class Trainer:
             epsilon=epsilon,
             frames=self.frame_count,
             velocity=self.num_transitions / (toc - tic),
+            fraction_loss=np.mean(self.FLs[-20:]) if len(self.FLs) > 0 else None,
             loss=np.mean(self.Ls[-20:]) if len(self.Ls) > 0 else None,
             return_train=np.mean(self.Rs[-20:]) if len(self.Rs) > 0 else None,
             return_train_max=np.max(self.Rs) if len(self.Rs) > 0 else None,

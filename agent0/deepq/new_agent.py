@@ -252,9 +252,9 @@ class Learner:
             loss_fn = self.train_step_fqf
         else:
             raise NotImplementedError(algo)
-        
         loss = loss_fn(obs, actions, rewards, terminals, next_obs)
 
+        result = {}
         if algo == AlgoEnum.fqf:
             loss, fraction_loss = loss
             fraction_loss = fraction_loss.mean()
@@ -263,6 +263,8 @@ class Learner:
             if self.cfg.learner.max_grad_norm > 0:
                 nn.utils.clip_grad_norm_(self.model.head.fraction_net.parameters(),
                 self.cfg.learner.max_grad_norm)
+            
+            result['fraction_loss'] = fraction_loss.item()
 
 
         loss = loss.mean()
@@ -270,8 +272,9 @@ class Learner:
         loss.backward()
         self.optimizer.step()
         self.update_steps += 1
+        result['loss'] = loss.item()
 
         if self.update_steps % self.cfg.learner.target_update_freq == 0:
             self.model_target = deepcopy(self.model)
 
-        return {"loss": loss.item()}
+        return result
