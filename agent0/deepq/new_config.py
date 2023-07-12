@@ -8,6 +8,7 @@ class AlgoEnum(Enum):
     c51 = 1
     qr = 2
     iqn = 3
+    fqf = 4
 
 class ActorEnum(Enum):
     greedy = 0
@@ -40,7 +41,9 @@ class C51Config:
 
 @dataclass
 class QRConfig:
-    num_quantiles: int = 200
+    num_atoms: int = 51
+    vmax: Any = None
+    vmin: Any = None
 
 @dataclass
 class IQNConfig:
@@ -48,7 +51,7 @@ class IQNConfig:
     N: int = 64
     N_dash: int = 64
     num_cosines: int = 64
-
+    F: int = 32
 
 @dataclass
 class LearnerConfig:
@@ -56,6 +59,8 @@ class LearnerConfig:
     discount: float = 0.99
     batch_size: int = 512
     learning_rate: float = 5e-4
+    max_grad_norm: float = -1.0
+
     target_update_freq: int = 500
     learner_steps: int = 20
     double_q: bool = False
@@ -69,7 +74,7 @@ class LearnerConfig:
 @dataclass
 class TrainerConfig:
     total_steps: int = int(1e7)
-    training_start_steps: int = int(1e5)
+    training_start_steps: int = int(1e4)
     exploration_steps: int = int(1e6)
     log_freq: int = 100
 

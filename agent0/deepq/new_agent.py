@@ -75,10 +75,18 @@ class Learner:
         self.model_target = deepcopy(self.model)
 
         self.optimizer = torch.optim.Adam(
-            self.model.parameters(),
+            self.model.params(),
             cfg.learner.learning_rate,
             eps=1e-2 / cfg.learner.batch_size,
         )
+
+        if self.cfg.learner.algo == AlgoEnum.fqf:
+            self.fqf_optimizer = torch.optim.RMSprop(
+                self.model.head.fraction_net.parameters(),
+                lr=cfg.learner.learning_rate / 2e4,
+                alpha=0.95,
+                eps=0.00001,
+            )
 
         self.update_steps = 0
         self.batch_indices = torch.arange(cfg.learner.batch_size).to(cfg.device.value)
@@ -184,6 +192,51 @@ class Learner:
         loss = huber_loss * (taus - q_target.lt(q).detach().float()).abs()
         return loss.view(-1)
 
+    def train_step_fqf(self, obs, actions, rewards, terminals, next_obs):
+        q_convs = self.model.encoder(obs)
+        # taus: B X (N+1) X 1, taus_hats: B X N X 1
+        taus, taus_hat, _ = self.model.head.prop_taus(q_convs.detach())
+        # q_hat: B X N X A
+        q_hat, _ = self.model.head(q_convs, taus=taus_hat)
+        q_hat = q_hat[self.batch_indices, :, actions]
+
+        with torch.no_grad():
+            q_next_convs = self.model_target.encoder(next_obs)
+            if self.cfg.learner.double_q:
+                q_next_convs_online = self.model.encoder(next_obs)
+                q_next_online = self.model.head.qval(q_next_convs_online)
+                a_next = q_next_online.argmax(dim=-1)
+            else:
+                q_next_ = self.model_target.head.qval(q_next_convs)
+                a_next = q_next_.argmax(dim=-1)
+
+            q_next, _ = self.model_target.head(q_next_convs, taus=taus_hat)
+            q_next = q_next[self.batch_indices, :, a_next]
+            q_target = rewards.view(-1, 1) + self.cfg.learner.discount * (1 - terminals.view(-1, 1)) * q_next
+
+
+        q_hat = rearrange(q_hat, 'b n -> b 1 n')
+        q_target = rearrange(q_target, 'b n -> b n 1')
+        tau_hats = rearrange(taus_hat, 'b n 1 -> b 1 n')
+        huber_loss = F.smooth_l1_loss(q_hat, q_target, reduction="none")
+        huber_loss = huber_loss * (tau_hats - q_target.lt(q_hat).detach().float()).abs()
+
+        q_hat = rearrange(q_hat, 'b 1 n -> b n')
+        with torch.no_grad():
+            # q: B X (N-1) X A
+            q, _ = self.model.head(q_convs, taus=taus[:, 1:-1])
+            q = q[self.batch_indices, :, actions]
+            values_1 = q - q_hat[:, :-1]
+            signs_1 = q.gt(torch.cat((q_hat[:, :1], q[:, :-1]), dim=1))
+
+            values_2 = q - q_hat[:, 1:]
+            signs_2 = q.lt(torch.cat((q[:, 1:], q_hat[:, -1:]), dim=1))
+
+        # gradients: B X (N-1)
+        gradients_of_taus = torch.where(signs_1, values_1, -values_1) + torch.where(signs_2, values_2, -values_2)
+        fraction_loss = (gradients_of_taus * taus[:, 1:-1, 0]).sum(dim=1).view(-1)
+        return huber_loss, fraction_loss
+
 
     def train_step(self, obs, actions, rewards, terminals, next_obs):
         algo = self.cfg.learner.algo
@@ -195,10 +248,21 @@ class Learner:
             loss_fn = self.train_step_qr
         elif algo == AlgoEnum.iqn:
             loss_fn = self.train_step_iqn
+        elif algo == AlgoEnum.fqf:
+            loss_fn = self.train_step_fqf
         else:
             raise NotImplementedError(algo)
         
         loss = loss_fn(obs, actions, rewards, terminals, next_obs)
+
+        if algo == AlgoEnum.fqf:
+            loss, fraction_loss = loss
+            fraction_loss = fraction_loss.mean()
+            self.fqf_optimizer.zero_grad()
+            fraction_loss.backward(retain_graph=True)
+            if self.cfg.learner.max_grad_norm > 0:
+                nn.utils.clip_grad_norm_(self.model.head.fraction_net.parameters(),
+                self.cfg.learner.max_grad_norm)
 
 
         loss = loss.mean()
