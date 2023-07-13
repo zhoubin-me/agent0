@@ -58,17 +58,16 @@ class Actor:
             done = np.logical_or(terminal, info['life_loss']) if 'life_loss' in info else terminal
             done = np.logical_and(done, np.logical_not(truncated))
 
-            if self.cfg.learner.n_step_q > 1:
-                self.tracker.append((self.obs, action, reward, done))
-                r_nstep = np.zeros_like(reward)
-                d_nstep = np.zeros_like(reward, dtype=np.bool_)
-                for _, _, rt, dt in reversed(self.tracker):
-                    d_nstep = np.logical_or(d_nstep, dt)
-                    r_nstep = r_nstep * self.cfg.learner.discount * (1 - dt) + rt
-                obs = self.tracker[0][0]
-                action = self.tracker[0][1]
-                reward = r_nstep
-                done = d_nstep
+            self.tracker.append((self.obs, action, reward, done))
+            r_nstep = np.zeros_like(reward)
+            d_nstep = np.zeros_like(reward, dtype=np.bool_)
+            for _, _, rt, dt in reversed(self.tracker):
+                d_nstep = np.logical_or(d_nstep, dt)
+                r_nstep = r_nstep * self.cfg.learner.discount * (1 - dt) + rt
+            obs = self.tracker[0][0]
+            action = self.tracker[0][1]
+            reward = r_nstep
+            done = d_nstep
             
             for st, at, rt, dt, st_next in zip(
                 obs, action, reward, done, obs_next
@@ -93,6 +92,10 @@ def huber_qr_loss(q, q_target, taus):
     huber_loss = F.smooth_l1_loss(q, q_target, reduction="none")
     loss = huber_loss * (taus - q_target.lt(q).detach().float()).abs()
     return loss.sum(-1).mean(-1).view(-1)
+
+def log_softmax_stable(logits, tau=0.01):
+    logits = logits - logits.max(dim=-1, keepdim=True)[0]
+    return logits - tau * torch.logsumexp(logits / tau, dim=-1, keepdim=True)
 
 
 class Learner:
@@ -123,6 +126,7 @@ class Learner:
             AlgoEnum.qr: self.train_step_qr,
             AlgoEnum.iqn: self.train_step_iqn,
             AlgoEnum.fqf: self.train_step_fqf,
+            AlgoEnum.mdqn: self.train_step_mdqn,
         }
         assert self.cfg.learner.algo in train_step_algos
         self.train_step_fn = train_step_algos[self.cfg.learner.algo]
@@ -135,11 +139,30 @@ class Learner:
             else:
                 a_next = q_next.argmax(dim=-1)
             q_next = q_next[self.batch_indices, a_next]
-            q_target = rewards + self.cfg.learner.discount * (1 - terminals) * q_next
+            q_target = rewards + self.cfg.learner.discount ** self.cfg.learner.n_step_q * (1 - terminals) * q_next
 
         q = self.model(obs)[self.batch_indices, actions]
         loss = F.smooth_l1_loss(q, q_target, reduction="none").view(-1)
         return loss
+    
+    def train_step_mdqn(self, obs, actions, rewards, terminals, next_obs):
+        cfg = self.cfg.learner.mdqn
+        with torch.no_grad():
+            q_next_logits = self.model_target(next_obs)
+            q_next = q_next_logits - log_softmax_stable(
+                q_next_logits, cfg.tau
+            )
+            q_next = q_next_logits.softmax(dim=-1).mul(q_next).sum(dim=-1)
+
+            add_on = self.model_target(obs)
+            add_on = log_softmax_stable(add_on, cfg.tau)
+            add_on = add_on[self.batch_indices, actions].clamp(cfg.lo, 0)
+
+            q_target = rewards + cfg.tau * add_on +  self.cfg.learner.discount ** self.cfg.learner.n_step_q * (1 - terminals) * q_next
+
+        q = self.model(obs)[self.batch_indices, actions]
+        loss = F.smooth_l1_loss(q, q_target, reduction="none")
+        return loss.view(-1)
 
     def train_step_c51(self, obs, actions, rewards, terminals, next_obs):
         with torch.no_grad():
@@ -152,7 +175,7 @@ class Learner:
 
             prob_next = prob_next[self.batch_indices, a_next, :]
 
-            atoms_next = rewards.view(-1, 1) + self.cfg.learner.discount * (
+            atoms_next = rewards.view(-1, 1) + self.cfg.learner.discount ** self.cfg.learner.n_step_q * (
                 1 - terminals.view(-1, 1)
             ) * self.model.head.atoms.view(1, -1)
 
@@ -199,7 +222,7 @@ class Learner:
             q_next = q_next[self.batch_indices, a_next, :]
             q_target = (
                 rewards.view(-1, 1)
-                + self.cfg.learner.discount * (1 - terminals.view(-1, 1)) * q_next
+                + self.cfg.learner.discount ** self.cfg.learner.n_step_q * (1 - terminals.view(-1, 1)) * q_next
             )
 
         q = self.model(obs)[self.batch_indices, actions, :]
@@ -227,7 +250,7 @@ class Learner:
 
             q_target = (
                 rewards.view(-1, 1)
-                + self.cfg.learner.discount * (1 - terminals.view(-1, 1)) * q_next
+                + self.cfg.learner.discount ** self.cfg.learner.n_step_q  * (1 - terminals.view(-1, 1)) * q_next
             )
 
         q, taus = self.model.head(self.model.encoder(obs), n=cfg.N)
@@ -260,7 +283,7 @@ class Learner:
             q_next = q_next[self.batch_indices, :, a_next]
             q_target = (
                 rewards.view(-1, 1)
-                + self.cfg.learner.discount * (1 - terminals.view(-1, 1)) * q_next
+                + self.cfg.learner.discount ** self.cfg.learner.n_step_q  * (1 - terminals.view(-1, 1)) * q_next
             )
 
         q_hat = rearrange(q_hat, "b n -> b 1 n")

@@ -279,7 +279,8 @@ class DeepQNet(nn.Module):
             AlgoEnum.c51: C51Head,
             AlgoEnum.qr: QRHead,
             AlgoEnum.iqn: IQNHead,
-            AlgoEnum.fqf: FQFHead
+            AlgoEnum.fqf: FQFHead,
+            AlgoEnum.mdqn: DQNHead,
         }
 
         head_cfgs = {
@@ -287,7 +288,8 @@ class DeepQNet(nn.Module):
             AlgoEnum.c51: cfg.learner.c51,
             AlgoEnum.qr: cfg.learner.qr,
             AlgoEnum.iqn: cfg.learner.iqn,
-            AlgoEnum.fqf: cfg.learner.iqn
+            AlgoEnum.fqf: cfg.learner.iqn,
+            AlgoEnum.mdqn: None,
         }
 
         algo = cfg.learner.algo

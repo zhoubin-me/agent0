@@ -11,7 +11,7 @@ class AlgoEnum(Enum):
     qr = 2
     iqn = 3
     fqf = 4
-
+    mdqn = 5
 
 class ActorEnum(Enum):
     greedy = 0
@@ -49,7 +49,7 @@ class C51Config:
 
 @dataclass
 class QRConfig:
-    num_atoms: int = 51
+    num_atoms: int = 200
     vmax: Any = None
     vmin: Any = None
 
@@ -62,6 +62,12 @@ class IQNConfig:
     num_cosines: int = 64
     F: int = 32
 
+
+@dataclass
+class MDQNConfig:
+    tau: float = 0.03
+    alpha: float = 0.9
+    lo: float = -1
 
 @dataclass
 class LearnerConfig:
@@ -77,15 +83,20 @@ class LearnerConfig:
     learner_steps: int = 20
 
     double_q: bool = False
+
     dueling_head: bool = False
+
     prioritize_replay: bool = False
+
     n_step_q: int = 3
+
     noisy_net: bool = False
     reset_noise_freq: int = 4
 
     c51: C51Config = field(default_factory=C51Config)
     qr: QRConfig = field(default=QRConfig)
     iqn: IQNConfig = field(default=IQNConfig)
+    mdqn: MDQNConfig = field(default=MDQNConfig)
 
 
 @dataclass
