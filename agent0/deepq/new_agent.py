@@ -6,6 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from einops import rearrange
 from lz4.block import compress
+from collections import deque
 
 from agent0.common.atari_wrappers import make_atari
 from agent0.deepq.new_config import AlgoEnum, ExpConfig
@@ -15,9 +16,10 @@ from agent0.deepq.new_model import DeepQNet
 class Actor:
     def __init__(self, cfg: ExpConfig):
         self.cfg = cfg
-        self.envs = make_atari(cfg.env_id, cfg.actor.num_envs, nstep=cfg.learner.n_step_q)
+        self.envs = make_atari(cfg.env_id, cfg.actor.num_envs)
         self.obs, _ = self.envs.reset()
         self.model = DeepQNet(cfg).to(cfg.device.value)
+        self.tracker = deque(maxlen=cfg.learner.n_step_q)
 
     
     def act(self, st, epsilon):
@@ -49,23 +51,28 @@ class Actor:
                 )
                 action, qt_max = self.act(st, epsilon)
             qs.append(qt_max)
-            obs_curr = self.obs
             obs_next, reward, terminal, truncated, info = self.envs.step(action)
+            done = np.logical_or(terminal, info['life_loss']) if 'life_loss' in info else terminal
+            done = np.logical_and(done, np.logical_not(truncated))
+
             if self.cfg.learner.n_step_q > 1:
-                obs_curr = info['nstep_obs']
-                action = info['nstep_action']
-                reward = info['nstep_reward']
-                done = info['nstep_done']
-            else:
-                done = np.logical_or(terminal, info['life_loss']) if 'life_loss' in info else terminal
-                done = np.logical_and(done, np.logical_not(truncated))
+                self.tracker.append((self.obs, action, reward, done))
+                r_nstep = np.zeros_like(reward)
+                d_nstep = np.zeros_like(reward, dtype=np.bool_)
+                for _, _, rt, dt in reversed(self.tracker):
+                    d_nstep = np.logical_or(d_nstep, dt)
+                    r_nstep = r_nstep * self.cfg.learner.discount * (1 - dt) + rt
+                obs = self.tracker[0][0]
+                action = self.tracker[0][1]
+                reward = r_nstep
+                done = d_nstep
 
             for st, at, rt, dt, st_next in zip(
-                obs_curr, action, reward, done, obs_next
+                obs, action, reward, done, obs_next
             ):
                 data.append(
-                    (compress(np.concatenate((st, st_next), axis=0)), at, rt, dt)
-                )
+                    (compress(np.concatenate((st, st_next), axis=0)), at, rt, dt))
+
 
             self.obs = obs_next
             if "final_info" in info:

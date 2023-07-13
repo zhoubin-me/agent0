@@ -51,42 +51,7 @@ class EpisodicLifeEnv(gym.Wrapper):
             info.update(step_info)
         return obs, reward, done, trunc, info
 
-class NStepEnv(gym.Wrapper):
-    def __init__(self, env, n=1, nstep_gamma=0.99):
-        gym.Wrapper.__init__(self, env)
-        assert n > 1
-        self.n = n
-        self.discount = nstep_gamma
-        self.tracker = deque(maxlen=n)
-        self.last_obs = None
-    
-    def reset(self, **kwargs):
-        ob, info = self.env.reset(**kwargs)
-        self.last_obs = ob
-        return ob, info
-
-    def step(self, action):
-        ob, reward, done, trunc, info = self.env.step(action)
-        
-        self.tracker.append((self.last_obs, action, reward, done, trunc, info))
-        self.last_obs = ob
-
-        r_discount = 0
-        d_discount = False
-        for _, _, rt, dt, tt, it in reversed(self.tracker):
-            dt = dt or it['life_loss'] if 'life_loss' in it else dt
-            dt = dt and (not tt)
-            r_discount = r_discount * self.discount * (1 - done) + rt
-            d_discount = d_discount or dt
-        info.update(
-            nstep_obs=self.tracker[0][0],
-            nstep_action=self.tracker[0][1],
-            nstep_reward=r_discount,
-            nstep_done=d_discount,
-        )
-        return ob, reward, done, trunc, info
-
-def make_atari(env_id, num_envs, episode_life=True, nstep=1, nstep_gamma=0.99):
+def make_atari(env_id, num_envs, episode_life=True):
     wrappers = [
         FireResetEnv,
         lambda x: AtariPreprocessing(x, terminal_on_life_loss=False),
@@ -94,7 +59,6 @@ def make_atari(env_id, num_envs, episode_life=True, nstep=1, nstep_gamma=0.99):
         lambda x: EpisodicLifeEnv(x) if episode_life else x,
         RecordEpisodeStatistics,
         ClipRewardEnv,
-        lambda x: NStepEnv(x, nstep, nstep_gamma) if nstep > 1 else x
     ]
     envs = gym.make_vec(f"{env_id}NoFrameskip-v4", num_envs, wrappers=wrappers)
     return envs
