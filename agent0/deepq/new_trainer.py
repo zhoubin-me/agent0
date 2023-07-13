@@ -9,7 +9,6 @@ from agent0.common.atari_wrappers import make_atari
 from agent0.common.utils import DataLoaderX, DataPrefetcher, set_random_seed
 from agent0.deepq.new_agent import Actor, Learner
 from agent0.deepq.new_config import ExpConfig
-from agent0.deepq.new_model import DeepQNet
 from agent0.deepq.replay import ReplayDataset
 
 

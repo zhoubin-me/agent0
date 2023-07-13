@@ -15,12 +15,14 @@ from agent0.deepq.new_model import DeepQNet
 class Actor:
     def __init__(self, cfg: ExpConfig):
         self.cfg = cfg
-        self.envs = make_atari(cfg.env_id, cfg.actor.num_envs)
+        self.envs = make_atari(cfg.env_id, cfg.actor.num_envs, nstep=cfg.learner.n_step_q)
         self.obs, _ = self.envs.reset()
         self.model = DeepQNet(cfg).to(cfg.device.value)
 
+    
     def act(self, st, epsilon):
-        qt = self.model.qval(st)
+        with torch.no_grad():
+            qt = self.model.qval(st)
         action_random = np.random.randint(
             0, self.cfg.action_dim, self.cfg.actor.num_envs
         )
@@ -46,24 +48,31 @@ class Actor:
                     .div(255.0)
                 )
                 action, qt_max = self.act(st, epsilon)
-
             qs.append(qt_max)
+            obs_curr = self.obs
             obs_next, reward, terminal, truncated, info = self.envs.step(action)
+            if self.cfg.learner.n_step_q > 1:
+                obs_curr = info['nstep_obs']
+                action = info['nstep_action']
+                reward = info['nstep_reward']
+                done = info['nstep_done']
+            else:
+                done = np.logical_or(terminal, info['life_loss']) if 'life_loss' in info else terminal
+                done = np.logical_and(done, np.logical_not(truncated))
 
-            done = np.logical_and(terminal, np.logical_not(truncated))
             for st, at, rt, dt, st_next in zip(
-                self.obs, action, reward, done, obs_next
+                obs_curr, action, reward, done, obs_next
             ):
                 data.append(
                     (compress(np.concatenate((st, st_next), axis=0)), at, rt, dt)
                 )
 
             self.obs = obs_next
-
             if "final_info" in info:
                 final_infos = info["final_info"][info["_final_info"]]
                 for stat in final_infos:
                     rs.append(stat["episode"]["r"][0])
+
         return data, rs, qs
 
     def close(self):
@@ -204,6 +213,7 @@ class Learner:
 
         q, taus = self.model.head(self.model.encoder(obs), n=cfg.N)
         q = q[self.batch_indices, :, actions]
+
         q = rearrange(q, "b n -> b 1 n")
         q_target = rearrange(q_target, "b n -> b n 1")
         taus = rearrange(taus, "b n 1 -> b 1 n")
@@ -240,7 +250,6 @@ class Learner:
         loss = huber_qr_loss(q_hat, q_target, tau_hats)
 
         q_hat = rearrange(q_hat, "b 1 n -> b n")
-
         with torch.no_grad():
             # q: B X (N-1) X A
             q, _ = self.model.head(q_convs, taus=taus[:, 1:-1])
