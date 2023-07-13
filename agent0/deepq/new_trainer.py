@@ -76,7 +76,7 @@ class Trainer:
                 ).div(255.0)
                 obs, next_obs = torch.split(frames, self.obs_shape[0], 1)
                 actions = actions.long()
-                loss = self.learner.train_step(
+                loss = self.learner.train_steps(
                     obs, actions, rewards, terminals, next_obs
                 )
                 self.Ls.append(loss["loss"])

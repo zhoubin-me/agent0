@@ -20,7 +20,7 @@ class Actor:
         self.obs, _ = self.envs.reset()
         self.model = DeepQNet(cfg).to(cfg.device.value)
         self.tracker = deque(maxlen=cfg.learner.n_step_q)
-
+        self.steps = 0
     
     def act(self, st, epsilon):
         with torch.no_grad():
@@ -42,6 +42,9 @@ class Actor:
             self.model.load_state_dict(state_dict)
         rs, qs, data = [], [], []
         for _ in range(self.cfg.actor.actor_steps):
+            if self.cfg.learner.noisy_net and (self.steps % self.cfg.learner.reset_noise_freq == 0):
+                self.model.reset_noise()
+            
             with torch.no_grad():
                 st = (
                     torch.from_numpy(self.obs)
@@ -49,9 +52,9 @@ class Actor:
                     .float()
                     .div(255.0)
                 )
-                action, qt_max = self.act(st, epsilon)
-            qs.append(qt_max)
+                action, qt_max = self.act(st, epsilon)                
             obs_next, reward, terminal, truncated, info = self.envs.step(action)
+            self.steps += 1
             done = np.logical_or(terminal, info['life_loss']) if 'life_loss' in info else terminal
             done = np.logical_and(done, np.logical_not(truncated))
 
@@ -66,15 +69,15 @@ class Actor:
                 action = self.tracker[0][1]
                 reward = r_nstep
                 done = d_nstep
-
+            
             for st, at, rt, dt, st_next in zip(
                 obs, action, reward, done, obs_next
             ):
                 data.append(
                     (compress(np.concatenate((st, st_next), axis=0)), at, rt, dt))
 
-
             self.obs = obs_next
+            qs.append(qt_max)
             if "final_info" in info:
                 final_infos = info["final_info"][info["_final_info"]]
                 for stat in final_infos:
@@ -114,6 +117,15 @@ class Learner:
 
         self.update_steps = 0
         self.batch_indices = torch.arange(cfg.learner.batch_size).to(cfg.device.value)
+        train_step_algos = {
+            AlgoEnum.dqn: self.train_step_dqn,
+            AlgoEnum.c51: self.train_step_c51,
+            AlgoEnum.qr: self.train_step_qr,
+            AlgoEnum.iqn: self.train_step_iqn,
+            AlgoEnum.fqf: self.train_step_fqf,
+        }
+        assert self.cfg.learner.algo in train_step_algos
+        self.train_step_fn = train_step_algos[self.cfg.learner.algo]
 
     def train_step_dqn(self, obs, actions, rewards, terminals, next_obs):
         with torch.no_grad():
@@ -275,22 +287,13 @@ class Learner:
         fraction_loss = (gradients_of_taus * taus[:, 1:-1, 0]).sum(dim=1).view(-1)
         return loss, fraction_loss
 
-    def train_step(self, obs, actions, rewards, terminals, next_obs):
+    def train_steps(self, obs, actions, rewards, terminals, next_obs):
         algo = self.cfg.learner.algo
-        if algo == AlgoEnum.dqn:
-            loss_fn = self.train_step_dqn
-        elif algo == AlgoEnum.c51:
-            loss_fn = self.train_step_c51
-        elif algo == AlgoEnum.qr:
-            loss_fn = self.train_step_qr
-        elif algo == AlgoEnum.iqn:
-            loss_fn = self.train_step_iqn
-        elif algo == AlgoEnum.fqf:
-            loss_fn = self.train_step_fqf
-        else:
-            raise NotImplementedError(algo)
-        loss = loss_fn(obs, actions, rewards, terminals, next_obs)
-
+        if self.cfg.learner.noisy_net:
+            self.model.reset_noise()
+            self.model_target.reset_noise()
+            
+        loss = self.train_step_fn(obs, actions, rewards, terminals, next_obs)
         result = {}
 
         if algo == AlgoEnum.fqf:

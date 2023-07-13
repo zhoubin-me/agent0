@@ -78,9 +78,10 @@ class LearnerConfig:
 
     double_q: bool = False
     dueling_head: bool = False
-    noisy_net: bool = False
     prioritize_replay: bool = False
     n_step_q: int = 3
+    noisy_net: bool = False
+    reset_noise_freq: int = 4
 
     c51: C51Config = field(default_factory=C51Config)
     qr: QRConfig = field(default=QRConfig)
