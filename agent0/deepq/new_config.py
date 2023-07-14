@@ -21,7 +21,7 @@ class ActorEnum(Enum):
 
 class ReplayEnum(Enum):
     uniform = 0
-    prior = 1
+    prioritize = 1
 
 
 class ModeEnum(Enum):
@@ -120,6 +120,8 @@ class ActorConfig:
 class ReplayConfig:
     size: int = int(1e6)
     policy: ReplayEnum = ReplayEnum.uniform
+    beta0: float = 0.4
+    alpha: float = 0.5
 
 
 @dataclass

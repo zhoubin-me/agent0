@@ -310,37 +310,47 @@ class Learner:
         fraction_loss = (gradients_of_taus * taus[:, 1:-1, 0]).sum(dim=1).view(-1)
         return loss, fraction_loss
 
-    def train_steps(self, obs, actions, rewards, terminals, next_obs):
+    def train_steps(self, data):
         algo = self.cfg.learner.algo
         if self.cfg.learner.noisy_net:
             self.model.reset_noise()
             self.model_target.reset_noise()
-            
-        loss = self.train_step_fn(obs, actions, rewards, terminals, next_obs)
-        result = {}
 
+        frames, actions, rewards, terminals, weights, indices = map(lambda x: x.float(), data)
+        frames = frames.reshape(
+            -1, self.cfg.obs_shape[0]*2, *self.cfg.obs_shape[1:]
+        ).div(255.0)
+        obs, next_obs = torch.split(frames, self.cfg.obs_shape[0], 1)
+        actions = actions.long()
+        weights /= weights.sum().add(1e-8)
+
+        loss = self.train_step_fn(obs, actions, rewards, terminals, next_obs)
+        
         if algo == AlgoEnum.fqf:
-            loss, fraction_loss = loss
-            fraction_loss = fraction_loss.mean()
+            q_loss, fraction_loss = loss
             self.fqf_optimizer.zero_grad()
-            fraction_loss.backward(retain_graph=True)
+            fraction_loss.mul(weights).sum().backward(retain_graph=True)
             if self.cfg.learner.max_grad_norm > 0:
                 nn.utils.clip_grad_norm_(
                     self.model.head.fraction_net.parameters(),
                     self.cfg.learner.max_grad_norm,
                 )
             self.fqf_optimizer.step()
+        else:
+            q_loss, fraction_loss = loss, None
 
-            result["fraction_loss"] = fraction_loss.item()
-
-        loss = loss.mean()
-        self.optimizer.zero_grad()
-        loss.backward()
-        self.optimizer.step()
-        self.update_steps += 1
-        result["loss"] = loss.item()
+        if not torch.isnan(q_loss).any():
+            self.optimizer.zero_grad()
+            q_loss.mul(weights).sum().backward()
+            self.optimizer.step()
+            self.update_steps += 1
+        else:
+            q_loss = None
 
         if self.update_steps % self.cfg.learner.target_update_freq == 0:
             self.model_target = deepcopy(self.model)
 
-        return result
+        return {'q_loss': None if q_loss is None else q_loss.detach().cpu(),
+                'fraction_loss': None if fraction_loss is None else fraction_loss.detach().cpu(),
+                'indices': indices.detach().cpu()
+                }

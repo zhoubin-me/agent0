@@ -9,7 +9,7 @@ from agent0.common.atari_wrappers import make_atari
 from agent0.common.utils import DataLoaderX, DataPrefetcher, set_random_seed
 from agent0.deepq.new_agent import Actor, Learner
 from agent0.deepq.new_config import ExpConfig
-from agent0.deepq.replay import ReplayDataset
+from agent0.deepq.replay import ReplayDataset, ReplayEnum
 
 
 class Trainer:
@@ -70,18 +70,19 @@ class Trainer:
                 except (StopIteration, AttributeError):
                     self.data_fetcher = self.get_data_fetcher()
                     data = self.data_fetcher.next()
-                frames, actions, rewards, terminals = map(lambda x: x.float(), data)
-                frames = frames.reshape(
-                    self.cfg.learner.batch_size, -1, *self.obs_shape[1:]
-                ).div(255.0)
-                obs, next_obs = torch.split(frames, self.obs_shape[0], 1)
-                actions = actions.long()
-                loss = self.learner.train_steps(
-                    obs, actions, rewards, terminals, next_obs
+
+                result = self.learner.train_steps(
+                    data
                 )
-                self.Ls.append(loss["loss"])
-                if "fraction_loss" in loss:
-                    self.FLs.append(loss["fraction_loss"])
+                q_loss = result['q_loss']
+                fraction_loss = result['fraction_loss']
+                indices = result['indices']
+
+                if self.cfg.replay.policy == ReplayEnum.prioritize:
+                    self.replay.update_priority(indices, priorities=q_loss)
+
+                if q_loss is not None: self.Ls.append(q_loss.mean().item())
+                if fraction_loss is not None: self.FLs.append(fraction_loss.mean().item())
 
         toc = time.time()
 
