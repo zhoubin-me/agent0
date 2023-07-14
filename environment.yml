@@ -159,7 +159,6 @@ dependencies:
       - arrow==1.2.3
       - asttokens==2.2.1
       - async-lru==2.0.2
-      - atari-py==0.2.9
       - autorom==0.4.2
       - autorom-accept-rom-license==0.6.1
       - babel==2.12.1
