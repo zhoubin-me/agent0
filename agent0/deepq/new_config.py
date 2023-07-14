@@ -83,11 +83,7 @@ class LearnerConfig:
     learner_steps: int = 20
 
     double_q: bool = False
-
     dueling_head: bool = False
-
-    prioritize_replay: bool = False
-
     n_step_q: int = 3
 
     noisy_net: bool = False
