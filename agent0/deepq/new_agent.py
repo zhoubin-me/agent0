@@ -350,5 +350,5 @@ class Learner:
 
         return {'q_loss': None if q_loss is None else q_loss.detach().cpu(),
                 'fraction_loss': None if fraction_loss is None else fraction_loss.detach().cpu(),
-                'indices': indices.detach().cpu()
+                'indices': indices.long().detach().cpu()
                 }
