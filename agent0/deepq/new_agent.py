@@ -322,8 +322,6 @@ class Learner:
         ).div(255.0)
         obs, next_obs = torch.split(frames, self.cfg.obs_shape[0], 1)
         actions = actions.long()
-        weights /= weights.sum().add(1e-8)
-
         loss = self.train_step_fn(obs, actions, rewards, terminals, next_obs)
         
         if algo == AlgoEnum.fqf:

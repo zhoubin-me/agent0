@@ -31,13 +31,13 @@ class ReplayDataset(Dataset, Sampler):
         idx = idx % self.top
         frames, at, rt, dt = self.data[idx]
         frames = np.frombuffer(decompress(frames), dtype=np.uint8)
-        weight = self.priority[idx] 
-        return np.array(frames), at, rt, dt, weight, idx
+        priority = self.priority[idx]
+        return np.array(frames), at, rt, dt, priority, idx
 
     def __iter__(self):
         for _ in range(self.top // self.cfg.learner.batch_size):
             yield torch.multinomial(
-                self.priority[: self.top], self.cfg.learner.batch_size, False
+                self.priority[:self.top], self.cfg.learner.batch_size, False
             ).tolist()
 
     def extend(self, transitions):
@@ -51,5 +51,5 @@ class ReplayDataset(Dataset, Sampler):
             self.beta = self.beta_schedule(num_entries)
     
     def update_priority(self, ids, priorities):
-        self.priority[ids] = (priorities + 1e-8).pow(self.cfg.replay.alpha)
+        self.priority[ids] = (priorities + self.cfg.replay.eps).pow(self.cfg.replay.alpha)
         self.max_p = max(priorities.max().item(), self.max_p)

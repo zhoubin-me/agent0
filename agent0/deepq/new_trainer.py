@@ -70,7 +70,11 @@ class Trainer:
                 except (StopIteration, AttributeError):
                     self.data_fetcher = self.get_data_fetcher()
                     data = self.data_fetcher.next()
-
+                frames, actions, rewards, terminals, priorities, indices = map(lambda x: x.float(), data)
+                probs = priorities / self.replay.priority.sum().item()
+                weights = (replay.top * probs).pow(-replay.beta)
+                weights = weights / weights.max().add(1e-8)
+                data = frames, actions, rewards, terminals, weights, indices
                 result = self.learner.train_steps(
                     data
                 )

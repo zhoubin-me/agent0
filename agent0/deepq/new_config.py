@@ -122,6 +122,7 @@ class ReplayConfig:
     policy: ReplayEnum = ReplayEnum.uniform
     beta0: float = 0.4
     alpha: float = 0.5
+    eps: float = 0.01
 
 
 @dataclass
