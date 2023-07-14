@@ -72,7 +72,7 @@ class Trainer:
                     data = self.data_fetcher.next()
                 frames, actions, rewards, terminals, priorities, indices = map(lambda x: x.float(), data)
                 probs = priorities / self.replay.priority.sum().item()
-                weights = (replay.top * probs).pow(-replay.beta)
+                weights = (self.replay.top * probs).pow(-self.replay.beta)
                 weights = weights / weights.max().add(1e-8)
                 data = frames, actions, rewards, terminals, weights, indices
                 result = self.learner.train_steps(
