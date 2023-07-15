@@ -102,7 +102,7 @@ class TrainerConfig:
     exploration_steps: int = int(1e6)
     log_freq: int = 10
     test_freq: int = 500
-    test_episodes: int = 10
+    test_episodes: int = 20
 
 
 @dataclass
