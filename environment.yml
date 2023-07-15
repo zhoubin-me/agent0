@@ -189,6 +189,9 @@ dependencies:
       - dm-tree==0.1.8
       - dulwich==0.21.5
       - einops==0.6.1
+      - wandb==0.15.5
+      - shortuuid==1.0.11
+      - gitpython==3.1.7
       - exceptiongroup==1.1.2
       - executing==1.2.0
       - fairscale==0.4.13

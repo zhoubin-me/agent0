@@ -181,7 +181,7 @@ def main(cfg: ExpConfig):
     uuid = shortuuid.uuid()[:4]
     timestr = strftime("%Y%m%d-%H%M%S", localtime())
     subdir = (
-        f"{cfg.name}-{cfg.env_id}-{cfg.learner.algo}-{cfg.seed}-{sha}-{timestr}-{uuid}"
+        f"{cfg.name}-{cfg.env_id}-{cfg.learner.algo.name}-{cfg.seed}-{sha}-{timestr}-{uuid}"
     )
     dummy_env = make_atari(cfg.env_id, num_envs=1)
     dummy_env.close()
