@@ -14,11 +14,11 @@ from agent0.deepq.model import DeepQNet
 
 
 class Actor:
-    def __init__(self, cfg: ExpConfig):
+    def __init__(self, cfg: ExpConfig, model=None):
         self.cfg = cfg
         self.envs = make_atari(cfg.env_id, cfg.actor.num_envs)
         self.obs, _ = self.envs.reset()
-        self.model = DeepQNet(cfg).to(cfg.device.value)
+        self.model = DeepQNet(cfg).to(cfg.device.value) if model is None else model
         self.tracker = deque(maxlen=cfg.learner.n_step_q)
         self.steps = 0
     
@@ -43,8 +43,9 @@ class Actor:
         )
         return action, qt_max.mean().item()
 
-    def sample(self, epsilon, state_dict):
-        self.model.load_state_dict(state_dict)
+    def sample(self, epsilon, state_dict=None):
+        if state_dict is not None:
+            self.model.load_state_dict(state_dict)
         rs, qs, data = [], [], []
         for _ in range(self.cfg.actor.sample_steps):
             if self.cfg.learner.noisy_net and (

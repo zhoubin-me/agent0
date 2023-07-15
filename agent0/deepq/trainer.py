@@ -1,5 +1,6 @@
 import numpy as np
 from tensorboardX import SummaryWriter
+import time
 
 import agent0.deepq.agent as agents
 from agent0.common.atari_wrappers import make_atari
@@ -11,6 +12,7 @@ from agent0.deepq.replay import ReplayDataset, ReplayEnum
 class Trainer:
     def __init__(self, cfg: ExpConfig, use_lp=False):
         self.cfg = cfg
+        self.use_lp = use_lp
 
         set_random_seed(cfg.seed)
 
@@ -29,7 +31,7 @@ class Trainer:
             )
         self.replay = ReplayDataset(cfg)
         if not use_lp:
-            self.actors = [agents.Actor(cfg), agents.Actor(cfg)]
+            self.actors = [agents.Actor(cfg, self.learner.model), agents.Actor(cfg, self.learner.model)]
 
         self.epsilon_fn = (
             lambda step: cfg.actor.min_eps
@@ -59,7 +61,7 @@ class Trainer:
         self.Rs.extend(returns)
         self.replay.extend(transitions)
         self.frame_count += self.num_transitions
-
+        
         # Start training at
         if len(self.replay) > self.cfg.trainer.training_start_steps:
             for _ in range(self.cfg.learner.learner_steps):
@@ -104,12 +106,20 @@ class Trainer:
     def test(self):
         rs = []
         while len(rs) < self.cfg.trainer.test_episodes:
-            _, returns, _ = self.actors[0].sample(
-                self.cfg.actor.test_steps, self.learner.model.state_dict()
-            )
+            _, returns, _ = self.actors[0].sample(self.cfg.actor.test_eps)
             rs.extend(returns)
         return rs
-    
+
+    def logging(self, result):
+        msg = ""
+        for k, v in result.items():
+            if v is None:
+                continue
+            self.writer.add_scalar(k, v, self.frame_count)
+            if k in ["frames", "loss", "qmax", "fps"] or "return" in k:
+                msg += f"{k}: {v:.2f} | "
+        print(msg)
+
     def run(self):
         trainer_steps = self.cfg.trainer.total_steps // self.num_transitions + 1
         for step in range(trainer_steps):
@@ -118,27 +128,24 @@ class Trainer:
                 test_returns = self.test()
                 print(f"TEST ---> Frames: {self.frame_count} | Return Avg: {np.mean(test_returns):.2f} Max: {np.max(test_returns)}")
                 self.RTs.extend(test_returns)
-                self.writer.add_scalar('test_returns', np.mean(test_returns), self.frame_count)
+                self.writer.add_scalar('return_test', np.mean(test_returns), self.frame_count)
+                self.writer.add_scalar('return_test_max', np.max(self.RTs), self.frame_count)
 
+            tic = time.time()
             epsilon = self.epsilon_fn(self.frame_count)
-            transitions, returns, qmax = self.actors[1].sample(
-                epsilon, self.learner.model.state_dict()
-            )
+            transitions, returns, qmax = self.actors[1].sample(epsilon)
             result = self.step(transitions, returns, qmax)
-            msg = ""
-            for k, v in result.items():
-                if v is None:
-                    continue
-                self.writer.add_scalar(k, v, self.frame_count)
-                if k in ["frames", "loss", "qmax"] or "return" in k:
-                    msg += f"{k}: {v:.2f} | "
+            fps = self.num_transitions /(time.time() - tic)
+            self.logging(result.update(fps=fps))
 
+        self.final()
 
-            if step % self.cfg.trainer.log_freq == 0:
-                print(msg)
-
-        self.close()
-
-    def close(self):
+    def final(self):
+        print("Final Testing ... ")
+        test_returns = self.test()
+        print(f"TEST ---> Frames: {self.frame_count} | Return Avg: {np.mean(test_returns):.2f} Max: {np.max(test_returns)}")
+        self.RTs.extend(test_returns)
+        self.writer.add_scalar('return_test', np.mean(test_returns), self.frame_count)
+        self.writer.add_scalar('return_test_max', np.max(self.RTs), self.frame_count)
         for actor in self.actors:
             actor.close()

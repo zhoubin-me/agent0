@@ -31,33 +31,42 @@ class TrainerNode(Trainer):
 
         step = 0
         while step < trainer_steps:
+            tic = time.time()
             dones, not_dones = futures.wait(tasks, return_when=futures.FIRST_COMPLETED)
             tasks = list(dones) + list(not_dones)
-            rank, (transitions, returns, qmax) = tasks.pop(0).result()
-
+            rank, (transitions, returns, qmax_or_frames) = tasks.pop(0).result()
             if rank > 0:
+                qmax = qmax_or_frames
+                sample_eps = self.epsilon_fn(self.frame_count)
+                tasks.append(self.actors[rank].futures.sample(
+                    sample_eps, self.learner.model.state_dict()))
                 result = self.step(transitions, returns, qmax)
                 step += 1
-            
-            sample_eps = self.epsilon_fn(self.frame_count) if rank > 0 else self.cfg.actor.test_eps
-            tasks.append(
-                self.actors[rank].futures.sample(
-                    sample_eps, self.learner.model.state_dict()
-                )
-            )
-            msg = "Train: " if rank > 0 else "Test :"
-            for k, v in result.items():
-                if v is None:
-                    continue
-                self.writer.add_scalar(k, v, self.frame_count)
-                if k in ["frames", "loss", "qmax"] or "return" in k:
-                    msg += f"{k}: {v:.2f} | "
-            if step % self.cfg.trainer.log_freq == 0:
-                    logging.info(msg)
+            else:
+                test_frames = qmax_or_frames
+                self.RTs.extend(returns)
+                tasks.append(self.actors[rank].futures.test(
+                    self.frame_count, self.learner.model.state_dict()))
+                self.writer.add_scalar('return_test', np.mean(returns), test_frames)
+                self.writer.add_scalar('return_test_max', np.max(self.RTs), test_frames)
+                continue
 
-        self.close()
-        
-    def close(self):
+            fps = self.num_transitions /(time.time() - tic)
+            self.logging(result.update(fps=fps))
+
+        self.final()
+
+    def final(self):
+        print("Final Testing ... ")
+        dones = futures.wait([actor.future.test(self.frame_count, self.learner.model.state_dict()) for actor in self.actors], return_when=futures.ALL_COMPLETED)
+        test_returns = []
+        for done in dones:
+            _, (_, returns, _) = done.result()
+            test_returns.extend(returns)
+
+        print(f"TEST ---> Frames: {self.frame_count} | Return Avg: {np.mean(test_returns):.2f} Max: {np.max(test_returns)}")
+        self.writer.add_scalar('return_test', np.mean(test_returns), self.frame_count)
+        self.writer.add_scalar('return_test_max', np.max(self.RTs), self.frame_count)        
         futures.wait(
             [actor.close() for actor in self.actors], return_when=futures.ALL_COMPLETED
         )
@@ -80,6 +89,13 @@ class ActorNode:
             f"Rank {self.rank} -- Step: {self.step_count:7d} | FPS: {fps:.2f} | Avg Return: {np.mean(returns):.2f}"
         )
         return self.rank, (transition, returns, qmax)
+
+    def test(self, frame_count, model_dict=None):
+        rs = []
+        while len(rs) < self.cfg.trainer.test_episodes:
+            _, returns, _ = self.actors.sample(self.cfg.actor.test_eps, model_dict)
+            rs.extend(returns)
+        return self.rank, (None, rs, frame_count)
 
     def close(self):
         self.actor.close()
