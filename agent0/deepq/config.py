@@ -135,9 +135,9 @@ class ExpConfig:
     num_actors: int = 3
     seed: int = 42
     device: DeviceEnum = DeviceEnum.cuda
-    name: str = ""
+    name: str = "agent0"
     mode: ModeEnum = ModeEnum.train
-    logdir: str = "tblog"
+    logdir: str = "logs"
 
     learner: LearnerConfig = field(default_factory=LearnerConfig)
     trainer: TrainerConfig = field(default_factory=TrainerConfig)
