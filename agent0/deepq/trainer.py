@@ -5,6 +5,7 @@ import os
 import numpy as np
 from tensorboardX import SummaryWriter
 from dataclasses import asdict
+from einops import repeat
 
 import agent0.deepq.agent as agents
 from agent0.common.atari_wrappers import make_atari
@@ -46,14 +47,10 @@ class Trainer:
             else (1.0 - step / cfg.trainer.exploration_steps) + cfg.actor.min_eps
         )
 
-        self.writer = SummaryWriter(cfg.logdir)
+        if cfg.wandb: wandb.init(project=cfg.name, config=asdict(cfg))
+        if cfg.tb: self.writer = SummaryWriter(cfg.logdir)
         self.logger = logging.getLogger('agent0')
         self.logger.addHandler(logging.FileHandler(os.path.join(cfg.logdir, 'msg.log')))
-        if cfg.wandb:
-            wandb.init(
-                project=cfg.name,
-                config=asdict(cfg)
-            )
         self.num_transitions = cfg.actor.sample_steps * cfg.actor.num_envs
         self.Ls, self.Rs, self.RTs, self.Qs, self.FLs = [], [], [], [], []
         self.data_fetcher = None
@@ -120,29 +117,39 @@ class Trainer:
     def test(self):
         rs = []
         self.logger.info("Testing ... ")
+        video = []
         while len(rs) < self.cfg.trainer.test_episodes:
-            _, returns, _ = self.actors[0].sample(self.cfg.actor.test_eps)
+            images, returns, _ = self.actors[0].sample(self.cfg.actor.test_eps, test=True)
             rs.extend(returns)
-        self.logger.info(f"TEST ---> Frames: {self.frame_count} | Return Avg: {np.mean(rs):.2f} Max: {np.max(rs)}")
+            if len(video) < 3600:
+                video.extend(images)
+
+        video = np.stack(video, axis=1)
+        video = repeat(video, 'n t c h w -> n t (3 c) h w')
         self.RTs.extend(rs)
-        self.writer.add_scalar("return_test", np.mean(rs), self.frame_count)
-        self.writer.add_scalar("return_test_max", np.max(self.RTs), self.frame_count)
+
+        if self.cfg.tb:
+            self.writer.add_scalar("return_test", np.mean(rs), self.frame_count)
+            self.writer.add_scalar("return_test_max", np.max(self.RTs), self.frame_count)
+            self.writer.add_video('test_video', video, self.frame_count, fps=60)
 
         if self.cfg.wandb:
             wandb.log({'return_test': np.mean(rs), 'frame': self.frame_count})
             wandb.log({'return_test_max': np.max(self.RTs), 'frame': self.frame_count})
+            wandb.log({'test_video': wandb.Video(video, fps=60, format='mp4'), 'frame': self.frame_count})
+        self.logger.info(f"TEST ---> Frames: {self.frame_count} | Return Avg: {np.mean(rs):.2f} Max: {np.max(rs)}")
+
 
     def logging(self, result):
         msg = ""
         for k, v in result.items():
             if v is None:
                 continue
-            self.writer.add_scalar(k, v, self.frame_count)
+            if self.cfg.tb: self.writer.add_scalar(k, v, self.frame_count)
             if self.cfg.wandb: wandb.log({k: v, 'frame': self.frame_count})
             if k in ["frames", "loss", "qmax", "fps"] or "return" in k:
                 msg += f"{k}: {v:.2f} | "
         self.logger.info(msg)
-    
 
     def run(self):
         trainer_steps = self.cfg.trainer.total_steps // self.num_transitions + 1

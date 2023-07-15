@@ -13,7 +13,7 @@ import git
 import shortuuid
 import os
 import wandb
-import yaml
+from einops import repeat
 
 import agent0.deepq.agent as agents
 from agent0.common.atari_wrappers import make_atari
@@ -45,9 +45,10 @@ class TrainerNode(Trainer):
             tic = time.time()
             dones, not_dones = futures.wait(tasks, return_when=futures.FIRST_COMPLETED)
             tasks = list(dones) + list(not_dones)
-            rank, (transitions, returns, qmax_or_frames) = tasks.pop(0).result()
+            rank, (transitions_or_video, returns, qmax_or_frames) = tasks.pop(0).result()
             if rank > 0:
                 qmax = qmax_or_frames
+                transitions = transitions_or_video
                 sample_eps = self.epsilon_fn(self.frame_count)
                 tasks.append(
                     self.actors[rank].futures.sample(
@@ -57,17 +58,27 @@ class TrainerNode(Trainer):
                 result = self.step(transitions, returns, qmax)
                 step += 1
             else:
-                test_frames = qmax_or_frames
-                self.RTs.extend(returns)
                 tasks.append(
                     self.actors[rank].futures.test(
                         self.frame_count, self.learner.model.state_dict()
                     )
                 )
-                self.writer.add_scalar("return_test", np.mean(returns), test_frames)
-                self.writer.add_scalar("return_test_max", np.max(self.RTs), test_frames)
-                wandb.log({'return_test': np.mean(returns), 'frame': test_frames})
-                wandb.log({'return_test_max': np.max(self.RTs), 'frame': test_frames})
+
+                test_frames = qmax_or_frames
+                video = transitions_or_video
+                video = np.stack(video, axis=1)
+                video = repeat(video, 'n t c h w -> n t (3 c) h w')
+                self.RTs.extend(returns)
+
+                if self.cfg.tb:
+                    self.writer.add_scalar("return_test", np.mean(returns), test_frames)
+                    self.writer.add_scalar("return_test_max", np.max(self.RTs), test_frames)
+                    self.writer.add_video("test_video", video, test_frames)
+                if self.cfg.wandb:
+                    wandb.log({'return_test': np.mean(returns), 'frame': test_frames})
+                    wandb.log({'return_test_max': np.max(self.RTs), 'frame': test_frames})
+                    wandb.log({'test_video': video, 'frame': test_frames})
+
                 continue
 
             if rank > 0 and self.frame_count > self.cfg.trainer.training_start_steps:
@@ -81,7 +92,7 @@ class TrainerNode(Trainer):
         self.logger.info("Final Testing ... ")
         dones = futures.wait(
             [
-                actor.future.test(self.frame_count, self.learner.model.state_dict())
+                actor.futures.test(self.frame_count, self.learner.model.state_dict())
                 for actor in self.actors
             ],
             return_when=futures.ALL_COMPLETED,
@@ -123,17 +134,21 @@ class ActorNode:
         rs = []
         tic = time.time()
         frames = 0
+        video = []
         while len(rs) < self.cfg.trainer.test_episodes:
-            transitions, returns, _ = self.actor.sample(
-                self.cfg.actor.test_eps, model_dict
+            images, returns, _ = self.actor.sample(
+                self.cfg.actor.test_eps, model_dict, test=True
             )
-            frames += len(transitions)
+            frames += sum([x.shape[0] for x in images])
             rs.extend(returns)
+            if len(video) < 3600:
+                video.extend(images)
+
         fps = frames / (time.time() - tic)
         logging.info(
             f"Rank {self.rank} -- Test Frames: {frame_count} FPS: {fps:.2f} | Avg Return {np.mean(rs):.2f}"
         )
-        return self.rank, (None, rs, frame_count)
+        return self.rank, (video, rs, frame_count)
 
     def close(self):
         self.actor.close()

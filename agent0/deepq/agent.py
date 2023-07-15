@@ -38,7 +38,7 @@ class Actor:
         )
         return action, qt_max.mean().item()
 
-    def sample(self, epsilon, state_dict=None):
+    def sample(self, epsilon, state_dict=None, test=False):
         if state_dict is not None:
             self.model.load_state_dict(state_dict)
         rs, qs, data = [], [], []
@@ -69,10 +69,13 @@ class Actor:
             reward = r_nstep
             done = d_nstep
 
-            for st, at, rt, dt, st_next in zip(obs, action, reward, done, obs_next):
-                data.append(
-                    (compress(np.concatenate((st, st_next), axis=0)), at, rt, dt)
-                )
+            if test:
+                data.append(self.obs[:4, -1:])
+            else:
+                for st, at, rt, dt, st_next in zip(obs, action, reward, done, obs_next):
+                    data.append(
+                        (compress(np.concatenate((st, st_next), axis=0)), at, rt, dt)
+                    )
 
             self.obs = obs_next
             qs.append(qt_max)
