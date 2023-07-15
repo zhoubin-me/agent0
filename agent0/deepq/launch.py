@@ -11,6 +11,9 @@ from hydra.core.config_store import ConfigStore
 from omegaconf import OmegaConf
 import git
 import shortuuid
+import os
+import wandb
+import yaml
 
 import agent0.deepq.agent as agents
 from agent0.common.atari_wrappers import make_atari
@@ -72,7 +75,7 @@ class TrainerNode(Trainer):
         self.final()
 
     def final(self):
-        logging.info("Final Testing ... ")
+        self.logger.info("Final Testing ... ")
         dones = futures.wait(
             [
                 actor.future.test(self.frame_count, self.learner.model.state_dict())
@@ -85,7 +88,7 @@ class TrainerNode(Trainer):
             _, (_, returns, _) = done.result()
             test_returns.extend(returns)
 
-        logging.info(
+        self.logger.info(
             f"TEST ---> Frames: {self.frame_count} | Return Avg: {np.mean(test_returns):.2f} Max: {np.max(test_returns)}"
         )
         self.writer.add_scalar("return_test", np.mean(test_returns), self.frame_count)
@@ -148,17 +151,35 @@ def make_program(cfg: ExpConfig):
 
 @hydra.main(version_base=None, config_name="config")
 def main(cfg: ExpConfig):
-    cfg = OmegaConf.to_container(cfg)
-    cfg = from_dict(ExpConfig, cfg)
-    dummy_env = make_atari(cfg.env_id, num_envs=1)
-    cfg.obs_shape = dummy_env.observation_space.shape[1:]
-    cfg.action_dim = dummy_env.action_space[0].n
-    dummy_env.close()
-
     repo = git.Repo(search_parent_directories=True)
     sha = repo.head.object.hexsha[:8]
     uuid = shortuuid.uuid()[:8]
-    cfg.logdir = f"{cfg.name}-{cfg.env_id}-{cfg.learner.algo}-{cfg.seed}-{sha}-{uuid}"
+    subdir = f"{cfg.name}-{cfg.env_id}-{cfg.learner.algo}-{cfg.seed}-{sha}-{uuid}"
+    dummy_env = make_atari(cfg.env_id, num_envs=1)
+
+    cfg.logdir = os.path.join(cfg.logdir, subdir)
+    cfg.obs_shape = dummy_env.observation_space.shape[1:]
+    cfg.action_dim = int(dummy_env.action_space[0].n)
+
+    if cfg.wandb:
+        wdb_cfg = OmegaConf.to_yaml(cfg)
+        wdb_cfg = yaml.safe_load(wdb_cfg)
+        wandb.init(
+            project=cfg.name,
+            config=wdb_cfg
+        )
+
+    cfg = OmegaConf.to_container(cfg)
+    cfg = from_dict(ExpConfig, cfg)
+    # dummy_env = make_atari(cfg.env_id, num_envs=1)
+    # cfg.obs_shape = dummy_env.observation_space.shape[1:]
+    # cfg.action_dim = dummy_env.action_space[0].n
+    # dummy_env.close()
+    # repo = git.Repo(search_parent_directories=True)
+    # sha = repo.head.object.hexsha[:8]
+    # uuid = shortuuid.uuid()[:8]
+    # subdir = f"{cfg.name}-{cfg.env_id}-{cfg.learner.algo}-{cfg.seed}-{sha}-{uuid}"
+    # cfg.logdir = os.path.join(cfg.logdir, subdir)
     program = make_program(cfg)
     lp.launch(program, launch_type="local_mp", terminal="tmux_session")
 

@@ -2,9 +2,6 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-import gymnasium as gym
-
-
 class AlgoEnum(Enum):
     dqn = 0
     c51 = 1
@@ -138,6 +135,7 @@ class ExpConfig:
     name: str = "agent0"
     mode: ModeEnum = ModeEnum.train
     logdir: str = "logs"
+    wandb: bool = True
 
     learner: LearnerConfig = field(default_factory=LearnerConfig)
     trainer: TrainerConfig = field(default_factory=TrainerConfig)

@@ -5,7 +5,8 @@ import numpy as np
 import torch
 from prefetch_generator import BackgroundGenerator
 from torch.utils.data import DataLoader
-
+import json
+from enum import Enum
 
 class LinearSchedule:
     def __init__(self, start, end=None, steps=None):
@@ -78,3 +79,10 @@ def set_random_seed(seed):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
     torch.manual_seed(np.random.randint(int(1e6)))
+
+
+class EnumEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, Enum):
+            return obj.name
+        return json.JSONEncoder.default(self, obj)

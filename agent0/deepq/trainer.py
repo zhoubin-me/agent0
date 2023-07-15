@@ -1,15 +1,18 @@
 import logging
 import time
 
+import os
 import numpy as np
 from tensorboardX import SummaryWriter
+from dataclasses import asdict
 
 import agent0.deepq.agent as agents
 from agent0.common.atari_wrappers import make_atari
-from agent0.common.utils import DataLoaderX, DataPrefetcher, set_random_seed
+from agent0.common.utils import DataLoaderX, DataPrefetcher, set_random_seed, EnumEncoder
 from agent0.deepq.config import ExpConfig
 from agent0.deepq.replay import ReplayDataset, ReplayEnum
-
+import wandb
+import json
 
 class Trainer:
     def __init__(self, cfg: ExpConfig, use_lp=False):
@@ -44,11 +47,19 @@ class Trainer:
             else (1.0 - step / cfg.trainer.exploration_steps) + cfg.actor.min_eps
         )
 
-        self.frame_count = 0
         self.writer = SummaryWriter(cfg.logdir)
+        self.logger = logging.getLogger('agent0')
+        self.logger.addHandler(logging.FileHandler(os.path.join(cfg.logdir, 'msg.log')))
+        if cfg.wandb:
+            wandb_cfg = asdict(cfg)
+            wandb.init(
+                project=cfg.name,
+                config=json.dumps(wandb_cfg, default=EnumEncoder)
+            )
         self.num_transitions = cfg.actor.sample_steps * cfg.actor.num_envs
         self.Ls, self.Rs, self.RTs, self.Qs, self.FLs = [], [], [], [], []
         self.data_fetcher = None
+        self.frame_count = 0
 
     def get_data_fetcher(self):
         data_loader = DataLoaderX(
@@ -110,12 +121,18 @@ class Trainer:
 
     def test(self):
         rs = []
+        self.logger.info("Testing ... ")
         while len(rs) < self.cfg.trainer.test_episodes:
             _, returns, _ = self.actors[0].sample(self.cfg.actor.test_eps)
             rs.extend(returns)
-        return rs
-    def save(self):
-        pass
+        self.logger.info(f"TEST ---> Frames: {self.frame_count} | Return Avg: {np.mean(rs):.2f} Max: {np.max(rs)}")
+        self.RTs.extend(rs)
+        self.writer.add_scalar("return_test", np.mean(rs), self.frame_count)
+        self.writer.add_scalar("return_test_max", np.max(self.RTs), self.frame_count)
+
+        if self.cfg.wandb:
+            wandb.log({'return_test': np.mean(rs), 'frame': self.frame_count})
+            wandb.log({'return_test_max': np.max(self.RTs), 'frame': self.frame_count})
 
     def logging(self, result):
         msg = ""
@@ -123,27 +140,17 @@ class Trainer:
             if v is None:
                 continue
             self.writer.add_scalar(k, v, self.frame_count)
+            if self.cfg.wandb: wandb.log({k: v, 'frame': self.frame_count})
             if k in ["frames", "loss", "qmax", "fps"] or "return" in k:
                 msg += f"{k}: {v:.2f} | "
-        logging.info(msg)
+        self.logger.info(msg)
+    
 
     def run(self):
         trainer_steps = self.cfg.trainer.total_steps // self.num_transitions + 1
         for step in range(trainer_steps):
             if step % self.cfg.trainer.test_freq == 0:
-                logging.info("Testing ... ")
-                test_returns = self.test()
-                logging.info(
-                    f"TEST ---> Frames: {self.frame_count} | Return Avg: {np.mean(test_returns):.2f} Max: {np.max(test_returns)}"
-                )
-                self.RTs.extend(test_returns)
-                self.writer.add_scalar(
-                    "return_test", np.mean(test_returns), self.frame_count
-                )
-                self.writer.add_scalar(
-                    "return_test_max", np.max(self.RTs), self.frame_count
-                )
-
+                self.test()
             tic = time.time()
             epsilon = self.epsilon_fn(self.frame_count)
             transitions, returns, qmax = self.actors[1].sample(epsilon)
@@ -155,13 +162,6 @@ class Trainer:
         self.final()
 
     def final(self):
-        logging.info("Final Testing ... ")
-        test_returns = self.test()
-        logging.info(
-            f"TEST ---> Frames: {self.frame_count} | Return Avg: {np.mean(test_returns):.2f} Max: {np.max(test_returns)}"
-        )
-        self.RTs.extend(test_returns)
-        self.writer.add_scalar("return_test", np.mean(test_returns), self.frame_count)
-        self.writer.add_scalar("return_test_max", np.max(self.RTs), self.frame_count)
+        self.test()
         for actor in self.actors:
             actor.close()
