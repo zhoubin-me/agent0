@@ -1,7 +1,8 @@
+import logging
+import time
+
 import numpy as np
 from tensorboardX import SummaryWriter
-import time
-import logging
 
 import agent0.deepq.agent as agents
 from agent0.common.atari_wrappers import make_atari
@@ -32,7 +33,10 @@ class Trainer:
             )
         self.replay = ReplayDataset(cfg)
         if not use_lp:
-            self.actors = [agents.Actor(cfg, self.learner.model), agents.Actor(cfg, self.learner.model)]
+            self.actors = [
+                agents.Actor(cfg, self.learner.model),
+                agents.Actor(cfg, self.learner.model),
+            ]
 
         self.epsilon_fn = (
             lambda step: cfg.actor.min_eps
@@ -62,7 +66,7 @@ class Trainer:
         self.Rs.extend(returns)
         self.replay.extend(transitions)
         self.frame_count += self.num_transitions
-        
+
         # Start training at
         if len(self.replay) > self.cfg.trainer.training_start_steps:
             for _ in range(self.cfg.learner.learner_steps):
@@ -98,12 +102,12 @@ class Trainer:
             frames=self.frame_count,
             fraction_loss=np.mean(self.FLs[-20:]) if len(self.FLs) > 0 else None,
             loss=np.mean(self.Ls[-20:]) if len(self.Ls) > 0 else None,
-            return_train=np.mean(self.Rs[-20:]) if len(self.Rs) > 0 else None,            
+            return_train=np.mean(self.Rs[-20:]) if len(self.Rs) > 0 else None,
             return_train_max=np.max(self.Rs) if len(self.Rs) > 0 else None,
             qmax=np.mean(self.Qs[-100:]) if len(self.Qs) > 0 else None,
         )
         return result
-    
+
     def test(self):
         rs = []
         while len(rs) < self.cfg.trainer.test_episodes:
@@ -127,16 +131,22 @@ class Trainer:
             if step % self.cfg.trainer.test_freq == 0:
                 logging.info("Testing ... ")
                 test_returns = self.test()
-                logging.info(f"TEST ---> Frames: {self.frame_count} | Return Avg: {np.mean(test_returns):.2f} Max: {np.max(test_returns)}")
+                logging.info(
+                    f"TEST ---> Frames: {self.frame_count} | Return Avg: {np.mean(test_returns):.2f} Max: {np.max(test_returns)}"
+                )
                 self.RTs.extend(test_returns)
-                self.writer.add_scalar('return_test', np.mean(test_returns), self.frame_count)
-                self.writer.add_scalar('return_test_max', np.max(self.RTs), self.frame_count)
+                self.writer.add_scalar(
+                    "return_test", np.mean(test_returns), self.frame_count
+                )
+                self.writer.add_scalar(
+                    "return_test_max", np.max(self.RTs), self.frame_count
+                )
 
             tic = time.time()
             epsilon = self.epsilon_fn(self.frame_count)
             transitions, returns, qmax = self.actors[1].sample(epsilon)
             result = self.step(transitions, returns, qmax)
-            fps = self.num_transitions /(time.time() - tic)
+            fps = self.num_transitions / (time.time() - tic)
             result.update(fps=fps)
             self.logging(result)
 
@@ -145,9 +155,11 @@ class Trainer:
     def final(self):
         logging.info("Final Testing ... ")
         test_returns = self.test()
-        logging.info(f"TEST ---> Frames: {self.frame_count} | Return Avg: {np.mean(test_returns):.2f} Max: {np.max(test_returns)}")
+        logging.info(
+            f"TEST ---> Frames: {self.frame_count} | Return Avg: {np.mean(test_returns):.2f} Max: {np.max(test_returns)}"
+        )
         self.RTs.extend(test_returns)
-        self.writer.add_scalar('return_test', np.mean(test_returns), self.frame_count)
-        self.writer.add_scalar('return_test_max', np.max(self.RTs), self.frame_count)
+        self.writer.add_scalar("return_test", np.mean(test_returns), self.frame_count)
+        self.writer.add_scalar("return_test_max", np.max(self.RTs), self.frame_count)
         for actor in self.actors:
             actor.close()

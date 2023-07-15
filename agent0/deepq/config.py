@@ -106,6 +106,7 @@ class TrainerConfig:
     test_freq: int = 500
     test_episodes: int = 20
 
+
 @dataclass
 class ActorConfig:
     policy: ActorEnum = ActorEnum.random

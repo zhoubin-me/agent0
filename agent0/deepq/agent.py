@@ -21,15 +21,10 @@ class Actor:
         self.model = DeepQNet(cfg).to(cfg.device.value) if model is None else model
         self.tracker = deque(maxlen=cfg.learner.n_step_q)
         self.steps = 0
-    
+
     @torch.no_grad()
     def act(self, epsilon):
-        st = (
-            torch.from_numpy(self.obs)
-            .to(self.cfg.device.value)
-            .float()
-            .div(255.0)
-        )
+        st = torch.from_numpy(self.obs).to(self.cfg.device.value).float().div(255.0)
         qt = self.model.qval(st)
         action_random = np.random.randint(
             0, self.cfg.action_dim, self.cfg.actor.num_envs
@@ -85,7 +80,7 @@ class Actor:
                 final_infos = info["final_info"][info["_final_info"]]
                 for stat in final_infos:
                     rs.append(stat["episode"]["r"][0])
-        
+
         return data, rs, qs
 
     def close(self):
