@@ -26,8 +26,10 @@ class TrainerNode(Trainer):
         sample_eps = self.epsilon_fn(self.frame_count)
         tasks = [
             actor.futures.sample(sample_eps, self.learner.model.state_dict())
-            for actor in self.actors
+            for actor in self.actors[1:]
         ]
+
+        tasks.append(self.actors[0].futures.test(self.frame_count, self.learner.model.state_dict()))
 
         step = 0
         while step < trainer_steps:
@@ -52,19 +54,20 @@ class TrainerNode(Trainer):
                 continue
 
             fps = self.num_transitions /(time.time() - tic)
-            self.logging(result.update(fps=fps))
+            result.update(fps=fps)
+            self.logging(result)
 
         self.final()
 
     def final(self):
-        print("Final Testing ... ")
+        logging.info("Final Testing ... ")
         dones = futures.wait([actor.future.test(self.frame_count, self.learner.model.state_dict()) for actor in self.actors], return_when=futures.ALL_COMPLETED)
         test_returns = []
         for done in dones:
             _, (_, returns, _) = done.result()
             test_returns.extend(returns)
 
-        print(f"TEST ---> Frames: {self.frame_count} | Return Avg: {np.mean(test_returns):.2f} Max: {np.max(test_returns)}")
+        logging.info(f"TEST ---> Frames: {self.frame_count} | Return Avg: {np.mean(test_returns):.2f} Max: {np.max(test_returns)}")
         self.writer.add_scalar('return_test', np.mean(test_returns), self.frame_count)
         self.writer.add_scalar('return_test_max', np.max(self.RTs), self.frame_count)        
         futures.wait(
@@ -92,9 +95,14 @@ class ActorNode:
 
     def test(self, frame_count, model_dict=None):
         rs = []
+        tic = time.time()
+        frames = 0
         while len(rs) < self.cfg.trainer.test_episodes:
-            _, returns, _ = self.actors.sample(self.cfg.actor.test_eps, model_dict)
+            transitions, returns, _ = self.actor.sample(self.cfg.actor.test_eps, model_dict)
+            frames += len(transitions)
             rs.extend(returns)
+        fps = frames / (time.time() - tic)
+        logging.info(f"Rank {self.rank} -- Test Frames: {frame_count} FPS: {fps:.2f} | Avg Return {np.mean(rs):.2f}")
         return self.rank, (None, rs, frame_count)
 
     def close(self):

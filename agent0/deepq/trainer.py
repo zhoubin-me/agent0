@@ -1,6 +1,7 @@
 import numpy as np
 from tensorboardX import SummaryWriter
 import time
+import logging
 
 import agent0.deepq.agent as agents
 from agent0.common.atari_wrappers import make_atari
@@ -118,15 +119,15 @@ class Trainer:
             self.writer.add_scalar(k, v, self.frame_count)
             if k in ["frames", "loss", "qmax", "fps"] or "return" in k:
                 msg += f"{k}: {v:.2f} | "
-        print(msg)
+        logging.info(msg)
 
     def run(self):
         trainer_steps = self.cfg.trainer.total_steps // self.num_transitions + 1
         for step in range(trainer_steps):
             if step % self.cfg.trainer.test_freq == 0:
-                print("Testing ... ")
+                logging.info("Testing ... ")
                 test_returns = self.test()
-                print(f"TEST ---> Frames: {self.frame_count} | Return Avg: {np.mean(test_returns):.2f} Max: {np.max(test_returns)}")
+                logging.info(f"TEST ---> Frames: {self.frame_count} | Return Avg: {np.mean(test_returns):.2f} Max: {np.max(test_returns)}")
                 self.RTs.extend(test_returns)
                 self.writer.add_scalar('return_test', np.mean(test_returns), self.frame_count)
                 self.writer.add_scalar('return_test_max', np.max(self.RTs), self.frame_count)
@@ -136,14 +137,15 @@ class Trainer:
             transitions, returns, qmax = self.actors[1].sample(epsilon)
             result = self.step(transitions, returns, qmax)
             fps = self.num_transitions /(time.time() - tic)
-            self.logging(result.update(fps=fps))
+            result.update(fps=fps)
+            self.logging(result)
 
         self.final()
 
     def final(self):
-        print("Final Testing ... ")
+        logging.info("Final Testing ... ")
         test_returns = self.test()
-        print(f"TEST ---> Frames: {self.frame_count} | Return Avg: {np.mean(test_returns):.2f} Max: {np.max(test_returns)}")
+        logging.info(f"TEST ---> Frames: {self.frame_count} | Return Avg: {np.mean(test_returns):.2f} Max: {np.max(test_returns)}")
         self.RTs.extend(test_returns)
         self.writer.add_scalar('return_test', np.mean(test_returns), self.frame_count)
         self.writer.add_scalar('return_test_max', np.max(self.RTs), self.frame_count)
