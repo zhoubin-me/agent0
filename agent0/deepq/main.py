@@ -22,14 +22,11 @@ def main(cfg: ExpConfig):
     repo = git.Repo(search_parent_directories=True)
     sha = repo.head.object.hexsha[:8]
     uuid = shortuuid.uuid()[:8]
-    cfg.logdir = f"{cfg.name}-{cfg.env_id}-{cfg.learner.algo}-{cfg.seed}-{sha}-{uuid}"
-    print(cfg.logdir)
-    return
+    subdir = f"{cfg.name}-{cfg.env_id}-{cfg.learner.algo}-{cfg.seed}-{sha}-{uuid}"
+    cfg.logdir = os.path.join(cfg.logdir, subdir)
     dummy_env.close()
     set_random_seed(cfg.seed)
-    print(cfg)
     Trainer(cfg).run()
-
 
 if __name__ == "__main__":
     cs = ConfigStore.instance()

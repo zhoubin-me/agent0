@@ -9,6 +9,8 @@ from absl import logging
 from dacite import from_dict
 from hydra.core.config_store import ConfigStore
 from omegaconf import OmegaConf
+import git
+import shortuuid
 
 import agent0.deepq.agent as agents
 from agent0.common.atari_wrappers import make_atari
@@ -152,6 +154,11 @@ def main(cfg: ExpConfig):
     cfg.obs_shape = dummy_env.observation_space.shape[1:]
     cfg.action_dim = dummy_env.action_space[0].n
     dummy_env.close()
+
+    repo = git.Repo(search_parent_directories=True)
+    sha = repo.head.object.hexsha[:8]
+    uuid = shortuuid.uuid()[:8]
+    cfg.logdir = f"{cfg.name}-{cfg.env_id}-{cfg.learner.algo}-{cfg.seed}-{sha}-{uuid}"
     program = make_program(cfg)
     lp.launch(program, launch_type="local_mp", terminal="tmux_session")
 

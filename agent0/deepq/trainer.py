@@ -114,6 +114,8 @@ class Trainer:
             _, returns, _ = self.actors[0].sample(self.cfg.actor.test_eps)
             rs.extend(returns)
         return rs
+    def save(self):
+        pass
 
     def logging(self, result):
         msg = ""
