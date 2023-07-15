@@ -20,7 +20,9 @@ class ReplayDataset(Dataset, Sampler):
         self.top = 0
 
         if self.cfg.replay.policy == ReplayEnum.prioritize:
-            self.beta_schedule = LinearSchedule(self.cfg.replay.beta0, 1.0, self.cfg.trainer.total_steps)
+            self.beta_schedule = LinearSchedule(
+                self.cfg.replay.beta0, 1.0, self.cfg.trainer.total_steps
+            )
             self.beta = self.cfg.replay.beta0
             self.max_p = 1.0
 
@@ -37,7 +39,7 @@ class ReplayDataset(Dataset, Sampler):
     def __iter__(self):
         for _ in range(self.top // self.cfg.learner.batch_size):
             yield torch.multinomial(
-                self.priority[:self.top], self.cfg.learner.batch_size, False
+                self.priority[: self.top], self.cfg.learner.batch_size, False
             ).tolist()
 
     def extend(self, transitions):
@@ -47,9 +49,11 @@ class ReplayDataset(Dataset, Sampler):
 
         if self.cfg.replay.policy == ReplayEnum.prioritize:
             self.priority.roll(-num_entries, 0)
-            self.priority[-num_entries:] = self.max_p ** self.cfg.replay.alpha
+            self.priority[-num_entries:] = self.max_p**self.cfg.replay.alpha
             self.beta = self.beta_schedule(num_entries)
-    
+
     def update_priority(self, ids, priorities):
-        self.priority[ids] = (priorities + self.cfg.replay.eps).pow(self.cfg.replay.alpha)
+        self.priority[ids] = (priorities + self.cfg.replay.eps).pow(
+            self.cfg.replay.alpha
+        )
         self.max_p = max(priorities.max().item(), self.max_p)

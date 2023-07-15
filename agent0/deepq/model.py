@@ -8,7 +8,8 @@ import torch.nn.functional as F
 from einops import rearrange
 from torch.nn.parameter import Parameter
 
-from agent0.deepq.config import AlgoEnum, C51Config, ExpConfig, IQNConfig, QRConfig
+from agent0.deepq.config import (AlgoEnum, C51Config, ExpConfig, IQNConfig,
+                                 QRConfig)
 
 
 def init(m, gain=1.0):
@@ -23,6 +24,7 @@ def init_xavier(m, gain=1.0):
         if m.bias is not None:
             torch.nn.init.constant_(m.bias, 0)
 
+
 class NoisyLinear(nn.Module):
     def __init__(self, in_features, out_features, std_init=0.4, noisy_layer_std=0.1):
         super(NoisyLinear, self).__init__()
@@ -31,16 +33,20 @@ class NoisyLinear(nn.Module):
         self.out_features = out_features
         self.std_init = std_init
         self.noisy_layer_std = noisy_layer_std
-        self.weight_mu = nn.Parameter(torch.zeros((out_features, in_features)), requires_grad=True)
-        self.weight_sigma = nn.Parameter(torch.zeros((out_features, in_features)), requires_grad=True)
-        self.register_buffer('weight_epsilon', torch.zeros((out_features, in_features)))
+        self.weight_mu = nn.Parameter(
+            torch.zeros((out_features, in_features)), requires_grad=True
+        )
+        self.weight_sigma = nn.Parameter(
+            torch.zeros((out_features, in_features)), requires_grad=True
+        )
+        self.register_buffer("weight_epsilon", torch.zeros((out_features, in_features)))
         self.bias_mu = nn.Parameter(torch.zeros(out_features), requires_grad=True)
         self.bias_sigma = nn.Parameter(torch.zeros(out_features), requires_grad=True)
-        self.register_buffer('bias_epsilon', torch.zeros(out_features))
+        self.register_buffer("bias_epsilon", torch.zeros(out_features))
 
-        self.register_buffer('noise_in', torch.zeros(in_features))
-        self.register_buffer('noise_out_weight', torch.zeros(out_features))
-        self.register_buffer('noise_out_bias', torch.zeros(out_features))
+        self.register_buffer("noise_in", torch.zeros(in_features))
+        self.register_buffer("noise_out_weight", torch.zeros(out_features))
+        self.register_buffer("noise_out_bias", torch.zeros(out_features))
 
         self.reset_parameters()
         self.reset_noise()
@@ -69,13 +75,17 @@ class NoisyLinear(nn.Module):
         self.noise_out_weight.normal_(std=self.noisy_layer_std)
         self.noise_out_bias.normal_(std=self.noisy_layer_std)
 
-        self.weight_epsilon.copy_(self.transform_noise(self.noise_out_weight).ger(
-            self.transform_noise(self.noise_in)))
+        self.weight_epsilon.copy_(
+            self.transform_noise(self.noise_out_weight).ger(
+                self.transform_noise(self.noise_in)
+            )
+        )
         self.bias_epsilon.copy_(self.transform_noise(self.noise_out_bias))
 
     @staticmethod
     def transform_noise(x):
         return x.sign().mul(x.abs().sqrt())
+
 
 class ConvEncoder(nn.Module):
     def __init__(self, chan_dim):
@@ -125,7 +135,9 @@ class DQNHead(nn.Module):
 
 
 class C51Head(nn.Module):
-    def __init__(self, act_dim: int, feat_dim: int, dueling: bool, noisy: bool, cfg: C51Config):
+    def __init__(
+        self, act_dim: int, feat_dim: int, dueling: bool, noisy: bool, cfg: C51Config
+    ):
         super(C51Head, self).__init__()
         Dense = NoisyLinear if noisy else nn.Linear
         self.first_dense = Dense(feat_dim, 512)
@@ -166,7 +178,9 @@ class C51Head(nn.Module):
 
 
 class QRHead(C51Head):
-    def __init__(self, act_dim: int, feat_dim: int, dueling: bool, noisy: bool, cfg: QRConfig):
+    def __init__(
+        self, act_dim: int, feat_dim: int, dueling: bool, noisy: bool, cfg: QRConfig
+    ):
         super(QRHead, self).__init__(act_dim, feat_dim, dueling, noisy, cfg)
         self.register_buffer(
             "cumulative_density",
@@ -179,7 +193,9 @@ class QRHead(C51Head):
 
 
 class IQNHead(nn.Module):
-    def __init__(self, act_dim: int, feat_dim: int, dueling: bool, noisy: bool, cfg: IQNConfig):
+    def __init__(
+        self, act_dim: int, feat_dim: int, dueling: bool, noisy: bool, cfg: IQNConfig
+    ):
         super(IQNHead, self).__init__()
         Dense = NoisyLinear if noisy else nn.Linear
         self.cfg = cfg
@@ -242,7 +258,9 @@ class IQNHead(nn.Module):
 
 
 class FQFHead(IQNHead):
-    def __init__(self, act_dim: int, feat_dim: int, dueling: bool, noisy: bool, cfg: IQNConfig):
+    def __init__(
+        self, act_dim: int, feat_dim: int, dueling: bool, noisy: bool, cfg: IQNConfig
+    ):
         super(FQFHead, self).__init__(act_dim, feat_dim, dueling, noisy, cfg)
         self.fraction_net = nn.Linear(feat_dim, cfg.F)
         self.fraction_net.apply(lambda m: init_xavier(m, 0.01))
@@ -295,12 +313,12 @@ class DeepQNet(nn.Module):
         algo = cfg.learner.algo
         assert algo in headers and algo in head_cfgs
         self.head = headers[algo](
-            cfg.action_dim, 
-            feat_dim, 
+            cfg.action_dim,
+            feat_dim,
             cfg.learner.dueling_head,
             cfg.learner.noisy_net,
-            head_cfgs[algo])
-
+            head_cfgs[algo],
+        )
 
     def forward(self, x):
         x = self.encoder(x)
@@ -313,11 +331,8 @@ class DeepQNet(nn.Module):
 
     def params(self):
         return chain(v for k, v in self.named_parameters() if "fraction" not in k)
-    
+
     def reset_noise(self):
         for m in self.modules():
             if isinstance(m, NoisyLinear):
                 m.reset_noise()
-
-
-

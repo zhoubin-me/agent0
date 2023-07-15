@@ -9,8 +9,9 @@ from absl import logging
 from dacite import from_dict
 from hydra.core.config_store import ConfigStore
 from omegaconf import OmegaConf
-from agent0.common.atari_wrappers import make_atari
+
 import agent0.deepq.agent as agents
+from agent0.common.atari_wrappers import make_atari
 from agent0.deepq.config import ExpConfig
 from agent0.deepq.trainer import Trainer
 
@@ -35,7 +36,9 @@ class TrainerNode(Trainer):
             result = self.step(transitions, returns, qmax)
             sample_eps = self.epsilon_fn(self.frame_count)
             tasks.append(
-                self.actors[rank].futures.sample(sample_eps, self.learner.model.state_dict())
+                self.actors[rank].futures.sample(
+                    sample_eps, self.learner.model.state_dict()
+                )
             )
 
             msg = ""
@@ -48,8 +51,11 @@ class TrainerNode(Trainer):
             if step % self.cfg.trainer.log_freq == 0:
                 logging.info(msg)
 
-        futures.wait([actor.close() for actor in self.actors], return_when=futures.ALL_COMPLETED)
-        
+        futures.wait(
+            [actor.close() for actor in self.actors], return_when=futures.ALL_COMPLETED
+        )
+
+
 class ActorNode:
     def __init__(self, rank: int, cfg: ExpConfig) -> None:
         self.cfg = cfg
@@ -63,7 +69,9 @@ class ActorNode:
         toc = time.time()
         fps = len(transition) / (toc - tic)
         self.step_count += 1
-        logging.info(f"Rank {self.rank} -- Step: {self.step_count:7d} | FPS: {fps:.2f} | Avg Return: {np.mean(returns):.2f}")
+        logging.info(
+            f"Rank {self.rank} -- Step: {self.step_count:7d} | FPS: {fps:.2f} | Avg Return: {np.mean(returns):.2f}"
+        )
         return self.rank, (transition, returns, qmax)
 
     def close(self):
@@ -85,7 +93,6 @@ def make_program(cfg: ExpConfig):
 
 @hydra.main(version_base=None, config_name="config")
 def main(cfg: ExpConfig):
-    print(cfg)
     cfg = OmegaConf.to_container(cfg)
     cfg = from_dict(ExpConfig, cfg)
     dummy_env = make_atari(cfg.env_id, num_envs=1)

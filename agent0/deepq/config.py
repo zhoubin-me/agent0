@@ -13,6 +13,7 @@ class AlgoEnum(Enum):
     fqf = 4
     mdqn = 5
 
+
 class ActorEnum(Enum):
     greedy = 0
     random = 1
@@ -69,6 +70,7 @@ class MDQNConfig:
     alpha: float = 0.9
     lo: float = -1
 
+
 @dataclass
 class LearnerConfig:
     algo: AlgoEnum = AlgoEnum.dqn
@@ -115,7 +117,7 @@ class ActorConfig:
 @dataclass
 class ReplayConfig:
     size: int = int(1e6)
-    policy: ReplayEnum = ReplayEnum.prioritize
+    policy: ReplayEnum = ReplayEnum.uniform
     beta0: float = 0.4
     alpha: float = 0.5
     eps: float = 0.01

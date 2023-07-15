@@ -1,8 +1,11 @@
+from collections import deque
+
 import gymnasium as gym
 import numpy as np
 from gymnasium.core import Env
-from gymnasium.wrappers import AtariPreprocessing, FrameStack, RecordEpisodeStatistics
-from collections import deque
+from gymnasium.wrappers import (AtariPreprocessing, FrameStack,
+                                RecordEpisodeStatistics)
+
 
 class ClipRewardEnv(gym.RewardWrapper):
     def __init__(self, env):
@@ -34,6 +37,7 @@ class EpisodicLifeEnv(gym.Wrapper):
     """Make end-of-life == end-of-episode, but only reset on true game over.
     Done by DeepMind for the DQN and co. since it helps value estimation.
     """
+
     def step(self, action):
         old_lives = self.env.unwrapped.ale.lives()
         obs, reward, done, trunc, info = super().step(action)
@@ -45,11 +49,12 @@ class EpisodicLifeEnv(gym.Wrapper):
         # so it's important to keep lives > 0, so that we only reset once
         # the environment advertises done.
         life_loss = old_lives > new_lives > 0
-        info['life_loss'] = life_loss
+        info["life_loss"] = life_loss
         if life_loss:
             obs, _, _, _, step_info = self.env.step(0)
             info.update(step_info)
         return obs, reward, done, trunc, info
+
 
 def make_atari(env_id, num_envs, episode_life=True):
     wrappers = [
