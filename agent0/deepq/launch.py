@@ -66,10 +66,13 @@ class TrainerNode(Trainer):
                 )
                 self.writer.add_scalar("return_test", np.mean(returns), test_frames)
                 self.writer.add_scalar("return_test_max", np.max(self.RTs), test_frames)
+                wandb.log({'return_test': np.mean(returns), 'frame': test_frames})
+                wandb.log({'return_test_max': np.max(self.RTs), 'frame': test_frames})
                 continue
 
-            fps = self.num_transitions / (time.time() - tic)
-            result.update(fps=fps)
+            if rank > 0 and self.frame_count > self.cfg.trainer.training_start_steps:
+                fps = self.num_transitions / (time.time() - tic)
+                result.update(fps=fps)
             self.logging(result)
 
         self.final()
@@ -156,30 +159,15 @@ def main(cfg: ExpConfig):
     uuid = shortuuid.uuid()[:8]
     subdir = f"{cfg.name}-{cfg.env_id}-{cfg.learner.algo}-{cfg.seed}-{sha}-{uuid}"
     dummy_env = make_atari(cfg.env_id, num_envs=1)
+    dummy_env.close()
 
     cfg.logdir = os.path.join(cfg.logdir, subdir)
     cfg.obs_shape = dummy_env.observation_space.shape[1:]
     cfg.action_dim = int(dummy_env.action_space[0].n)
 
-    if cfg.wandb:
-        wdb_cfg = OmegaConf.to_yaml(cfg)
-        wdb_cfg = yaml.safe_load(wdb_cfg)
-        wandb.init(
-            project=cfg.name,
-            config=wdb_cfg
-        )
-
     cfg = OmegaConf.to_container(cfg)
     cfg = from_dict(ExpConfig, cfg)
-    # dummy_env = make_atari(cfg.env_id, num_envs=1)
-    # cfg.obs_shape = dummy_env.observation_space.shape[1:]
-    # cfg.action_dim = dummy_env.action_space[0].n
-    # dummy_env.close()
-    # repo = git.Repo(search_parent_directories=True)
-    # sha = repo.head.object.hexsha[:8]
-    # uuid = shortuuid.uuid()[:8]
-    # subdir = f"{cfg.name}-{cfg.env_id}-{cfg.learner.algo}-{cfg.seed}-{sha}-{uuid}"
-    # cfg.logdir = os.path.join(cfg.logdir, subdir)
+
     program = make_program(cfg)
     lp.launch(program, launch_type="local_mp", terminal="tmux_session")
 
