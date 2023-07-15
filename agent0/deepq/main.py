@@ -4,14 +4,11 @@ from dacite import from_dict
 from hydra.core.config_store import ConfigStore
 import git
 import shortuuid
-import json
 
 from agent0.common.atari_wrappers import make_atari
 from agent0.common.utils import set_random_seed
 from agent0.deepq.config import ExpConfig
 from agent0.deepq.trainer import Trainer
-
-import json
 
 @hydra.main(version_base=None, config_name="config")
 def main(cfg: ExpConfig):

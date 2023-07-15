@@ -12,7 +12,6 @@ from agent0.common.utils import DataLoaderX, DataPrefetcher, set_random_seed, En
 from agent0.deepq.config import ExpConfig
 from agent0.deepq.replay import ReplayDataset, ReplayEnum
 import wandb
-import json
 
 class Trainer:
     def __init__(self, cfg: ExpConfig, use_lp=False):
@@ -51,10 +50,9 @@ class Trainer:
         self.logger = logging.getLogger('agent0')
         self.logger.addHandler(logging.FileHandler(os.path.join(cfg.logdir, 'msg.log')))
         if cfg.wandb:
-            wandb_cfg = asdict(cfg)
             wandb.init(
                 project=cfg.name,
-                config=json.dumps(wandb_cfg, default=EnumEncoder)
+                config=asdict(cfg)
             )
         self.num_transitions = cfg.actor.sample_steps * cfg.actor.num_envs
         self.Ls, self.Rs, self.RTs, self.Qs, self.FLs = [], [], [], [], []
