@@ -100,7 +100,7 @@ class TrainerConfig:
     total_steps: int = int(1e7)
     training_start_steps: int = int(1e5)
     exploration_steps: int = int(1e6)
-    log_freq: int = 100
+    log_freq: int = 10
 
 
 @dataclass
@@ -115,7 +115,7 @@ class ActorConfig:
 @dataclass
 class ReplayConfig:
     size: int = int(1e6)
-    policy: ReplayEnum = ReplayEnum.uniform
+    policy: ReplayEnum = ReplayEnum.prioritize
     beta0: float = 0.4
     alpha: float = 0.5
     eps: float = 0.01

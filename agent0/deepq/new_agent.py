@@ -88,17 +88,7 @@ class Actor:
         self.envs.close()
 
 
-def huber_qr_loss(q, q_target, taus):
-    huber_loss = F.smooth_l1_loss(q, q_target, reduction="none")
-    loss = huber_loss * (taus - q_target.lt(q).detach().float()).abs()
-    return loss.sum(-1).mean(-1).view(-1)
-
-def log_softmax_stable(logits, tau=0.01):
-    logits = logits - logits.max(dim=-1, keepdim=True)[0]
-    return logits - tau * torch.logsumexp(logits / tau, dim=-1, keepdim=True)
-
-
-class Learner:
+class BaseLearner:
     def __init__(self, cfg: ExpConfig):
         self.cfg = cfg
         self.model = DeepQNet(cfg).to(cfg.device.value)
@@ -109,29 +99,68 @@ class Learner:
             cfg.learner.learning_rate,
             eps=1e-2 / cfg.learner.batch_size,
         )
-
-        if self.cfg.learner.algo == AlgoEnum.fqf:
-            self.fqf_optimizer = torch.optim.RMSprop(
-                self.model.head.fraction_net.parameters(),
-                lr=cfg.learner.learning_rate / 2e4,
-                alpha=0.95,
-                eps=0.00001,
-            )
-
         self.update_steps = 0
         self.batch_indices = torch.arange(cfg.learner.batch_size).to(cfg.device.value)
-        train_step_algos = {
-            AlgoEnum.dqn: self.train_step_dqn,
-            AlgoEnum.c51: self.train_step_c51,
-            AlgoEnum.qr: self.train_step_qr,
-            AlgoEnum.iqn: self.train_step_iqn,
-            AlgoEnum.fqf: self.train_step_fqf,
-            AlgoEnum.mdqn: self.train_step_mdqn,
-        }
-        assert self.cfg.learner.algo in train_step_algos
-        self.train_step_fn = train_step_algos[self.cfg.learner.algo]
 
-    def train_step_dqn(self, obs, actions, rewards, terminals, next_obs):
+    @staticmethod
+    def huber_qr_loss(q, q_target, taus):
+        huber_loss = F.smooth_l1_loss(q, q_target, reduction="none")
+        loss = huber_loss * (taus - q_target.lt(q).detach().float()).abs()
+        return loss.sum(-1).mean(-1).view(-1)
+
+    @staticmethod
+    def log_softmax_stable(logits, tau=0.01):
+        logits = logits - logits.max(dim=-1, keepdim=True)[0]
+        return logits - tau * torch.logsumexp(logits / tau, dim=-1, keepdim=True)
+
+    def train_step(self):
+        raise NotImplementedError()
+
+
+    def train(self, data):
+        if self.cfg.learner.noisy_net:
+            self.model.reset_noise()
+            self.model_target.reset_noise()
+
+        frames, actions, rewards, terminals, weights, indices = map(lambda x: x.float(), data)
+        frames = frames.reshape(
+            -1, self.cfg.obs_shape[0]*2, *self.cfg.obs_shape[1:]
+        ).div(255.0)
+        obs, next_obs = torch.split(frames, self.cfg.obs_shape[0], 1)
+        actions = actions.long()
+        loss = self.train_step(obs, actions, rewards, terminals, next_obs)
+        
+        if self.cfg.learner.algo == AlgoEnum.fqf:
+            q_loss, fraction_loss = loss
+            self.fqf_optimizer.zero_grad()
+            fraction_loss.mul(weights).sum().backward(retain_graph=True)
+            if self.cfg.learner.max_grad_norm > 0:
+                nn.utils.clip_grad_norm_(
+                    self.model.head.fraction_net.parameters(),
+                    self.cfg.learner.max_grad_norm,
+                )
+            self.fqf_optimizer.step()
+        else:
+            q_loss, fraction_loss = loss, None
+
+        if not torch.isnan(q_loss).any():
+            self.optimizer.zero_grad()
+            q_loss.mul(weights).sum().backward()
+            self.optimizer.step()
+            self.update_steps += 1
+        else:
+            q_loss = None
+
+        if self.update_steps % self.cfg.learner.target_update_freq == 0:
+            self.model_target = deepcopy(self.model)
+
+        return {'q_loss': None if q_loss is None else q_loss.detach().cpu(),
+                'fraction_loss': None if fraction_loss is None else fraction_loss.detach().cpu(),
+                'indices': indices.long().detach().cpu()
+                }
+
+class DQNLearner(BaseLearner):
+    def train_step(self, obs, actions, rewards, terminals, next_obs):
         with torch.no_grad():
             q_next = self.model_target(next_obs)
             if self.cfg.learner.double_q:
@@ -145,17 +174,18 @@ class Learner:
         loss = F.smooth_l1_loss(q, q_target, reduction="none").view(-1)
         return loss
     
-    def train_step_mdqn(self, obs, actions, rewards, terminals, next_obs):
+class MDQNLearner(BaseLearner):
+    def train_step(self, obs, actions, rewards, terminals, next_obs):
         cfg = self.cfg.learner.mdqn
         with torch.no_grad():
             q_next_logits = self.model_target(next_obs)
-            q_next = q_next_logits - log_softmax_stable(
+            q_next = q_next_logits - self.log_softmax_stable(
                 q_next_logits, cfg.tau
             )
             q_next = q_next_logits.softmax(dim=-1).mul(q_next).sum(dim=-1)
 
             add_on = self.model_target(obs)
-            add_on = log_softmax_stable(add_on, cfg.tau)
+            add_on = self.log_softmax_stable(add_on, cfg.tau)
             add_on = add_on[self.batch_indices, actions].clamp(cfg.lo, 0)
 
             q_target = rewards + cfg.tau * add_on +  self.cfg.learner.discount ** self.cfg.learner.n_step_q * (1 - terminals) * q_next
@@ -163,8 +193,9 @@ class Learner:
         q = self.model(obs)[self.batch_indices, actions]
         loss = F.smooth_l1_loss(q, q_target, reduction="none")
         return loss.view(-1)
-
-    def train_step_c51(self, obs, actions, rewards, terminals, next_obs):
+    
+class C51Learner(BaseLearner):
+    def train_step(self, obs, actions, rewards, terminals, next_obs):
         with torch.no_grad():
             prob_next = self.model_target(next_obs).softmax(dim=-1)
 
@@ -212,7 +243,8 @@ class Learner:
         loss = target_prob.mul(log_prob).sum(-1).neg()
         return loss.view(-1)
 
-    def train_step_qr(self, obs, actions, rewards, terminals, next_obs):
+class QRLearner(BaseLearner):
+    def train_step(self, obs, actions, rewards, terminals, next_obs):
         with torch.no_grad():
             q_next = self.model_target(next_obs)
             if self.cfg.learner.double_q:
@@ -229,10 +261,11 @@ class Learner:
         q = rearrange(q, "b n -> b 1 n")
         q_target = rearrange(q_target, "b n -> b n 1")
         taus = self.model.head.cumulative_density.view(1, 1, -1)
-        loss = huber_qr_loss(q, q_target, taus)
+        loss = self.huber_qr_loss(q, q_target, taus)
         return loss
 
-    def train_step_iqn(self, obs, actions, rewards, terminals, next_obs):
+class IQNLearner(BaseLearner):
+    def train_step(self, obs, actions, rewards, terminals, next_obs):
         cfg = self.cfg.learner.iqn
         with torch.no_grad():
             q_next_convs = self.model_target.encoder(next_obs)
@@ -259,10 +292,20 @@ class Learner:
         q = rearrange(q, "b n -> b 1 n")
         q_target = rearrange(q_target, "b n -> b n 1")
         taus = rearrange(taus, "b n 1 -> b 1 n")
-        loss = huber_qr_loss(q, q_target, taus)
+        loss = self.huber_qr_loss(q, q_target, taus)
         return loss
 
-    def train_step_fqf(self, obs, actions, rewards, terminals, next_obs):
+class FQFLearner(BaseLearner):
+    def __init__(self, cfg: ExpConfig):
+        super().__init__(cfg)
+        self.fqf_optimizer = torch.optim.RMSprop(
+            self.model.head.fraction_net.parameters(),
+            lr=cfg.learner.learning_rate / 2e4,
+            alpha=0.95,
+            eps=0.00001,
+        )
+    
+    def train_step(self, obs, actions, rewards, terminals, next_obs):
         q_convs = self.model.encoder(obs)
         # taus: B X (N+1) X 1, taus_hats: B X N X 1
         taus, taus_hat, _ = self.model.head.prop_taus(q_convs.detach())
@@ -289,7 +332,7 @@ class Learner:
         q_hat = rearrange(q_hat, "b n -> b 1 n")
         q_target = rearrange(q_target, "b n -> b n 1")
         tau_hats = rearrange(taus_hat, "b n 1 -> b 1 n")
-        loss = huber_qr_loss(q_hat, q_target, tau_hats)
+        loss = self.huber_qr_loss(q_hat, q_target, tau_hats)
 
         q_hat = rearrange(q_hat, "b 1 n -> b n")
         with torch.no_grad():
@@ -309,46 +352,3 @@ class Learner:
         gradients_of_taus = gradients_of_taus.view(-1, self.cfg.learner.iqn.F - 1)
         fraction_loss = (gradients_of_taus * taus[:, 1:-1, 0]).sum(dim=1).view(-1)
         return loss, fraction_loss
-
-    def train_steps(self, data):
-        algo = self.cfg.learner.algo
-        if self.cfg.learner.noisy_net:
-            self.model.reset_noise()
-            self.model_target.reset_noise()
-
-        frames, actions, rewards, terminals, weights, indices = map(lambda x: x.float(), data)
-        frames = frames.reshape(
-            -1, self.cfg.obs_shape[0]*2, *self.cfg.obs_shape[1:]
-        ).div(255.0)
-        obs, next_obs = torch.split(frames, self.cfg.obs_shape[0], 1)
-        actions = actions.long()
-        loss = self.train_step_fn(obs, actions, rewards, terminals, next_obs)
-        
-        if algo == AlgoEnum.fqf:
-            q_loss, fraction_loss = loss
-            self.fqf_optimizer.zero_grad()
-            fraction_loss.mul(weights).sum().backward(retain_graph=True)
-            if self.cfg.learner.max_grad_norm > 0:
-                nn.utils.clip_grad_norm_(
-                    self.model.head.fraction_net.parameters(),
-                    self.cfg.learner.max_grad_norm,
-                )
-            self.fqf_optimizer.step()
-        else:
-            q_loss, fraction_loss = loss, None
-
-        if not torch.isnan(q_loss).any():
-            self.optimizer.zero_grad()
-            q_loss.mul(weights).sum().backward()
-            self.optimizer.step()
-            self.update_steps += 1
-        else:
-            q_loss = None
-
-        if self.update_steps % self.cfg.learner.target_update_freq == 0:
-            self.model_target = deepcopy(self.model)
-
-        return {'q_loss': None if q_loss is None else q_loss.detach().cpu(),
-                'fraction_loss': None if fraction_loss is None else fraction_loss.detach().cpu(),
-                'indices': indices.long().detach().cpu()
-                }
