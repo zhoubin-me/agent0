@@ -24,13 +24,11 @@ class FireResetEnv(gym.Wrapper):
 
     def reset(self, **kwargs):
         self.env.reset(**kwargs)
-        obs, _, terminated, truncated, _ = self.env.step(1)
-        if terminated or truncated:
-            self.env.reset(**kwargs)
-        obs, _, terminated, truncated, _ = self.env.step(2)
-        if terminated or truncated:
-            self.env.reset(**kwargs)
-        return obs, {}
+        for a in range(3):
+            obs, _, terminated, _, info = self.env.step(a)
+            if terminated:
+                obs, info = self.env.reset(**kwargs)
+        return obs, info
 
 
 class EpisodicLifeEnv(gym.Wrapper):
@@ -50,8 +48,9 @@ class EpisodicLifeEnv(gym.Wrapper):
         # the environment advertises done.
         life_loss = old_lives > new_lives > 0
         info["life_loss"] = life_loss
-        if life_loss:
-            obs, _, _, _, step_info = self.env.step(0)
+        if life_loss and self.env.unwrapped.get_action_meanings()[1] == "FIRE":
+            for a in range(3):
+                obs, _, _, _, step_info = self.env.step(a)
             info.update(step_info)
         return obs, reward, done, trunc, info
 
@@ -59,9 +58,9 @@ class EpisodicLifeEnv(gym.Wrapper):
 def make_atari(env_id, num_envs, episode_life=True):
     wrappers = [
         lambda x: AtariPreprocessing(x, terminal_on_life_loss=False),
-        FireResetEnv,
         lambda x: FrameStack(x, 4, False),
         lambda x: EpisodicLifeEnv(x) if episode_life else x,
+        FireResetEnv,
         RecordEpisodeStatistics,
         ClipRewardEnv,
     ]
