@@ -29,19 +29,23 @@ class TrainerNode(Trainer):
             for actor in self.actors
         ]
 
-        for step in range(trainer_steps):
+        step = 0
+        while step < trainer_steps:
             dones, not_dones = futures.wait(tasks, return_when=futures.FIRST_COMPLETED)
             tasks = list(dones) + list(not_dones)
             rank, (transitions, returns, qmax) = tasks.pop(0).result()
-            result = self.step(transitions, returns, qmax)
-            sample_eps = self.epsilon_fn(self.frame_count)
+
+            if rank > 0:
+                result = self.step(transitions, returns, qmax)
+                step += 1
+            
+            sample_eps = self.epsilon_fn(self.frame_count) if rank > 0 else self.cfg.actor.test_eps
             tasks.append(
                 self.actors[rank].futures.sample(
                     sample_eps, self.learner.model.state_dict()
                 )
             )
-
-            msg = ""
+            msg = "Train: " if rank > 0 else "Test :"
             for k, v in result.items():
                 if v is None:
                     continue
@@ -49,8 +53,11 @@ class TrainerNode(Trainer):
                 if k in ["frames", "loss", "qmax"] or "return" in k:
                     msg += f"{k}: {v:.2f} | "
             if step % self.cfg.trainer.log_freq == 0:
-                logging.info(msg)
+                    logging.info(msg)
 
+        self.close()
+        
+    def close(self):
         futures.wait(
             [actor.close() for actor in self.actors], return_when=futures.ALL_COMPLETED
         )

@@ -21,10 +21,16 @@ class Actor:
         self.model = DeepQNet(cfg).to(cfg.device.value)
         self.tracker = deque(maxlen=cfg.learner.n_step_q)
         self.steps = 0
-
-    def act(self, st, epsilon):
-        with torch.no_grad():
-            qt = self.model.qval(st)
+    
+    @torch.no_grad()
+    def act(self, epsilon):
+        st = (
+            torch.from_numpy(self.obs)
+            .to(self.cfg.device.value)
+            .float()
+            .div(255.0)
+        )
+        qt = self.model.qval(st)
         action_random = np.random.randint(
             0, self.cfg.action_dim, self.cfg.actor.num_envs
         )
@@ -37,24 +43,16 @@ class Actor:
         )
         return action, qt_max.mean().item()
 
-    def sample(self, epsilon, state_dict=None):
-        if state_dict is not None:
-            self.model.load_state_dict(state_dict)
+    def sample(self, epsilon, state_dict):
+        self.model.load_state_dict(state_dict)
         rs, qs, data = [], [], []
-        for _ in range(self.cfg.actor.actor_steps):
+        for _ in range(self.cfg.actor.sample_steps):
             if self.cfg.learner.noisy_net and (
                 self.steps % self.cfg.learner.reset_noise_freq == 0
             ):
                 self.model.reset_noise()
 
-            with torch.no_grad():
-                st = (
-                    torch.from_numpy(self.obs)
-                    .to(self.cfg.device.value)
-                    .float()
-                    .div(255.0)
-                )
-                action, qt_max = self.act(st, epsilon)
+            action, qt_max = self.act(epsilon)
             obs_next, reward, terminal, truncated, info = self.envs.step(action)
             self.steps += 1
             done = (
@@ -86,7 +84,7 @@ class Actor:
                 final_infos = info["final_info"][info["_final_info"]]
                 for stat in final_infos:
                     rs.append(stat["episode"]["r"][0])
-
+        
         return data, rs, qs
 
     def close(self):

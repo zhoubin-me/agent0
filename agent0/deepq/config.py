@@ -86,7 +86,7 @@ class LearnerConfig:
 
     double_q: bool = False
     dueling_head: bool = False
-    n_step_q: int = 3
+    n_step_q: int = 1
 
     noisy_net: bool = False
     reset_noise_freq: int = 4
@@ -103,13 +103,15 @@ class TrainerConfig:
     training_start_steps: int = int(1e5)
     exploration_steps: int = int(1e6)
     log_freq: int = 10
-
+    test_freq: int = 100
+    test_episodes: int = 20
 
 @dataclass
 class ActorConfig:
     policy: ActorEnum = ActorEnum.random
     num_envs: int = 16
-    actor_steps: int = 80
+    sample_steps: int = 80
+    test_steps: int = 800
     min_eps: float = 0.01
     test_eps: float = 0.001
 
@@ -129,7 +131,7 @@ class ExpConfig:
     env_type: EnvEnum = EnvEnum.atari
     obs_shape: Any = (0,)
     action_dim: int = 0
-    num_actors: int = 2
+    num_actors: int = 3
     seed: int = 42
     device: DeviceEnum = DeviceEnum.cuda
     name: str = ""
