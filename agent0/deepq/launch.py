@@ -78,13 +78,13 @@ class TrainerNode(Trainer):
                     self.writer.add_scalar(
                         "return_test_max", np.max(self.RTs), test_frames
                     )
-                    self.writer.add_video("test_video", video, test_frames)
+                    self.writer.add_video("test_video", video, test_frames, fps=60)
                 if self.cfg.wandb:
                     wandb.log({"return_test": np.mean(returns), "frame": test_frames})
                     wandb.log(
                         {"return_test_max": np.max(self.RTs), "frame": test_frames}
                     )
-                    wandb.log({"test_video": video, "frame": test_frames})
+                    wandb.log({"test_video": wandb.Video(video, fps=60, format="mp4"), "frame": test_frames})
 
                 continue
 

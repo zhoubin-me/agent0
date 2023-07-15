@@ -58,8 +58,8 @@ class EpisodicLifeEnv(gym.Wrapper):
 
 def make_atari(env_id, num_envs, episode_life=True):
     wrappers = [
-        FireResetEnv,
         lambda x: AtariPreprocessing(x, terminal_on_life_loss=False),
+        FireResetEnv,
         lambda x: FrameStack(x, 4, False),
         lambda x: EpisodicLifeEnv(x) if episode_life else x,
         RecordEpisodeStatistics,
