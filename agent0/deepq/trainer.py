@@ -1,18 +1,20 @@
 import logging
-import time
-
 import os
-import numpy as np
-from tensorboardX import SummaryWriter
+import time
 from dataclasses import asdict
+
+import numpy as np
 from einops import repeat
+from tensorboardX import SummaryWriter
 
 import agent0.deepq.agent as agents
+import wandb
 from agent0.common.atari_wrappers import make_atari
-from agent0.common.utils import DataLoaderX, DataPrefetcher, set_random_seed, EnumEncoder
+from agent0.common.utils import (DataLoaderX, DataPrefetcher, EnumEncoder,
+                                 set_random_seed)
 from agent0.deepq.config import ExpConfig
 from agent0.deepq.replay import ReplayDataset, ReplayEnum
-import wandb
+
 
 class Trainer:
     def __init__(self, cfg: ExpConfig, use_lp=False):
@@ -47,10 +49,12 @@ class Trainer:
             else (1.0 - step / cfg.trainer.exploration_steps) + cfg.actor.min_eps
         )
 
-        if cfg.wandb: wandb.init(project=cfg.name, config=asdict(cfg))
-        if cfg.tb: self.writer = SummaryWriter(cfg.logdir)
-        self.logger = logging.getLogger('agent0')
-        self.logger.addHandler(logging.FileHandler(os.path.join(cfg.logdir, 'msg.log')))
+        if cfg.wandb:
+            wandb.init(project=cfg.name, config=asdict(cfg))
+        if cfg.tb:
+            self.writer = SummaryWriter(cfg.logdir)
+        self.logger = logging.getLogger("agent0")
+        self.logger.addHandler(logging.FileHandler(os.path.join(cfg.logdir, "msg.log")))
         self.num_transitions = cfg.actor.sample_steps * cfg.actor.num_envs
         self.Ls, self.Rs, self.RTs, self.Qs, self.FLs = [], [], [], [], []
         self.data_fetcher = None
@@ -119,34 +123,46 @@ class Trainer:
         self.logger.info("Testing ... ")
         video = []
         while len(rs) < self.cfg.trainer.test_episodes:
-            images, returns, _ = self.actors[0].sample(self.cfg.actor.test_eps, test=True)
+            images, returns, _ = self.actors[0].sample(
+                self.cfg.actor.test_eps, test=True
+            )
             rs.extend(returns)
             if len(video) < 3600:
                 video.extend(images)
 
         video = np.stack(video, axis=1)
-        video = repeat(video, 'n t c h w -> n t (3 c) h w')
+        video = repeat(video, "n t c h w -> n t (3 c) h w")
         self.RTs.extend(rs)
 
         if self.cfg.tb:
             self.writer.add_scalar("return_test", np.mean(rs), self.frame_count)
-            self.writer.add_scalar("return_test_max", np.max(self.RTs), self.frame_count)
-            self.writer.add_video('test_video', video, self.frame_count, fps=60)
+            self.writer.add_scalar(
+                "return_test_max", np.max(self.RTs), self.frame_count
+            )
+            self.writer.add_video("test_video", video, self.frame_count, fps=60)
 
         if self.cfg.wandb:
-            wandb.log({'return_test': np.mean(rs), 'frame': self.frame_count})
-            wandb.log({'return_test_max': np.max(self.RTs), 'frame': self.frame_count})
-            wandb.log({'test_video': wandb.Video(video, fps=60, format='mp4'), 'frame': self.frame_count})
-        self.logger.info(f"TEST ---> Frames: {self.frame_count} | Return Avg: {np.mean(rs):.2f} Max: {np.max(rs)}")
-
+            wandb.log({"return_test": np.mean(rs), "frame": self.frame_count})
+            wandb.log({"return_test_max": np.max(self.RTs), "frame": self.frame_count})
+            wandb.log(
+                {
+                    "test_video": wandb.Video(video, fps=60, format="mp4"),
+                    "frame": self.frame_count,
+                }
+            )
+        self.logger.info(
+            f"TEST ---> Frames: {self.frame_count} | Return Avg: {np.mean(rs):.2f} Max: {np.max(rs)}"
+        )
 
     def logging(self, result):
         msg = ""
         for k, v in result.items():
             if v is None:
                 continue
-            if self.cfg.tb: self.writer.add_scalar(k, v, self.frame_count)
-            if self.cfg.wandb: wandb.log({k: v, 'frame': self.frame_count})
+            if self.cfg.tb:
+                self.writer.add_scalar(k, v, self.frame_count)
+            if self.cfg.wandb:
+                wandb.log({k: v, "frame": self.frame_count})
             if k in ["frames", "loss", "qmax", "fps"] or "return" in k:
                 msg += f"{k}: {v:.2f} | "
         self.logger.info(msg)

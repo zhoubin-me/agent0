@@ -1,21 +1,22 @@
 # from tensorboardX import SummaryWriter
+import os
 import time
 from concurrent import futures
+from time import localtime, strftime
 
+import git
 import hydra
 import launchpad as lp
 import numpy as np
+import shortuuid
 from absl import logging
 from dacite import from_dict
+from einops import repeat
 from hydra.core.config_store import ConfigStore
 from omegaconf import OmegaConf
-import git
-import shortuuid
-import os
-import wandb
-from einops import repeat
 
 import agent0.deepq.agent as agents
+import wandb
 from agent0.common.atari_wrappers import make_atari
 from agent0.deepq.config import ExpConfig
 from agent0.deepq.trainer import Trainer
@@ -45,7 +46,9 @@ class TrainerNode(Trainer):
             tic = time.time()
             dones, not_dones = futures.wait(tasks, return_when=futures.FIRST_COMPLETED)
             tasks = list(dones) + list(not_dones)
-            rank, (transitions_or_video, returns, qmax_or_frames) = tasks.pop(0).result()
+            rank, (transitions_or_video, returns, qmax_or_frames) = tasks.pop(
+                0
+            ).result()
             if rank > 0:
                 qmax = qmax_or_frames
                 transitions = transitions_or_video
@@ -67,17 +70,21 @@ class TrainerNode(Trainer):
                 test_frames = qmax_or_frames
                 video = transitions_or_video
                 video = np.stack(video, axis=1)
-                video = repeat(video, 'n t c h w -> n t (3 c) h w')
+                video = repeat(video, "n t c h w -> n t (3 c) h w")
                 self.RTs.extend(returns)
 
                 if self.cfg.tb:
                     self.writer.add_scalar("return_test", np.mean(returns), test_frames)
-                    self.writer.add_scalar("return_test_max", np.max(self.RTs), test_frames)
+                    self.writer.add_scalar(
+                        "return_test_max", np.max(self.RTs), test_frames
+                    )
                     self.writer.add_video("test_video", video, test_frames)
                 if self.cfg.wandb:
-                    wandb.log({'return_test': np.mean(returns), 'frame': test_frames})
-                    wandb.log({'return_test_max': np.max(self.RTs), 'frame': test_frames})
-                    wandb.log({'test_video': video, 'frame': test_frames})
+                    wandb.log({"return_test": np.mean(returns), "frame": test_frames})
+                    wandb.log(
+                        {"return_test_max": np.max(self.RTs), "frame": test_frames}
+                    )
+                    wandb.log({"test_video": video, "frame": test_frames})
 
                 continue
 
@@ -171,8 +178,11 @@ def make_program(cfg: ExpConfig):
 def main(cfg: ExpConfig):
     repo = git.Repo(search_parent_directories=True)
     sha = repo.head.object.hexsha[:8]
-    uuid = shortuuid.uuid()[:8]
-    subdir = f"{cfg.name}-{cfg.env_id}-{cfg.learner.algo}-{cfg.seed}-{sha}-{uuid}"
+    uuid = shortuuid.uuid()[:4]
+    timestr = strftime("%Y%m%d-%H%M%S", localtime())
+    subdir = (
+        f"{cfg.name}-{cfg.env_id}-{cfg.learner.algo}-{cfg.seed}-{sha}-{timestr}-{uuid}"
+    )
     dummy_env = make_atari(cfg.env_id, num_envs=1)
     dummy_env.close()
 

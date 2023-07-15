@@ -1,12 +1,13 @@
 import argparse
+import json
 import random
+from enum import Enum
 
 import numpy as np
 import torch
 from prefetch_generator import BackgroundGenerator
 from torch.utils.data import DataLoader
-import json
-from enum import Enum
+
 
 class LinearSchedule:
     def __init__(self, start, end=None, steps=None):
