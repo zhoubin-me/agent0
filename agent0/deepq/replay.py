@@ -8,7 +8,7 @@ from lz4.block import decompress
 from torch.utils.data import Dataset, Sampler
 
 from agent0.common.utils import LinearSchedule
-from agent0.deepq.new_config import ExpConfig, ReplayEnum
+from agent0.deepq.config import ExpConfig, ReplayEnum
 
 
 class ReplayDataset(Dataset, Sampler):

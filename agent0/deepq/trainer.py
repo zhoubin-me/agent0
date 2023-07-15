@@ -1,187 +1,111 @@
-import json
-import os
-import time
-from abc import ABC
-
 import numpy as np
-import ray
-import torch
-from ray import tune
-from ray.tune.experiment.trial import ExportFormat
+from tensorboardX import SummaryWriter
+from tqdm import tqdm
 
-from agent0.common.utils import LinearSchedule, set_random_seed
-from agent0.deepq.actor import Actor
-from agent0.deepq.agent import Agent
-from agent0.deepq.config import Config
+from agent0.common.atari_wrappers import make_atari
+from agent0.common.utils import DataLoaderX, DataPrefetcher, set_random_seed
+import agent0.deepq.agent as agents
+from agent0.deepq.config import ExpConfig
+from agent0.deepq.replay import ReplayDataset, ReplayEnum
 
+class Trainer:
+    def __init__(self, cfg: ExpConfig, use_lp=False):
+        self.cfg = cfg
 
-class Trainer(tune.Trainable, ABC):
-    def __init__(self, config=None, logger_creator=None):
-        self.Rs, self.Qs, self.TRs, self.Ls, self.ITRs, self.velocity = (
-            [],
-            [],
-            [],
-            [],
-            [],
-            [],
+        set_random_seed(cfg.seed)
+
+        dummy_env = make_atari(cfg.env_id, 1)
+        self.obs_shape = dummy_env.observation_space.shape[1:]
+        self.act_dim = dummy_env.action_space[0].n
+        dummy_env.close()
+        
+        try:
+            self.learner = getattr(agents, f'{self.cfg.learner.algo.name.upper()}Learner')(cfg)
+        except:
+            raise NotImplementedError(f"No such learner for {self.cfg.learner.algo.name}")
+        self.replay = ReplayDataset(cfg)
+        if not use_lp:
+            self.actors = agents.Actor(cfg)
+
+        self.epsilon_fn = (
+            lambda step: cfg.actor.min_eps
+            if step > cfg.trainer.exploration_steps
+            else (1.0 - step / cfg.trainer.exploration_steps) + cfg.actor.min_eps
         )
-        self.cfg = None
-        self.agent = None
-        self.epsilon = None
-        self.epsilon_schedule = None
-        self.actors = None
-        self.frame_count = None
-        self.Rs, self.Qs, self.TRs, self.Ls, self.ITRs = [], [], [], [], []
-        self.best = float("-inf")
-        self.sample_ops = None
-        super(Trainer, self).__init__(config, logger_creator)
-
-    def setup(self, config):
-        self.cfg = Config(**config)
-        self.cfg.update_atoms()
-        set_random_seed(self.cfg.random_seed)
-        print(
-            "input args:\n", json.dumps(vars(self.cfg), indent=4, separators=(",", ":"))
-        )
-
-        self.agent = Agent(**config)
-        self.epsilon_schedule = LinearSchedule(
-            1.0, self.cfg.min_eps, self.cfg.exploration_steps
-        )
-        self.actor = Actor(rank=0, **config)
 
         self.frame_count = 0
-        self.best = float("-inf")
-        self.epsilon = 1.0
+        self.writer = SummaryWriter(cfg.logdir)
+        self.num_transitions = cfg.actor.actor_steps * cfg.actor.num_envs
+        self.Ls, self.Rs, self.Qs, self.FLs = [], [], [], []
+        self.data_fetcher = None
 
-    def step(self):
-        fraction_loss = None
-        ce_loss = None
-        tic = time.time()
-
-        transitions, rs, qs, rank, fps, best_ep = self.actor.sample(
-            self.cfg.actor_steps, self.epsilon, self.agent.model
+    def get_data_fetcher(self):
+        data_loader = DataLoaderX(
+            self.replay,
+            batch_size=self.cfg.learner.batch_size,
+            shuffle=True,
+            num_workers=2,
+            pin_memory=True,
         )
-        # Actors
-        if len(transitions) > 0:
-            self.agent.replay.extend(transitions)
-        if len(best_ep) > 0:
-            self.agent.replay.extend_ep_best(best_ep)
+        data_fetcher = DataPrefetcher(data_loader, self.cfg.device.value)
+        return data_fetcher
 
-        self.epsilon = self.epsilon_schedule(self.cfg.actor_steps * self.cfg.num_envs)
-        self.frame_count += self.cfg.actor_steps * self.cfg.num_envs
+    def step(self, transitions, returns, qmax):
 
-        self.Rs += rs
-        self.Qs += qs
+        self.Qs.extend(qmax)
+        self.Rs.extend(returns)
+        self.replay.extend(transitions)
+        self.frame_count += self.num_transitions
+
         # Start training at
-        if len(self.agent.replay) > self.cfg.start_training_step:
-            data = [self.agent.train_step() for _ in range(self.cfg.agent_train_steps)]
-            if self.cfg.algo in ["fqf"]:
-                fraction_loss = (
-                    torch.stack([x["fraction_loss"] for x in data]).mean().item()
-                )
-            if self.cfg.best_ep:
-                ce_loss = torch.stack([x["ce_loss"] for x in data]).mean().item()
+        if len(self.replay) > self.cfg.trainer.training_start_steps:
+            for _ in range(self.cfg.learner.learner_steps):
+                try:
+                    data = self.data_fetcher.next()
+                except (StopIteration, AttributeError):
+                    self.data_fetcher = self.get_data_fetcher()
+                    data = self.data_fetcher.next()
+                frames, actions, rewards, terminals, priorities, indices = map(lambda x: x.float(), data)
+                probs = priorities / self.replay.priority.sum().item()
+                weights = (self.replay.top * probs).pow(-self.replay.beta)
+                weights = weights / weights.max().add(1e-8)
+                data = frames, actions, rewards, terminals, weights, indices
+                result = self.learner.train(data)
+                q_loss = result['q_loss']
+                fraction_loss = result['fraction_loss']
+                indices = result['indices']
 
-            loss = [x["loss"] for x in data]
-            loss = torch.stack(loss)
-            self.Ls += loss.tolist()
-        toc = time.time()
-        self.velocity.append(self.cfg.actor_steps * self.cfg.num_envs / (toc - tic))
+                if self.cfg.replay.policy == ReplayEnum.prioritize:
+                    self.replay.update_priority(indices, priorities=q_loss)
+
+                if q_loss is not None: self.Ls.append(q_loss.mean().item())
+                if fraction_loss is not None: self.FLs.append(fraction_loss.mean().item())
 
         result = dict(
-            game=self.cfg.game,
-            time_past=self._time_total,
-            epsilon=self.epsilon,
-            adam_lr=self.cfg.adam_lr,
             frames=self.frame_count,
-            fraction_loss=fraction_loss if fraction_loss is not None else 0,
-            ce_loss=ce_loss if ce_loss is not None else 0,
-            velocity=np.mean(self.velocity[-20:]) if len(self.velocity) > 0 else 0,
-            speed=self.frame_count / (self._time_total + 1),
-            time_remain=(self.cfg.total_steps - self.frame_count)
-            / ((self.frame_count + 1) / (self._time_total + 1)),
-            loss=np.mean(self.Ls[-20:]) if len(self.Ls) > 0 else 0,
-            ep_reward_test=np.mean(self.ITRs) if len(self.ITRs) > 0 else 0,
-            ep_reward_train=np.mean(self.Rs[-20:]) if len(self.Rs) > 0 else 0,
-            ep_reward_train_max=np.max(self.Rs) if len(self.Rs) > 0 else 0,
-            ep_reward_test_max=np.max(self.TRs) if len(self.TRs) > 0 else 0,
-            qmax=np.mean(self.Qs[-100:]) if len(self.Qs) > 0 else 0,
+            fraction_loss=np.mean(self.FLs[-20:]) if len(self.FLs) > 0 else None,
+            loss=np.mean(self.Ls[-20:]) if len(self.Ls) > 0 else None,
+            return_train=np.mean(self.Rs[-20:]) if len(self.Rs) > 0 else None,
+            return_train_max=np.max(self.Rs) if len(self.Rs) > 0 else None,
+            qmax=np.mean(self.Qs[-100:]) if len(self.Qs) > 0 else None,
         )
         return result
 
-    def save_checkpoint(self, checkpoint_dir):
-        print(f"Iteration {self.training_iteration} testing started")
-        _, rs, qs, rank, fps, _ = self.actor.sample(
-            self.cfg.actor_steps,
-            self.cfg.test_eps,
-            self.agent.model,
-            testing=True,
-            test_episodes=self.cfg.test_episode_per_actor * 2,
-        )
-        ckpt_rs = rs
+    def run(self):
+        trainer_steps = self.cfg.trainer.total_steps // self.num_transitions + 1
 
-        self.ITRs = ckpt_rs
-        self.TRs += ckpt_rs
-        print(
-            f"Iteration {self.training_iteration} test Result(mean|std|max|min|len):"
-            f" {np.mean(ckpt_rs)}\t{np.std(ckpt_rs)}\t{np.max(ckpt_rs)}\t{np.min(ckpt_rs)}\t{len(ckpt_rs)}"
-        )
+        with tqdm(range(trainer_steps)) as t:
+            for _ in t:
+                epsilon = self.epsilon_fn(self.frame_count)
+                transitions, returns, qmax = self.actors.sample(epsilon, self.learner.model.state_dict())
+                result = self.step(transitions, returns, qmax)
+                msg = ""
+                for k, v in result.items():
+                    if v is None:
+                        continue
+                    self.writer.add_scalar(k, v, self.frame_count)
+                    if k in ["frames", "loss", "qmax"] or "return" in k:
+                        msg += f"{k}: {v:.2f} | "
+                t.set_description(msg)
 
-        data_to_save = {
-            "model": self.agent.model.state_dict(),
-            "optim": self.agent.optimizer.state_dict(),
-            "model_target": self.agent.model_target.state_dict(),
-            "Ls": self.Ls,
-            "Rs": self.Rs,
-            "Qs": self.Qs,
-            "TRs": self.TRs,
-            "frame_count": self.frame_count,
-            "ITRs": ckpt_rs,
-            "best": self.best,
-        }
-
-        if np.mean(ckpt_rs) > self.best:
-            self.best = np.mean(ckpt_rs)
-            # torch.save(data_to_save, f'./itr_{self.training_iteration}.pth')
-            torch.save(data_to_save, f"./best.pth")
-
-        return data_to_save
-
-    def load_checkpoint(self, checkpoint):
-        self.agent.model.load_state_dict(checkpoint["model"])
-        self.agent.model_target.load_state_dict(checkpoint["model_target"])
-        self.agent.optimizer.load_state_dict(checkpoint["optim"])
-        self.Ls = checkpoint["Ls"]
-        self.Qs = checkpoint["Qs"]
-        self.Rs = checkpoint["Rs"]
-        self.TRs = checkpoint["TRs"]
-        self.frame_count = checkpoint["frame_count"]
-        self.best = checkpoint["best"]
-        self.epsilon_schedule(self.frame_count)
-
-    def _export_model(self, export_formats, export_dir):
-        if export_formats == [ExportFormat.MODEL]:
-            path = os.path.join(export_dir, "exported_models")
-            torch.save(
-                {
-                    "model": self.agent.model.state_dict(),
-                    "optim": self.agent.optimizer.state_dict(),
-                },
-                path,
-            )
-            return {ExportFormat.MODEL: path}
-        else:
-            raise ValueError("unexpected formats: " + str(export_formats))
-
-    def reset_config(self, new_config):
-        if "adam_lr" in new_config:
-            self.cfg.adam_lr = new_config["adam_lr"]
-            for param_group in self.agent.optimizer.param_groups:
-                param_group["lr"] = new_config["adam_lr"]
-
-        self.config = new_config
-        return True
-
-    def cleanup(self):
-        ray.get([a.close_envs.remote() for a in self.actors])
+        self.actors.close()

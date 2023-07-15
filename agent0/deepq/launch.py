@@ -10,9 +10,9 @@ from dacite import from_dict
 from hydra.core.config_store import ConfigStore
 from omegaconf import OmegaConf
 from agent0.common.atari_wrappers import make_atari
-import agent0.deepq.new_agent as agents
-from agent0.deepq.new_config import ExpConfig
-from agent0.deepq.new_trainer import Trainer
+import agent0.deepq.agent as agents
+from agent0.deepq.config import ExpConfig
+from agent0.deepq.trainer import Trainer
 
 
 class TrainerNode(Trainer):
@@ -63,9 +63,7 @@ class ActorNode:
         toc = time.time()
         fps = len(transition) / (toc - tic)
         self.step_count += 1
-        logging.info(
-            f"Rank {self.rank} -- Step: {self.step_count:7d} | FPS: {fps:.2f} | Avg Return: {np.mean(returns):.2f}"
-        )
+        logging.info(f"Rank {self.rank} -- Step: {self.step_count:7d} | FPS: {fps:.2f} | Avg Return: {np.mean(returns):.2f}")
         return self.rank, (transition, returns, qmax)
 
     def close(self):
