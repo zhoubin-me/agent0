@@ -142,6 +142,7 @@ class ActorNode:
         tic = time.time()
         frames = 0
         video = []
+        self.actor.reset()
         while len(rs) < self.cfg.trainer.test_episodes:
             images, returns, _ = self.actor.sample(
                 self.cfg.actor.test_eps, model_dict, test=True

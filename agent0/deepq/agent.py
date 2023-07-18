@@ -37,6 +37,9 @@ class Actor:
             action_random,
         )
         return action, qt_max.mean().item()
+    
+    def reset(self):
+        self.obs, _ = self.envs.reset()
 
     def sample(self, epsilon, state_dict=None, test=False):
         if state_dict is not None:

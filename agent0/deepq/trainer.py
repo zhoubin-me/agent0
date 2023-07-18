@@ -122,6 +122,7 @@ class Trainer:
         rs = []
         self.logger.info("Testing ... ")
         video = []
+        self.actors[0].reset()
         while len(rs) < self.cfg.trainer.test_episodes:
             images, returns, _ = self.actors[0].sample(
                 self.cfg.actor.test_eps, test=True
