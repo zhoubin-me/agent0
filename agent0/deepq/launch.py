@@ -35,11 +35,11 @@ class TrainerNode(Trainer):
             for actor in self.actors[1:]
         ]
 
-        tasks.append(
-            self.actors[0].futures.test(
-                self.frame_count, self.learner.model.state_dict()
-            )
-        )
+        # tasks.append(
+        #     self.actors[0].futures.test(
+        #         self.frame_count, self.learner.model.state_dict()
+        #     )
+        # )
 
         step = 0
         while step < trainer_steps:
@@ -49,7 +49,8 @@ class TrainerNode(Trainer):
             rank, (transitions_or_video, returns, qmax_or_frames) = tasks.pop(
                 0
             ).result()
-            if rank > 0:
+            if True:
+            # if rank > 0:
                 qmax = qmax_or_frames
                 transitions = transitions_or_video
                 sample_eps = self.epsilon_fn(self.frame_count)
@@ -87,8 +88,8 @@ class TrainerNode(Trainer):
                     wandb.log({"test_video": wandb.Video(video, fps=60, format="mp4"), "frame": test_frames})
 
                 continue
-
-            if rank > 0 and self.frame_count > self.cfg.trainer.training_start_steps:
+            if True and self.frame_count > self.cfg.trainer.training_start_steps:
+            # if rank > 0 and self.frame_count > self.cfg.trainer.training_start_steps:
                 fps = self.num_transitions / (time.time() - tic)
                 result.update(fps=fps)
             self.logging(result)
