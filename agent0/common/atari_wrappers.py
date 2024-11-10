@@ -1,13 +1,11 @@
 from collections import deque
 
 import gymnasium as gym
-import ale_py
 
 import numpy as np
 from gymnasium.core import Env
-from gymnasium.wrappers import (AtariPreprocessing, FrameStackObservation,
+from gymnasium.wrappers import (AtariPreprocessing, FrameStack,
                                 RecordEpisodeStatistics)
-gym.register_envs(ale_py)
 
 
 class ClipRewardEnv(gym.RewardWrapper):
@@ -61,7 +59,7 @@ class EpisodicLifeEnv(gym.Wrapper):
 def make_atari(env_id, num_envs, episode_life=True):
     wrappers = [
         lambda x: AtariPreprocessing(x, terminal_on_life_loss=False),
-        lambda x: FrameStackObservation(x, 4),
+        lambda x: FrameStack(x, 4),
         lambda x: EpisodicLifeEnv(x) if episode_life else x,
         FireResetEnv,
         RecordEpisodeStatistics,

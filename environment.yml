@@ -177,6 +177,7 @@ dependencies:
       - contourpy==1.1.0
       - crashtest==0.4.1
       - cycler==0.11.0
+      - tensorflow==2.8.4
       - cython==0.29.36
       - dacite==1.8.1
       - dataclasses==0.6
@@ -224,9 +225,6 @@ dependencies:
       - isoduration==20.11.0
       - isort==5.12.0
       - jaraco-classes==3.2.3
-      - jax==0.3.24
-      - jax-jumpy==1.0.0
-      - jaxlib==0.3.24
       - jedi==0.18.2
       - jeepney==0.8.0
       - json5==0.9.14
