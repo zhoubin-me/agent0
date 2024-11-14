@@ -5,8 +5,7 @@ from dataclasses import asdict
 
 import numpy as np
 from einops import repeat
-from tensorboardX import SummaryWriter
-
+from torch.utils.tensorboard import SummaryWriter
 import agent0.deepq.agent as agents
 import wandb
 from agent0.common.atari_wrappers import make_atari
