@@ -6,6 +6,7 @@ from dataclasses import asdict
 import numpy as np
 from einops import repeat
 from torch.utils.tensorboard import SummaryWriter
+
 import agent0.deepq.agent as agents
 import wandb
 from agent0.common.atari_wrappers import make_atari
@@ -170,8 +171,8 @@ class Trainer:
     def run(self):
         trainer_steps = self.cfg.trainer.total_steps // self.num_transitions + 1
         for step in range(trainer_steps):
-            if step % self.cfg.trainer.test_freq == 0:
-                self.test()
+            # if step % self.cfg.trainer.test_freq == 0:
+            #     self.test()
             tic = time.time()
             epsilon = self.epsilon_fn(self.frame_count)
             transitions, returns, qmax = self.actors[1].sample(epsilon)

@@ -11,11 +11,7 @@ git clone https://github.com/zhoubin-me/agent0
 cd agent0
 pip install uv
 uv sync
-# pip install tensorflow==2.8.4
-# pip install protobuf==3.20.3
 ```
-**Note**: DO NOT use ```pip install -r requirements.txt``` which will create a very slow environment. Package version matches for these two, but reason unknown for slow environment.
-
 
 ## Hardware Requirements:
 - A GPU

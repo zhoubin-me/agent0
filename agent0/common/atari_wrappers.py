@@ -1,6 +1,7 @@
 from collections import deque
 
 import gymnasium as gym
+
 import numpy as np
 from gymnasium.core import Env
 from gymnasium.wrappers import (AtariPreprocessing, FrameStack,

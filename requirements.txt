@@ -1,0 +1,15 @@
+gymnasium[atari,accept-rom-license,other]
+prefetch_generator
+lz4
+tensorboard
+hydra-core
+dacite
+einops
+dm-launchpad
+numpy==1.25.0
+wandb
+ale-py
+shortuuid
+gitpython
+torch
+torchvision
