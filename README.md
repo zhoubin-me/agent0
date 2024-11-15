@@ -7,11 +7,10 @@ AgentZero is a Lightweight Distributed Reinforcement Learning Framework based on
 
 ## Installation
 ```bash
-sudo apt install libgl1-mesa-glx
-git clone https://github.com/zhoubin-me/AgentZero
-cd AgentZero
-conda env create -f environment.yml -n agent0
-conda activate agent0
+git clone https://github.com/zhoubin-me/agent0
+cd agent0
+pip install uv
+uv sync
 # pip install tensorflow==2.8.4
 # pip install protobuf==3.20.3
 ```
