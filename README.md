@@ -33,23 +33,23 @@ Other implementations usually fall below 100 FPS after exploration. The bottle n
 ## Run
 Single thread run:
 ```bash
-python -m agent0.deepq.main
+uv run python -m agent0.deepq.main
 ```
 
 Launchpad mulit-thread run:
 ```bash
-python -m agent.deepq.launch
+uv run python -m agent.deepq.launch
 ```
 
 Specify game:
 ```bash
-python -m agent0.deepq.launch env_id=enduro
+uv run python -m agent0.deepq.launch env_id=enduro
 ```
 
 Specify algorithms:
 ```bash
 # Our current implementation includes: c51, qr, mdqn, iqr, fqf
-python -m agent0.deepq.launch learner.algo=c51
+uv run python -m agent0.deepq.launch learner.algo=c51
 ```
 
 <!-- 
