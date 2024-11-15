@@ -1,0 +1,23 @@
+[project]
+name = "agent0"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "ale-py>=0.10.1",
+    "dacite>=1.8.1",
+    "dm-launchpad[tensorflow]>=0.5.2",
+    "einops>=0.8.0",
+    "gymnasium==0.28.1",
+    "hydra-core>=1.3.2",
+    "lz4>=4.3.3",
+    "numpy==1.25.0",
+    "opencv-python>=4.8.1.78",
+    "prefetch-generator>=1.0.3",
+    "shortuuid>=1.0.13",
+    "tensorboard>=2.8.0",
+    "tensorflow==2.8.4",
+    "torch>=2.5.1",
+    "wandb[media]>=0.18.7",
+]

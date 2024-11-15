@@ -6,7 +6,7 @@ import numpy as np
 from gymnasium.core import Env
 from gymnasium.wrappers import (AtariPreprocessing, FrameStack,
                                 RecordEpisodeStatistics)
-
+import ale_py
 
 class ClipRewardEnv(gym.RewardWrapper):
     def __init__(self, env):
