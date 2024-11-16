@@ -14,17 +14,17 @@ from dataclasses import dataclass, asdict
 import logging
 import wandb
 import os
-import sys
 import time
 import tyro
 from tqdm import tqdm
 
 @dataclass
 class Config:
-    env_id = 'breakout'
-    num_envs = 16
-    act_dim = None
-    obs_shape = None
+    env_id: str = 'breakout'
+    num_envs: int = 16
+
+    use_wandb: bool = False
+    logdir: str = 'logdir'
 
     num_envs: int = 16
     sample_steps: int = 80
@@ -41,8 +41,8 @@ class Config:
     exploration_steps: int = int(1e6)
     replay_size: int = int(1e6)
 
-    use_wandb = False
-    logdir = 'logdir'
+    act_dim = None
+    obs_shape = None
 
 def init(m, gain=1.0):
     if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
@@ -241,7 +241,7 @@ class Trainer:
             self.buffer.extend(transitions)
             pbar.update(len(transitions))
         pbar.close()
-        
+
         # Main training loop
         returns = []
         losses = []

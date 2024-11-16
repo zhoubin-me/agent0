@@ -14,6 +14,7 @@ dependencies = [
     "lz4>=4.3.3",
     "opencv-python>=4.10.0.84",
     "prefetch-generator>=1.0.3",
+    "ruff>=0.7.4",
     "shortuuid>=1.0.13",
     "tensorflow==2.18.0",
     "torch>=2.5.1",
