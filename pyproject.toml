@@ -17,6 +17,7 @@ dependencies = [
     "shortuuid>=1.0.13",
     "tensorflow==2.18.0",
     "torch>=2.5.1",
+    "tyro>=0.8.14",
     "wandb[media]>=0.18.7",
 ]
 

@@ -1,25 +1,16 @@
 from collections import deque
 
 import gymnasium as gym
+import ale_py
+import numpy as np
 
-import numpy as np
-from gymnasium.core import Env
-import numpy as np
 from gymnasium.wrappers import (
     AtariPreprocessing, 
     FrameStackObservation,
     TransformReward,
     RecordEpisodeStatistics)
 
-import ale_py
 
-class ClipRewardEnv(gym.RewardWrapper):
-    def __init__(self, env):
-        gym.RewardWrapper.__init__(self, env)
-
-    def reward(self, reward):
-        """Bin reward to {+1, 0, -1} by its sign."""
-        return np.sign(reward)
 
 
 class FireResetEnv(gym.Wrapper):
