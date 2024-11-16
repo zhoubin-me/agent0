@@ -1,21 +1,14 @@
 from collections import deque
 
 import gymnasium as gym
-
-import numpy as np
-from gymnasium.core import Env
-from gymnasium.wrappers import (AtariPreprocessing, FrameStack,
-                                RecordEpisodeStatistics)
 import ale_py
 
-class ClipRewardEnv(gym.RewardWrapper):
-    def __init__(self, env):
-        gym.RewardWrapper.__init__(self, env)
-
-    def reward(self, reward):
-        """Bin reward to {+1, 0, -1} by its sign."""
-        return np.sign(reward)
-
+import numpy as np
+from gymnasium.wrappers import (
+    AtariPreprocessing, 
+    FrameStackObservation,
+    TransformReward,
+    RecordEpisodeStatistics)
 
 class FireResetEnv(gym.Wrapper):
     def __init__(self, env: gym.Env):
@@ -43,12 +36,11 @@ class EpisodicLifeEnv(gym.Wrapper):
         # check current lives, make loss of life terminal,
         # then update lives to handle bonus lives
         new_lives = self.env.unwrapped.ale.lives()
-
         # for Qbert sometimes we stay in lives == 0 condition for a few frames
         # so it's important to keep lives > 0, so that we only reset once
         # the environment advertises done.
         life_loss = old_lives > new_lives > 0
-        info["life_loss"] = life_loss
+        info["lifeloss"] = life_loss
         if life_loss and self.env.unwrapped.get_action_meanings()[1] == "FIRE":
             for a in range(3):
                 obs, _, _, _, step_info = self.env.step(a)
@@ -56,14 +48,15 @@ class EpisodicLifeEnv(gym.Wrapper):
         return obs, reward, done, trunc, info
 
 
-def make_atari(env_id, num_envs, episode_life=True):
-    wrappers = [
-        lambda x: AtariPreprocessing(x, terminal_on_life_loss=False),
-        lambda x: FrameStack(x, 4),
-        lambda x: EpisodicLifeEnv(x) if episode_life else x,
-        FireResetEnv,
-        RecordEpisodeStatistics,
-        ClipRewardEnv,
-    ]
-    envs = gym.make_vec(f"{env_id}NoFrameskip-v4", num_envs, wrappers=wrappers)
+def make_atari(env_id: str, num_envs: int, episode_life=True):
+    def trunk():
+        x = gym.make(f'{env_id.capitalize()}NoFrameskip-v4')
+        x = AtariPreprocessing(x, terminal_on_life_loss=False)
+        x = FrameStackObservation(x, 4)
+        x = EpisodicLifeEnv(x)
+        x = FireResetEnv(x)
+        x = RecordEpisodeStatistics(x)
+        x = TransformReward(x, lambda r: np.sign(r))
+        return x
+    envs = gym.vector.AsyncVectorEnv([lambda: trunk() for _ in range(num_envs)])
     return envs

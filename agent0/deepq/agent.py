@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from einops import rearrange
 from lz4.block import compress
 
-from agent0.common.atari_wrappers import make_atari
+from agent0.common.atari_env import make_atari
 from agent0.deepq.config import AlgoEnum, ExpConfig
 from agent0.deepq.model import DeepQNet
 
@@ -54,13 +54,8 @@ class Actor:
             action, qt_max = self.act(epsilon)
             obs_next, reward, terminal, truncated, info = self.envs.step(action)
             self.steps += 1
-            done = (
-                np.logical_or(terminal, info["life_loss"])
-                if "life_loss" in info
-                else terminal
-            )
+            done = np.logical_or(terminal, info["lifeloss"])
             done = np.logical_and(done, np.logical_not(truncated))
-
             self.tracker.append((self.obs, action, reward, done))
             r_nstep = np.zeros_like(reward)
             d_nstep = np.zeros_like(reward, dtype=np.bool_)
@@ -82,10 +77,10 @@ class Actor:
 
             self.obs = obs_next
             qs.append(qt_max)
-            if "final_info" in info:
-                final_infos = info["final_info"][info["_final_info"]]
-                for stat in final_infos:
-                    rs.append(stat["episode"]["r"][0])
+            if len(info['score'][np.logical_or(terminal, truncated)]) > 0:
+                rs += info['score'][np.logical_or(terminal, truncated)].tolist()
+            # if "episode" in info:
+            #     rs += info["episode"]['r'][info["_episode"]].tolist()
 
         return data, rs, qs
 

@@ -7,92 +7,12 @@ import random
 from collections import deque
 from gymnasium.utils import seeding
 import cv2
-from lz4.block import compress
-
-class LazyFrames:
-    __slots__ = ("frame_shape", "dtype", "shape", "lz4_compress", "_frames")
-
-    def __init__(self, frames: list, lz4_compress: bool = False):
-        self.frame_shape = tuple(frames[0].shape)
-        self.shape = (len(frames),) + self.frame_shape
-        self.dtype = frames[0].dtype
-        frames = [compress(frame) for frame in frames]
-        self._frames = frames
-        self.lz4_compress = lz4_compress
-
-    def __array__(self, dtype=None):
-        arr = self[:]
-        if dtype is not None:
-            return arr.astype(dtype)
-        return arr
-
-    def __len__(self):
-        return self.shape[0]
-
-    def __getitem__(self, int_or_slice):
-        if isinstance(int_or_slice, int):
-            return self._check_decompress(self._frames[int_or_slice])  # single frame
-        return np.stack(
-            [self._check_decompress(f) for f in self._frames[int_or_slice]], axis=0
-        )
-
-    def __eq__(self, other):
-        return self.__array__() == other
-
-    def _check_decompress(self, frame):
-        if self.lz4_compress:
-            from lz4.block import decompress
-
-            return np.frombuffer(decompress(frame), dtype=self.dtype).reshape(
-                self.frame_shape
-            )
-        return frame
-
-
-class FrameStack(gym.ObservationWrapper, gym.utils.RecordConstructorArgs):
-    def __init__(
-        self,
-        env: gym.Env,
-        num_stack: int,
-        lz4_compress: bool = False,
-    ):
-        gym.utils.RecordConstructorArgs.__init__(
-            self, num_stack=num_stack, lz4_compress=lz4_compress
-        )
-        gym.ObservationWrapper.__init__(self, env)
-
-        self.num_stack = num_stack
-        self.lz4_compress = lz4_compress
-
-        self.frames = deque(maxlen=num_stack)
-
-        low = np.repeat(self.observation_space.low[np.newaxis, ...], num_stack, axis=0)
-        high = np.repeat(
-            self.observation_space.high[np.newaxis, ...], num_stack, axis=0
-        )
-        self.observation_space = spaces.Box(
-            low=low, high=high, dtype=self.observation_space.dtype
-        )
-
-    def observation(self, observation):
-        assert len(self.frames) == self.num_stack, (len(self.frames), self.num_stack)
-        return LazyFrames(list(self.frames), self.lz4_compress)
-
-    def step(self, action):
-        observation, reward, terminated, truncated, info = self.env.step(action)
-        self.frames.append(observation)
-        return self.observation(None), reward, terminated, truncated, info
-
-    def reset(self, **kwargs):
-        obs, info = self.env.reset(**kwargs)
-        [self.frames.append(obs) for _ in range(self.num_stack)]
-        return self.observation(None), info
-
 
 class AtariEnv(gym.Env):
     def __init__(self,
                  game: str,
-                 max_frames=108_000, 
+                 max_frames=108_000,
+                 frame_stack=4,
                  frame_skip=4):
         self.ale = ale_py.ALEInterface()
         self.ale.setFloat("repeat_action_probability", 0.0)  # Set deterministic actions
@@ -104,13 +24,14 @@ class AtariEnv(gym.Env):
         self.action_space = spaces.Discrete(len(self.action_set))
         self.observation_space = spaces.Box(
             low=0, high=255,
-            shape=(84, 84),
+            shape=(4, 84, 84),
             dtype=np.uint8)
         
         self.frame_skip = frame_skip
+        self.frame_stack = frame_stack
         self.firereset = ale_py.Action.FIRE in self.action_set
-
         self.screen_buffer = np.zeros((2, *self.ale.getScreenDims()), dtype=np.uint8)
+        self.frame_buffer = deque([self._get_obs()]*frame_stack, maxlen=frame_stack)
         self.lives = self.ale.lives()
         self.score = 0
 
@@ -134,13 +55,13 @@ class AtariEnv(gym.Env):
 
         
         if self.firereset:
-            for _ in range(4):
-                self.ale.act(ale_py.Action.FIRE, 1.0)
+            for a in range(3):
+                self.ale.act(self.action_set[a], 1.0)
 
         if self.ale.game_over():
             self.reset()
-
-        return self._get_obs(), self._get_info()
+        self.frame_buffer = deque([self._get_obs()]*self.frame_stack, maxlen=self.frame_stack)
+        return self._get_frames(), self._get_info()
         
     def step(self, action):
         reward = 0
@@ -151,10 +72,12 @@ class AtariEnv(gym.Env):
             if self.ale.game_over():
                 break
         self.score += reward
+        reward_reshaped = np.sign(reward) * np.log(1 + np.abs(reward))
+        self.frame_buffer.append(self._get_obs())
 
         terminal = self.ale.game_over()
         truncated = self.ale.game_truncated()
-        return self._get_obs(), reward, terminal, truncated, self._get_info()
+        return self._get_frames(), reward_reshaped, terminal, truncated, self._get_info()
         
 
     def _get_info(self):
@@ -166,13 +89,17 @@ class AtariEnv(gym.Env):
     def _get_obs(self):
         return cv2.resize(np.max(self.screen_buffer, axis=0), (84, 84))
 
-
+    def _get_frames(self):
+        return np.array(self.frame_buffer)
 
 def make_atari(env_id, num_envs):
     def trunk():
         env = AtariEnv(env_id.lower())
-        env = FrameStack(env, 4, lz4_compress=True)
         return env
     envs = gym.vector.AsyncVectorEnv([lambda: trunk() for _ in range(num_envs)])
     return envs
 
+if __name__ == '__main__':
+    envs = make_atari('breakout', 3)
+    obs = envs.reset()
+    breakpoint()
