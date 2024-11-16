@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from einops import rearrange
 from lz4.block import compress
 
-from agent0.common.atari_env import make_atari
+from agent0.common.atari_wrappers import make_atari
 from agent0.deepq.config import AlgoEnum, ExpConfig
 from agent0.deepq.model import DeepQNet
 
@@ -77,10 +77,10 @@ class Actor:
 
             self.obs = obs_next
             qs.append(qt_max)
-            if len(info['score'][np.logical_or(terminal, truncated)]) > 0:
-                rs += info['score'][np.logical_or(terminal, truncated)].tolist()
-            # if "episode" in info:
-            #     rs += info["episode"]['r'][info["_episode"]].tolist()
+            # if len(info['score'][np.logical_or(terminal, truncated)]) > 0:
+            #     rs += info['score'][np.logical_or(terminal, truncated)].tolist()
+            if "episode" in info:
+                rs += info["episode"]['r'][info["_episode"]].tolist()
 
         return data, rs, qs
 

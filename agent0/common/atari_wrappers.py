@@ -56,6 +56,7 @@ def make_atari(env_id: str, num_envs: int, episode_life=True):
         x = EpisodicLifeEnv(x)
         x = FireResetEnv(x)
         x = RecordEpisodeStatistics(x)
+        # x = TransformReward(x, lambda r: np.sign(r) * np.log(1 + np.abs(r)))
         x = TransformReward(x, lambda r: np.sign(r))
         return x
     envs = gym.vector.AsyncVectorEnv([lambda: trunk() for _ in range(num_envs)])
