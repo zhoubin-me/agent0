@@ -316,12 +316,12 @@ class Trainer:
             wandb.log({
                 'steps': self.steps,
                 f'qvals/{prefix}_mean': qvals_mean,
-                'qvals/{prefix}_max': qvals_max,
-                'losses/{prefix}_mean': losses_mean,
-                'losses/{prefix}_max': losses_max,
-                'returns/{prefix}_mean': returns_mean,
-                'returns/{prefix}_max': returns_max,
-                'returns/{prefix}_count': len(returns),
+                f'qvals/{prefix}_max': qvals_max,
+                f'losses/{prefix}_mean': losses_mean,
+                f'losses/{prefix}_max': losses_max,
+                f'returns/{prefix}_mean': returns_mean,
+                f'returns/{prefix}_max': returns_max,
+                f'returns/{prefix}_count': len(returns),
             })
 
         # Log to logger
