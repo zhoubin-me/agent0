@@ -42,6 +42,5 @@ class ActorNode:
             if self.courier.actor_should_sample():
                 self.actor.sample()
 
-    def sync(self):
         
 
