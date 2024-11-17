@@ -30,7 +30,7 @@ class Config:
     sample_steps: int = 80
     min_eps: float = 0.01
     test_eps: float = 0.001
-    test_steps: int = 1000
+    test_steps: int = 500
     test_freq: int = 750
 
     discount: float = 0.99

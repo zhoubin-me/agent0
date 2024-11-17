@@ -10,6 +10,8 @@ AgentZero is a Lightweight Distributed Reinforcement Learning Framework based on
 git clone https://github.com/zhoubin-me/agent0
 cd agent0
 pip install uv
+uv python install 3.12
+uv venv --python 3.12
 uv sync
 ```
 
