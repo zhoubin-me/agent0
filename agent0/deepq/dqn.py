@@ -20,7 +20,7 @@ from tqdm import tqdm
 
 @dataclass
 class Config:
-    env_id: str = 'breakout'
+    game: str = 'breakout'
     num_envs: int = 16
 
     use_wandb: bool = False
@@ -93,7 +93,7 @@ class NatureCNN(nn.Module):
 class Actor:
     def __init__(self, cfg: Config, model):
         self.cfg = cfg
-        self.envs = make_atari(cfg.env_id, cfg.num_envs)
+        self.envs = make_atari(cfg.game, cfg.num_envs)
         self.obs, _ = self.envs.reset()
         self.model = model
 
@@ -339,7 +339,7 @@ class Trainer:
 
 def main():
     cfg = tyro.cli(Config)
-    env = make_atari(cfg.env_id, 1)
+    env = make_atari(cfg.game, 1)
     cfg.obs_shape = env.observation_space.shape[1:]
     cfg.act_dim = env.action_space[0].n
     env.close()
