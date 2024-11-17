@@ -2,7 +2,7 @@ import launchpad as lp
 from agent0.deepq.dqn import Actor, Learner, ReplayBuffer, Config
 import time
 
-class Signal:
+class Shared:
     def __init__(self):
         self.actor_ready = False
         self.actor_should_sample = False
@@ -64,19 +64,30 @@ class LearnerNode:
                 time.sleep(0.01)
 
 
+class TrainerNode:
+    def __init__(self, cfg: Config, signal: Signal, actor, learner, replay):
+        self.cfg = cfg
+        self.signal = signal
+        self.actor = actor
+        self.learner = learner
+        self.replay = replay
+
+
 def make_program(cfg: Config):
     program = lp.Program("dqn")
     signal = Signal()
+
     actor = lp.CourierNode(ActorNode, signal)
     program.add_node(actor, label="actor")
-    
-    program.add_node(lp.CourierNode(LearnerNode, signal), label="actor")
-    program.add_node(lp.CourierNode(ReplayNode, signal), label="actor")
-    program.add_node(lp.CourierNode(ReplayNode, signal), label="actor")
 
+    learner = lp.CourierNode(LearnerNode, signal)
+    program.add_node(learner, label="leaner")
 
-    node = lp.CourierNode(TrainerNode, cfg=cfg, actors=actors)
-    program.add_node(node, label="trainer")
+    replay = lp.CourierNode(ReplayNode, signal)
+    program.add_node(replay, label="replay")
+
+    trainer = lp.CourierNode(TrainerNode, cfg=cfg, actors=actors)
+    program.add_node(trainer, label="trainer")
     return program
         
 

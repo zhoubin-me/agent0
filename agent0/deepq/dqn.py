@@ -17,15 +17,16 @@ import wandb
 import time
 from tqdm import tqdm
 import os
-
+import mediapy
 
 @dataclass
 class Config:
     game: str = 'Breakout'
     num_envs: int = 16
+    logdir: str = 'logdir'
 
     use_tb_wandb: bool = True
-    logdir: str = 'logdir'
+    record_video: bool = True
     exp_name = None
 
     num_envs: int = 16
@@ -34,7 +35,7 @@ class Config:
     test_eps: float = 0.001
     test_max_steps: int = 450
     test_rs_len: int = 32
-    test_freq: int = 80
+    test_freq: int = 160
 
     discount: float = 0.99
     batch_size: int = 512
@@ -131,7 +132,7 @@ class Actor:
                     frames = lz4.block.compress(frames)
                     transitions.append((frames, at, rt, dt))
             else:
-                transitions.append(obs_next[0])
+                transitions.append(obs_next[0][-1])
 
             self.obs = obs_next
             qs.append(qt_max)
@@ -289,25 +290,25 @@ class Trainer:
     def test(self):
         rss = []
         qss = []
-        videos = []
+        video = []
         pbar = tqdm(total=self.cfg.test_max_steps, desc="Testing")
         for _ in range(self.cfg.test_max_steps):
             frames, rs, qs = self.actor.sample(epsilon=self.cfg.test_eps, test=True)
             rss.extend(rs)
             qss.extend(qs)
-            videos.extend(frames)
+            video.extend(frames)
             pbar.update(1)
-            if len(rss) > self.cfg.test_rs_len:
-                break
+            # if len(rss) > self.cfg.test_rs_len:
+            #     break
         pbar.close()
         logdata = dict(
             qvals=qss,
             loss=[],
             returns=rss
         )
-        self.log(logdata, videos=np.array([videos]), test=True)
+        self.log(logdata, video=video, test=True)
 
-    def log(self, logdata, videos=None, test=False):
+    def log(self, logdata, video=None, test=False):
         if self.cfg.use_tb_wandb and self.writer is None:
             wandb.init(
                 project="dqn-atari", 
@@ -333,17 +334,18 @@ class Trainer:
         self.logger.info(logstr)
         if test:
             self.logger.info("=" * 100)
+
         data_stat.update(steps=self.steps-1)
         if self.cfg.use_tb_wandb:
             wandb.log(data_stat)
-            if videos is not None:
-                wandb.log({"video": wandb.Video(videos, fps=30)}, step=self.steps)
-
             for k, v in logdata.items():
                 if len(v) > 0:
                     self.writer.add_histogram(k, np.array(v), self.steps)
-            if videos is not None:
-                self.writer.add_video("video", videos, self.steps)
+            if self.cfg.record_video and video is not None:
+                timestr = time.strftime("%Y%m%d-%H%M%S")
+                video_path = f"/tmp/{self.cfg.exp_name}-{timestr}.mp4"
+                mediapy.write_video(video_path, video, fps=15)
+                wandb.log({"video": wandb.Video(video_path)}, step=self.steps)
 
 def main():
     from wonderwords import RandomWord
