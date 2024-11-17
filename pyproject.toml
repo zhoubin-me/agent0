@@ -20,6 +20,7 @@ dependencies = [
     "torch>=2.5.1",
     "tyro>=0.8.14",
     "wandb[media]>=0.18.7",
+    "wonderwords>=2.2.0",
 ]
 
 [tool.uv.sources]

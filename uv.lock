@@ -38,6 +38,7 @@ dependencies = [
     { name = "torch", marker = "python_full_version >= '3.12'" },
     { name = "tyro", marker = "python_full_version >= '3.12'" },
     { name = "wandb", extra = ["media"], marker = "python_full_version >= '3.12'" },
+    { name = "wonderwords", marker = "python_full_version >= '3.12'" },
 ]
 
 [package.metadata]
@@ -57,6 +58,7 @@ requires-dist = [
     { name = "torch", specifier = ">=2.5.1" },
     { name = "tyro", specifier = ">=0.8.14" },
     { name = "wandb", extras = ["media"], specifier = ">=0.18.7" },
+    { name = "wonderwords", specifier = ">=2.2.0" },
 ]
 
 [[package]]
@@ -1641,6 +1643,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/e7/52/fd4516fb8f7d11a08e3f9cd69eb1558f098ab67e79f32d920c4974ee550f/wheel-0.45.0.tar.gz", hash = "sha256:a57353941a3183b3d5365346b567a260a0602a0f8a635926a7dede41b94c674a", size = 107426 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/92/81/65ae90d584a73ca976d8f1eb83e2f58447a4055a9fb3ae69b28721070bdf/wheel-0.45.0-py3-none-any.whl", hash = "sha256:52f0baa5e6522155090a09c6bd95718cc46956d1b51d537ea5454249edb671c7", size = 72497 },
+]
+
+[[package]]
+name = "wonderwords"
+version = "2.2.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f3/ed/d5f4336a7b1b416d5c502a6ed323f02acdb5e67467ef8f5e80ea6617fe3e/wonderwords-2.2.0.tar.gz", hash = "sha256:0b7ec6f591062afc55603bfea71463afbab06794b3064d9f7b04d0ce251a13d0", size = 50579 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b4/a4/6a7705c6e17de71e45782a0284e06691f85350adb80b1dea9c027c07f024/wonderwords-2.2.0-py3-none-any.whl", hash = "sha256:65fc665f1f5590e98f6d9259414ea036bf1b6dd83e51aa6ba44473c99ca92da1", size = 44970 },
 ]
 
 [[package]]

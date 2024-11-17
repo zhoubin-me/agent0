@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.utils.tensorboard import SummaryWriter
 
 from collections import deque
 from copy import deepcopy
@@ -13,10 +14,10 @@ import random
 from dataclasses import dataclass, asdict
 import logging
 import wandb
-import os
 import time
-import tyro
 from tqdm import tqdm
+import os
+
 
 @dataclass
 class Config:
@@ -24,7 +25,9 @@ class Config:
     num_envs: int = 16
 
     use_wandb: bool = True
+    use_tb: bool = True
     logdir: str = 'logdir'
+    exp_name = None
 
     num_envs: int = 16
     sample_steps: int = 80
@@ -223,11 +226,6 @@ class Trainer:
             else (1.0 - step / cfg.exploration_steps) + cfg.min_eps
         )
 
-        os.makedirs(cfg.logdir, exist_ok=True)
-        # Initialize wandb and logging
-        if cfg.use_wandb:
-            wandb.init(project="dqn-atari", config=asdict(cfg), dir=cfg.logdir)
-            
         # Set up logging
         self.logger = logging.getLogger("dqn")
         self.logger.setLevel(logging.INFO)
@@ -239,12 +237,20 @@ class Trainer:
         ch.setFormatter(formatter)
         self.logger.addHandler(ch)
         
-        timestr = time.strftime("%Y%m%d_%H%M%S")
-        fh = logging.FileHandler(os.path.join(cfg.logdir, f'training_{timestr}.log'))
+        fh = logging.FileHandler(os.path.join(cfg.logdir, f'train.log'))
         fh.setLevel(logging.INFO)
         fh.setFormatter(formatter)
         self.logger.addHandler(fh)
 
+        if cfg.use_tb:
+            self.writer = SummaryWriter(log_dir=cfg.logdir)
+        
+        if self.cfg.use_wandb:
+            wandb.init(
+                project="dqn-atari", 
+                config=asdict(cfg), 
+                dir=cfg.logdir,
+                name=cfg.exp_name)
         
     def train(self):
         # Initial exploration
@@ -256,11 +262,8 @@ class Trainer:
         pbar.close()
 
         # Main training loop
-        returns = []
-        losses = []
-        qvals = []
-        
         while self.steps < self.cfg.total_steps:
+
             # Sample transitions
             if self.steps % (self.cfg.sample_steps * self.cfg.num_envs * self.cfg.test_freq) == 0:
                 self.evaluate()
@@ -268,82 +271,86 @@ class Trainer:
             epsilon = self.epsilon_fn(self.steps)
             transitions, rs, qs = self.actor.sample(epsilon)
             self.buffer.extend(transitions)
-            returns.extend(rs)
-            qvals.extend(qs)
             self.steps += self.cfg.sample_steps * self.cfg.num_envs
             
             # Train
+            losses = []
             for _ in range(self.cfg.learner_steps):
                 batch = self.buffer.sample()
                 loss = self.learner.step(batch)
                 losses.append(loss)
+            
+            logdata = dict(
+                loss=losses,
+                returns=rs,
+                qvals=qs,
+            )
         
-            self.log(qvals=qvals[-20:],
-                     losses = losses[-20:],
-                     returns = returns[-20:],
-                     test=False)
+            self.log(logdata, test=False)
         
         self.evaluate()
         self.actor.envs.close()
     
     def evaluate(self):
-        returns = []
-        qvals = []
+        rss = []
+        qss = []
         pbar = tqdm(total=self.cfg.test_steps, desc="Testing")
         for _ in range(self.cfg.test_steps):
             _, rs, qs = self.actor.sample(epsilon=self.cfg.test_eps, test=True)
-            returns.extend(rs)
-            qvals.extend(qs)
+            rss.extend(rs)
+            qss.extend(qs)
             pbar.update(1)
+            if len(rss) > 10:
+                break
         pbar.close()
-        self.log(qvals=qvals, losses=[0, 0], returns=returns, test=True)
+        self.log(qvals=qss, losses=[], returns=rss, test=True)
 
-    def log(self, qvals, losses, returns, test=False):
-        # Check if enough data exists for statistics
-        if len(qvals) <= 1 or len(losses) <= 1 or len(returns) <= 1:
-            return
-        # Calculate statistics
-        qvals_mean = np.mean(qvals)
-        qvals_max = np.max(qvals)
-        losses_mean = np.mean(losses)
-        losses_max = np.max(losses)
-        returns_mean = np.mean(returns)
-        returns_max = np.max(returns)
-
-        # Log to wandb if enabled
+    def log(self, logdata, videos=None, test=False):
+        data_stat = dict()
         prefix = 'train' if not test else 'test'
-        if self.cfg.use_wandb:
-            wandb.log({
-                'steps': self.steps,
-                f'qvals/{prefix}_mean': qvals_mean,
-                f'qvals/{prefix}_max': qvals_max,
-                f'losses/{prefix}_mean': losses_mean,
-                f'losses/{prefix}_max': losses_max,
-                f'returns/{prefix}_mean': returns_mean,
-                f'returns/{prefix}_max': returns_max,
-                f'returns/{prefix}_count': len(returns),
-            })
+        logstr = f"{prefix} - Steps: {self.steps:7d} | "
+        for k, v in logdata.items():
+            if len(v) > 0:
+                data_stat[f"{prefix}_{k}_mean"] = np.mean(v)
+                data_stat[f"{prefix}_{k}_max"] = np.max(v)
+                data_stat[f"{prefix}_{k}_min"] = np.min(v)
+                logstr += f"{k} - Mean {np.mean(v):.2f}, Max {np.max(v):.2f}"
 
-        # Log to logger
-        prefix = 'Train' if not test else "Test Result====>\n"
-        self.logger.info(
-            f"{prefix} - Steps: {self.steps:7d} | "
-            f"Q-Values - Mean: {qvals_mean:.3f}, Max: {qvals_max:.3f} | "
-            f"Losses - Mean: {losses_mean:.3f}, Max: {losses_max:.3f} | "
-            f"Returns - Mean: {returns_mean:.3f}, Max: {returns_max:.3f} Count: {len(returns)}"
-        )
-
-
-
+        self.logger.info(logstr)
         
+        data_stat.update(steps=self.steps)
+        if self.cfg.use_wandb:
+            wandb.log(data_stat)
+            if videos is not None:
+                wandb.log({"video": wandb.Video(videos, fps=30)}, step=self.steps)
+        
+        if self.cfg.use_tb:
+            for k, v in logdata.items():
+                if len(v) > 0:
+                    self.writer.add_histogram(k, v, self.steps)
+            if videos is not None:
+                self.writer.add_video("video", videos, self.steps)
 
 def main():
+    from wonderwords import RandomWord
+    import tyro
+    import git
+
     cfg = tyro.cli(Config)
     env = make_atari(cfg.game, 1)
     cfg.obs_shape = env.observation_space.shape[1:]
     cfg.act_dim = env.action_space[0].n
     env.close()
-    
+
+
+    timestr = time.strftime("%Y%m%d-%H%M%S")
+    wordstr = "-".join(RandomWord().random_words(2))
+    sha = git.Repo(search_parent_directories=True).head.object.hexsha
+
+    cfg.exp_name = f"{cfg.game}-{wordstr}"
+    cfg.logdir = f"{cfg.logdir}/{cfg.game}-{timestr}-{sha}-{wordstr}"
+    os.makedirs(cfg.logdir, exist_ok=False)
+
     # Create and train agent
     model = NatureCNN(cfg).cuda()
     trainer = Trainer(cfg, model)
