@@ -32,9 +32,9 @@ class Config:
     sample_steps: int = 80
     min_eps: float = 0.01
     test_eps: float = 0.001
-    test_max_steps: int = 500
-    test_rs_len: int = 100
-    test_freq: int = 75
+    test_max_steps: int = 450
+    test_rs_len: int = 32
+    test_freq: int = 80
 
     discount: float = 0.99
     batch_size: int = 512
@@ -280,9 +280,6 @@ class Trainer:
                 qvals=qs,
                 returns=rs,
             )
-
-
-
             self.log(logdata, test=False)
         
         self.test()
@@ -320,17 +317,23 @@ class Trainer:
             self.writer = SummaryWriter(log_dir=self.cfg.logdir)
 
         data_stat = dict()
-        prefix = 'train' if not test else 'test'
-        logstr = f"{prefix} - Steps: {self.steps:7d} | "
+        prefix = 'train' if not test else 'test '
+        logstr = f"{prefix} - Steps: {self.steps-1:7d}"
         for k, v in logdata.items():
             if len(v) > 0:
                 data_stat[f"{k}/{prefix}_mean"] = np.mean(v)
                 data_stat[f"{k}/{prefix}_max"] = np.max(v)
                 data_stat[f"{k}/{prefix}_min"] = np.min(v)
-                logstr += f"{k} - Mean {np.mean(v):.2f}, Max {np.max(v):.2f} | "
+                if k == "returns":
+                    data_stat[f"{k}/{prefix}_count"] = np.min(v)
+                    logstr += f" | {k} - Mean {np.mean(v):5.0f}, Max {np.max(v):5.0f}, Count: {len(v):3d}"
+                else:
+                    logstr += f" | {k} - Mean {np.mean(v):5.2f}, Max {np.max(v):5.2f}"
 
         self.logger.info(logstr)
-        data_stat.update(steps=self.steps)
+        if test:
+            self.logger.info("=" * 100)
+        data_stat.update(steps=self.steps-1)
         if self.cfg.use_tb_wandb:
             wandb.log(data_stat)
             if videos is not None:
