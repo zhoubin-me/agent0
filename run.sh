@@ -1,6 +1,6 @@
-python -m agent0.deepq.run --algo all --game atari7 --exp_name atari_all
+# python -m agent0.deepq.dqn --algo all --game atari7 --exp_name atari_all
 
-python -m agent0.deepq.run --game atari6 --algo dqn --feature_mult 2 --exp_name atari_feature_mult2
+# python -m agent0.deepq.run --game atari6 --algo dqn --feature_mult 2 --exp_name atari_feature_mult2
 # python -m agent0.deepq.run --game atari6 --algo c51 --noisy --prioritize --n_step 3 --exp_name atari_rainbow4
 # python -m agent0.deepq.run --double_q --dueling --prioritize --noisy --algo c51 --n_step 3 --game atari6 --exp_name atari_rainbow
 
@@ -15,3 +15,9 @@ python -m agent0.deepq.run --game atari6 --algo dqn --feature_mult 2 --exp_name 
 # python -m agent0.ddpg.run --algo td3 --game mujoco7 --exp_name mujoco_td3
 
 # python -m agent0.ddpg.run --algo all --game mujoco7 --exp_name mujoco_bench
+
+python -m agent0.deepq.dqn --game breakout
+python -m agent0.deepq.dqn --game name_this_game
+python -m agent0.deepq.dqn --game phoenix
+python -m agent0.deepq.dqn --game double_dunk
+python -m agent0.deepq.dqn --game qbert
