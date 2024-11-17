@@ -29,6 +29,9 @@ class Config:
     num_envs: int = 16
     sample_steps: int = 80
     min_eps: float = 0.01
+    test_eps: float = 0.001
+    test_steps: int = 1000
+    test_freq: int = 750
 
     discount: float = 0.99
     batch_size: int = 512
@@ -111,18 +114,19 @@ class Actor:
         )
         return action, qvals.mean().item()
 
-    def sample(self, epsilon):
+    def sample(self, epsilon, test=False):
         rs, qs, transitions = [], [], []
         for _ in range(self.cfg.sample_steps):
             action, qt_max = self.act(epsilon)
             obs_next, reward, terminal, truncated, info = self.envs.step(action)
-            done = np.logical_or(terminal, truncated)
-            done = np.logical_or(done, info["lifeloss"])
+            if not test:
+                done = np.logical_or(terminal, truncated)
+                done = np.logical_or(done, info["lifeloss"])
 
-            for st, at, rt, dt, st_next in zip(self.obs, action, reward, done, obs_next):
-                frames = np.concat([st, st_next], axis=0)
-                frames = lz4.block.compress(frames)
-                transitions.append((frames, at, rt, dt))
+                for st, at, rt, dt, st_next in zip(self.obs, action, reward, done, obs_next):
+                    frames = np.concat([st, st_next], axis=0)
+                    frames = lz4.block.compress(frames)
+                    transitions.append((frames, at, rt, dt))
 
             self.obs = obs_next
             qs.append(qt_max)
@@ -130,13 +134,17 @@ class Actor:
                 rs += info["episode"]['r'][info["_episode"]].tolist()
         return transitions, rs, qs
 
+    
+    def sync(self, state_dict):
+        self.model.load_state_dict(state_dict)
+
 
 
 
 class Learner:
-    def __init__(self, cfg: Config):
+    def __init__(self, cfg: Config, model):
         self.cfg = cfg
-        self.model = NatureCNN(cfg).cuda()
+        self.model = model
         self.model_target = deepcopy(self.model)
         
         self.optimizer = torch.optim.AdamW(
@@ -145,7 +153,18 @@ class Learner:
             eps=1e-2 / cfg.batch_size
         )
         self.update_steps = 0
-        
+    
+    def train_step(self, batch):
+        obs, actions, rewards, terminals, obs_next = batch
+        with torch.no_grad():
+            next_q = self.model_target(obs_next)
+            next_q, _ = next_q.max(dim=1)
+            target_q = rewards + self.cfg.discount * (1 - terminals) * next_q
+        curr_q = self.model(obs)
+        curr_q = curr_q.gather(1, actions.long().unsqueeze(-1)).squeeze(-1)
+        loss = F.smooth_l1_loss(curr_q, target_q, reduction='sum')
+        return loss
+    
     def step(self, data):
         frames, actions, rewards, terminals = map(
             lambda x: x.cuda().float(), data
@@ -154,15 +173,8 @@ class Learner:
         frames = frames.div(255.0)
         obs, obs_next = torch.split(frames, self.cfg.obs_shape[0], dim=1)
 
-        with torch.no_grad():
-            next_q = self.model_target(obs_next)
-            next_q, _ = next_q.max(dim=1)
-            target_q = rewards + self.cfg.discount * (1 - terminals) * next_q
-            
-        curr_q = self.model(obs)
-        curr_q = curr_q.gather(1, actions.long().unsqueeze(-1)).squeeze(-1)
-        
-        loss = F.smooth_l1_loss(curr_q, target_q, reduction='sum')
+        batch = obs, actions, rewards, terminals, obs_next
+        loss = self.train_step(batch)
         
         self.optimizer.zero_grad()
         loss.backward()
@@ -198,10 +210,11 @@ class ReplayBuffer(Sequence):
                    zip(*transitions))
     
 class Trainer:
-    def __init__(self, cfg: Config):
+    def __init__(self, cfg: Config, model):
         self.cfg = cfg
-        self.learner = Learner(cfg)
-        self.actor = Actor(cfg, self.learner.model)
+        self.model = model
+        self.learner = Learner(cfg, model)
+        self.actor = Actor(cfg, model)
         self.buffer = ReplayBuffer(cfg)
         self.steps = 0
         self.epsilon_fn = (
@@ -246,13 +259,17 @@ class Trainer:
         returns = []
         losses = []
         qvals = []
+        
         while self.steps < self.cfg.total_steps:
             # Sample transitions
+            if self.steps % (self.cfg.sample_steps * self.cfg.num_envs * self.cfg.test_freq) == 0:
+                self.evaluate()
+
             epsilon = self.epsilon_fn(self.steps)
-            transitions, returns, qval = self.actor.sample(epsilon)
+            transitions, rs, qs = self.actor.sample(epsilon)
             self.buffer.extend(transitions)
-            returns.extend(returns)
-            qvals.extend(qval)
+            returns.extend(rs)
+            qvals.extend(qs)
             self.steps += self.cfg.sample_steps * self.cfg.num_envs
             
             # Train
@@ -261,45 +278,59 @@ class Trainer:
                 loss = self.learner.step(batch)
                 losses.append(loss)
         
-            # Log metrics
-            logs = dict(
-                qvals = qvals[-20:],
-                losses = losses[-20:],
-                returns = returns[-20:]
-            )
-            self.log(logs)
+            self.log(qvals=qvals[-20:],
+                     losses = losses[-20:],
+                     returns = returns[-20:],
+                     test=False)
         
+        self.evaluate()
         self.actor.envs.close()
     
-    def log(self, logs):
+    def evaluate(self):
+        returns = []
+        qvals = []
+        pbar = tqdm(total=self.cfg.test_steps, desc="Testing")
+        for _ in range(self.cfg.test_steps):
+            _, rs, qs = self.actor.sample(epsilon=self.cfg.test_eps, test=True)
+            returns.extend(rs)
+            qvals.extend(qs)
+            pbar.update(1)
+        pbar.close()
+        self.log(qvals=qvals, losses=[0, 0], returns=returns, test=True)
+
+    def log(self, qvals, losses, returns, test=False):
         # Check if enough data exists for statistics
-        if len(logs['qvals']) <= 1 or len(logs['losses']) <= 1 or len(logs['returns']) <= 1:
+        if len(qvals) <= 1 or len(losses) <= 1 or len(returns) <= 1:
             return
         # Calculate statistics
-        qvals_mean = np.mean(logs['qvals'])
-        qvals_max = np.max(logs['qvals'])
-        losses_mean = np.mean(logs['losses']) 
-        losses_max = np.max(logs['losses'])
-        returns_mean = np.mean(logs['returns'])
-        returns_max = np.max(logs['returns'])
+        qvals_mean = np.mean(qvals)
+        qvals_max = np.max(qvals)
+        losses_mean = np.mean(losses)
+        losses_max = np.max(losses)
+        returns_mean = np.mean(returns)
+        returns_max = np.max(returns)
 
         # Log to wandb if enabled
+        prefix = 'train' if not test else 'test'
         if self.cfg.use_wandb:
             wandb.log({
                 'steps': self.steps,
-                'qvals/mean': qvals_mean,
-                'qvals/max': qvals_max,
-                'losses/mean': losses_mean,
-                'losses/max': losses_max,
-                'returns/mean': returns_mean,
-                'returns/max': returns_max
+                f'qvals/{prefix}_mean': qvals_mean,
+                'qvals/{prefix}_max': qvals_max,
+                'losses/{prefix}_mean': losses_mean,
+                'losses/{prefix}_max': losses_max,
+                'returns/{prefix}_mean': returns_mean,
+                'returns/{prefix}_max': returns_max,
+                'returns/{prefix}_count': len(returns),
             })
 
         # Log to logger
+        prefix = 'Train' if not test else "Test Result====>\n"
         self.logger.info(
+            f"{prefix} - Steps: {self.steps:7d} | "
             f"Q-Values - Mean: {qvals_mean:.3f}, Max: {qvals_max:.3f} | "
             f"Losses - Mean: {losses_mean:.3f}, Max: {losses_max:.3f} | "
-            f"Returns - Mean: {returns_mean:.3f}, Max: {returns_max:.3f}"
+            f"Returns - Mean: {returns_mean:.3f}, Max: {returns_max:.3f} Count: {len(returns)}"
         )
 
 
@@ -314,7 +345,8 @@ def main():
     env.close()
     
     # Create and train agent
-    trainer = Trainer(cfg)
+    model = NatureCNN(cfg).cuda()
+    trainer = Trainer(cfg, model)
     trainer.train()
 
 

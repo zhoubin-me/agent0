@@ -10,9 +10,6 @@ from gymnasium.wrappers import (
     TransformReward,
     RecordEpisodeStatistics)
 
-
-
-
 class FireResetEnv(gym.Wrapper):
     def __init__(self, env: gym.Env):
         super().__init__(env)
