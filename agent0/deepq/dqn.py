@@ -23,7 +23,7 @@ class Config:
     game: str = 'breakout'
     num_envs: int = 16
 
-    use_wandb: bool = False
+    use_wandb: bool = True
     logdir: str = 'logdir'
 
     num_envs: int = 16
