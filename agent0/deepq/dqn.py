@@ -129,7 +129,6 @@ class Actor:
 
                 for st, at, rt, dt, st_next in zip(self.obs, action, reward, done, obs_next):
                     frames = np.concat([st, st_next], axis=0)
-                    frames = lz4.block.compress(frames)
                     transitions.append((frames, at, rt, dt))
             else:
                 transitions.append(obs_next[0][-1])
@@ -208,7 +207,8 @@ class ReplayBuffer(Sequence):
         return np.array(frames), at, rt, dt
 
     def extend(self, transitions):
-        self.data.extend(transitions)
+        for frames, at, rt, dt in transitions:
+            self.data.append((lz4.block.compress(frames), at, rt, dt))
     
     def sample(self):
         transitions = random.sample(self, self.cfg.batch_size)
@@ -259,8 +259,6 @@ class Trainer:
 
         # Main training loop
         while self.steps < self.cfg.total_steps:
-
-            # Sample transitions
             if self.steps % (self.cfg.sample_steps * self.cfg.num_envs * self.cfg.test_freq) == 1:
                 self.test()
 
@@ -319,14 +317,14 @@ class Trainer:
 
         data_stat = dict()
         prefix = 'train' if not test else 'test '
-        logstr = f"{prefix} - Steps: {self.steps-1:7d}"
+        logstr = f"{prefix} - Steps: {self.steps-1:8d}"
         for k, v in logdata.items():
             if len(v) > 0:
                 data_stat[f"{k}/{prefix}_mean"] = np.mean(v)
                 data_stat[f"{k}/{prefix}_max"] = np.max(v)
                 data_stat[f"{k}/{prefix}_min"] = np.min(v)
                 if k == "returns":
-                    data_stat[f"{k}/{prefix}_count"] = np.min(v)
+                    data_stat[f"{k}/{prefix}_count"] = len(v)
                     logstr += f" | {k} - Mean {np.mean(v):5.0f}, Max {np.max(v):5.0f}, Count: {len(v):3d}"
                 else:
                     logstr += f" | {k} - Mean {np.mean(v):5.2f}, Max {np.max(v):5.2f}"
@@ -334,7 +332,7 @@ class Trainer:
         self.logger.info(logstr)
         if test:
             self.logger.info("=" * 100)
-
+        
         data_stat.update(steps=self.steps-1)
         if self.cfg.use_tb_wandb:
             wandb.log(data_stat)
