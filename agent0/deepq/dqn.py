@@ -35,7 +35,7 @@ class Config:
     test_eps: float = 0.001
     test_max_steps: int = 450
     test_rs_len: int = 32
-    test_freq: int = 160
+    test_freq: int = 320
 
     discount: float = 0.99
     batch_size: int = 512
@@ -298,8 +298,8 @@ class Trainer:
             qss.extend(qs)
             video.extend(frames)
             pbar.update(1)
-            # if len(rss) > self.cfg.test_rs_len:
-            #     break
+            if len(rss) > self.cfg.test_rs_len:
+                break
         pbar.close()
         logdata = dict(
             qvals=qss,
