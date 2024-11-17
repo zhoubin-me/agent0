@@ -49,9 +49,9 @@ class EpisodicLifeEnv(gym.Wrapper):
         return obs, reward, done, trunc, info
 
 
-def make_atari(env_id: str, num_envs: int, episode_life=True):
+def make_atari(game: str, num_envs: int):
     def trunk():
-        x = gym.make(f'{env_id.capitalize()}NoFrameskip-v4')
+        x = gym.make(f'{game}NoFrameskip-v4')
         x = AtariPreprocessing(x, terminal_on_life_loss=False)
         x = FrameStackObservation(x, 4)
         x = EpisodicLifeEnv(x)

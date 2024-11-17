@@ -1,7 +1,7 @@
 
 
-python -m agent0.deepq.dqn --game breakout
-python -m agent0.deepq.dqn --game name_this_game
-python -m agent0.deepq.dqn --game phoenix
-python -m agent0.deepq.dqn --game double_dunk
-python -m agent0.deepq.dqn --game qbert
+python -m agent0.deepq.dqn --game Breakout
+python -m agent0.deepq.dqn --game NameThisGame
+python -m agent0.deepq.dqn --game Phoenix
+python -m agent0.deepq.dqn --game DoubleDunk
+python -m agent0.deepq.dqn --game Qbert
