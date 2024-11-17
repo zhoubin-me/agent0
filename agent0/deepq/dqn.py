@@ -32,8 +32,9 @@ class Config:
     sample_steps: int = 80
     min_eps: float = 0.01
     test_eps: float = 0.001
-    test_steps: int = 500
-    test_freq: int = 750
+    test_max_steps: int = 500
+    test_rs_len: int = 100
+    test_freq: int = 75
 
     discount: float = 0.99
     batch_size: int = 512
@@ -260,7 +261,7 @@ class Trainer:
 
             # Sample transitions
             if self.steps % (self.cfg.sample_steps * self.cfg.num_envs * self.cfg.test_freq) == 1:
-                self.evaluate()
+                self.test()
 
             epsilon = self.epsilon_fn(self.steps)
             transitions, rs, qs = self.actor.sample(epsilon)
@@ -276,28 +277,30 @@ class Trainer:
             
             logdata = dict(
                 loss=losses,
-                returns=rs,
                 qvals=qs,
+                returns=rs,
             )
-        
+
+
+
             self.log(logdata, test=False)
         
-        self.evaluate()
+        self.test()
         self.actor.envs.close()
         wandb.finish()
     
-    def evaluate(self):
+    def test(self):
         rss = []
         qss = []
         videos = []
-        pbar = tqdm(total=self.cfg.test_steps, desc="Testing")
-        for _ in range(self.cfg.test_steps):
+        pbar = tqdm(total=self.cfg.test_max_steps, desc="Testing")
+        for _ in range(self.cfg.test_max_steps):
             frames, rs, qs = self.actor.sample(epsilon=self.cfg.test_eps, test=True)
             rss.extend(rs)
             qss.extend(qs)
             videos.extend(frames)
             pbar.update(1)
-            if len(rss) > 10:
+            if len(rss) > self.cfg.test_rs_len:
                 break
         pbar.close()
         logdata = dict(
@@ -321,9 +324,9 @@ class Trainer:
         logstr = f"{prefix} - Steps: {self.steps:7d} | "
         for k, v in logdata.items():
             if len(v) > 0:
-                data_stat[f"{prefix}_{k}_mean"] = np.mean(v)
-                data_stat[f"{prefix}_{k}_max"] = np.max(v)
-                data_stat[f"{prefix}_{k}_min"] = np.min(v)
+                data_stat[f"{k}/{prefix}_mean"] = np.mean(v)
+                data_stat[f"{k}/{prefix}_max"] = np.max(v)
+                data_stat[f"{k}/{prefix}_min"] = np.min(v)
                 logstr += f"{k} - Mean {np.mean(v):.2f}, Max {np.max(v):.2f} | "
 
         self.logger.info(logstr)
