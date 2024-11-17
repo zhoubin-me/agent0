@@ -21,11 +21,10 @@ import os
 
 @dataclass
 class Config:
-    game: str = 'breakout'
+    game: str = 'Breakout'
     num_envs: int = 16
 
-    use_wandb: bool = True
-    use_tb: bool = True
+    use_tb_wandb: bool = True
     logdir: str = 'logdir'
     exp_name = None
 
@@ -130,6 +129,8 @@ class Actor:
                     frames = np.concat([st, st_next], axis=0)
                     frames = lz4.block.compress(frames)
                     transitions.append((frames, at, rt, dt))
+            else:
+                transitions.append(obs_next[0])
 
             self.obs = obs_next
             qs.append(qt_max)
@@ -219,7 +220,7 @@ class Trainer:
         self.learner = Learner(cfg, model)
         self.actor = Actor(cfg, model)
         self.buffer = ReplayBuffer(cfg)
-        self.steps = 0
+        self.steps = 1
         self.epsilon_fn = (
             lambda step: cfg.min_eps
             if step > cfg.exploration_steps
@@ -242,15 +243,8 @@ class Trainer:
         fh.setFormatter(formatter)
         self.logger.addHandler(fh)
 
-        if cfg.use_tb:
-            self.writer = SummaryWriter(log_dir=cfg.logdir)
-        
-        if self.cfg.use_wandb:
-            wandb.init(
-                project="dqn-atari", 
-                config=asdict(cfg), 
-                dir=cfg.logdir,
-                name=cfg.exp_name)
+        self.writer = None
+
         
     def train(self):
         # Initial exploration
@@ -265,7 +259,7 @@ class Trainer:
         while self.steps < self.cfg.total_steps:
 
             # Sample transitions
-            if self.steps % (self.cfg.sample_steps * self.cfg.num_envs * self.cfg.test_freq) == 0:
+            if self.steps % (self.cfg.sample_steps * self.cfg.num_envs * self.cfg.test_freq) == 1:
                 self.evaluate()
 
             epsilon = self.epsilon_fn(self.steps)
@@ -290,22 +284,38 @@ class Trainer:
         
         self.evaluate()
         self.actor.envs.close()
+        wandb.finish()
     
     def evaluate(self):
         rss = []
         qss = []
+        videos = []
         pbar = tqdm(total=self.cfg.test_steps, desc="Testing")
         for _ in range(self.cfg.test_steps):
-            _, rs, qs = self.actor.sample(epsilon=self.cfg.test_eps, test=True)
+            frames, rs, qs = self.actor.sample(epsilon=self.cfg.test_eps, test=True)
             rss.extend(rs)
             qss.extend(qs)
+            videos.extend(frames)
             pbar.update(1)
             if len(rss) > 10:
                 break
         pbar.close()
-        self.log(qvals=qss, losses=[], returns=rss, test=True)
+        logdata = dict(
+            qvals=qss,
+            loss=[],
+            returns=rss
+        )
+        self.log(logdata, videos=np.array([videos]), test=True)
 
     def log(self, logdata, videos=None, test=False):
+        if self.cfg.use_tb_wandb and self.writer is None:
+            wandb.init(
+                project="dqn-atari", 
+                config=asdict(self.cfg), 
+                dir=self.cfg.logdir,
+                name=self.cfg.exp_name)
+            self.writer = SummaryWriter(log_dir=self.cfg.logdir)
+
         data_stat = dict()
         prefix = 'train' if not test else 'test'
         logstr = f"{prefix} - Steps: {self.steps:7d} | "
@@ -314,20 +324,18 @@ class Trainer:
                 data_stat[f"{prefix}_{k}_mean"] = np.mean(v)
                 data_stat[f"{prefix}_{k}_max"] = np.max(v)
                 data_stat[f"{prefix}_{k}_min"] = np.min(v)
-                logstr += f"{k} - Mean {np.mean(v):.2f}, Max {np.max(v):.2f}"
+                logstr += f"{k} - Mean {np.mean(v):.2f}, Max {np.max(v):.2f} | "
 
         self.logger.info(logstr)
-        
         data_stat.update(steps=self.steps)
-        if self.cfg.use_wandb:
+        if self.cfg.use_tb_wandb:
             wandb.log(data_stat)
             if videos is not None:
                 wandb.log({"video": wandb.Video(videos, fps=30)}, step=self.steps)
-        
-        if self.cfg.use_tb:
+
             for k, v in logdata.items():
                 if len(v) > 0:
-                    self.writer.add_histogram(k, v, self.steps)
+                    self.writer.add_histogram(k, np.array(v), self.steps)
             if videos is not None:
                 self.writer.add_video("video", videos, self.steps)
 
@@ -342,11 +350,9 @@ def main():
     cfg.act_dim = env.action_space[0].n
     env.close()
 
-
     timestr = time.strftime("%Y%m%d-%H%M%S")
     wordstr = "-".join(RandomWord().random_words(2))
-    sha = git.Repo(search_parent_directories=True).head.object.hexsha
-
+    sha = git.Repo(search_parent_directories=True).head.object.hexsha[:7]
     cfg.exp_name = f"{cfg.game}-{wordstr}"
     cfg.logdir = f"{cfg.logdir}/{cfg.game}-{timestr}-{sha}-{wordstr}"
     os.makedirs(cfg.logdir, exist_ok=False)
