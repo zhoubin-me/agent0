@@ -25,8 +25,8 @@ class Config:
     num_envs: int = 16
     logdir: str = 'logdir'
 
-    use_tb_wandb: bool = True
-    record_video: bool = True
+    use_tb_wandb: bool = False
+    record_video: bool = False
     exp_name = None
 
     num_actors: int = 2
@@ -128,7 +128,7 @@ class Actor:
                 done = np.logical_or(done, info["lifeloss"])
 
                 for st, at, rt, dt, st_next in zip(self.obs, action, reward, done, obs_next):
-                    frames = np.concat([st, st_next], axis=0)
+                    frames = lz4.block.compress(np.concat([st, st_next], axis=0))
                     transitions.append((frames, at, rt, dt))
             else:
                 transitions.append(obs_next[0][-1])
@@ -205,9 +205,7 @@ class ReplayBuffer(Dataset):
         return np.array(frames), at, rt, dt
 
     def extend(self, data):
-        for frames, at, rt, dt in data:
-            self.replay.append((lz4.block.compress(frames), at, rt, dt))
-
+        self.replay.extend(data)
 
 class Trainer:
     def __init__(self, cfg: Config, actors: List[Actor]=None):
@@ -275,13 +273,13 @@ class Trainer:
         step_frames = self.cfg.num_envs * self.cfg.sample_steps
         # Main training loop
         for _ in range(self.cfg.total_steps // step_frames + 1):
-            if self.steps % (self.cfg.sample_steps * self.cfg.num_envs * self.cfg.test_freq) == 1:
+            if self.steps % (step_frames * self.cfg.test_freq) == 1:
                 self.test()
 
             epsilon = self.epsilon_fn(self.steps)
             transitions, rs, qs = self.actor.sample(epsilon)
             self.replay.extend(transitions)
-            self.steps += self.cfg.sample_steps * self.cfg.num_envs
+            self.steps += step_frames
             
             # Train
             losses = []

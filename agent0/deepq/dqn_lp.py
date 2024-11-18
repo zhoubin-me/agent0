@@ -33,17 +33,18 @@ class TrainerNode(Trainer):
             pbar.update(len(transitions))
 
         pbar.close()
-        step_frames = self.cfg.num_envs * self.cfg.sample_steps
         data_iter = self.get_data_fetcher()
-
+        step_frames = self.cfg.num_envs * self.cfg.sample_steps
         for _ in range(self.cfg.total_steps // step_frames + 1):
+            if self.steps % (step_frames * self.cfg.test_freq) == 1:
+                self.test()
             epsilon = self.epsilon_fn(self.steps)
             dones, not_dones = futures.wait(sample_tasks, return_when=futures.FIRST_COMPLETED)
             sample_tasks = list(dones) + list(not_dones)
             rank, (transitions, rs, qs) = sample_tasks.pop(0).result()
             sample_tasks.append(self.actor[rank].futures.sample(epsilon, self.learner.model.state_dict()))
             self.replay.extend(transitions)
-            self.steps += self.cfg.sample_steps * self.cfg.num_envs
+            self.steps += step_frames
             
             # Train
             losses = []
