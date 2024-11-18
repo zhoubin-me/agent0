@@ -1,7 +1,8 @@
 
+python -m deepq.agent0.dqn --use-wandb --use-tb --use-lp --game Breakout
 
-python -m agent0.deepq.dqn --game Breakout
-python -m agent0.deepq.dqn --game NameThisGame
-python -m agent0.deepq.dqn --game Phoenix
-python -m agent0.deepq.dqn --game DoubleDunk
-python -m agent0.deepq.dqn --game Qbert
+python -m deepq.agent0.dqn --use-wandb --use-tb --use-lp --game Qbert
+python -m deepq.agent0.dqn --use-wandb --use-tb --use-lp --game NameThisGame
+python -m deepq.agent0.dqn --use-wandb --use-tb --use-lp --game BattleZone
+python -m deepq.agent0.dqn --use-wandb --use-tb --use-lp --game Phoenix
+python -m deepq.agent0.dqn --use-wandb --use-tb --use-lp --game DoubleDunk

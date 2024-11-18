@@ -1,32 +1,37 @@
+# Standard library imports
+import logging
+import os
+import time
+from collections import deque
+from concurrent import futures
+from copy import deepcopy
+from dataclasses import dataclass, asdict
+from typing import List
+
+# Third party imports
+import lz4.block
+import mediapy
 import numpy as np
+import launchpad as lp
+from tqdm import tqdm
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import launchpad as lp
-
-from torch.utils.tensorboard import SummaryWriter
-from torch.utils.data import Dataset, DataLoader, RandomSampler
-from collections import deque
-from copy import deepcopy
-from concurrent import futures
-
-from agent0.common.atari_wrappers import make_atari
-from agent0.common.utils import DataPrefetcher
-import lz4.block
-from dataclasses import dataclass, asdict
-import logging
 import wandb
-import time
-from tqdm import tqdm
-import os
-import mediapy
-from typing import List
+from torch.utils.data import Dataset, DataLoader, RandomSampler
+from torch.utils.tensorboard import SummaryWriter
+
+# Local imports
+from agent0.common.atari_wrappers import make_atari
+from agent0.common.utils import DataPrefetcher, set_random_seed, init
+
 
 @dataclass
 class Config:
     game: str = 'Breakout'
-    num_envs: int = 16
     logdir: str = 'logdir'
+    seed: int = 42
 
     use_wandb: bool = False
     use_tb: bool = False
@@ -34,6 +39,7 @@ class Config:
     record_video: bool = False
     exp_name = None
 
+    num_envs: int = 16
     num_actors: int = 2
     sample_steps: int = 80
     min_epsilon: float = 0.01
@@ -55,13 +61,6 @@ class Config:
 
     act_dim = None
     obs_shape = None
-
-
-def init(m, gain=1.0):
-    if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
-        nn.init.orthogonal_(m.weight.data, gain)
-        nn.init.zeros_(m.bias.data)
-
 
 class NatureCNN(nn.Module):
     def __init__(self, cfg: Config):
@@ -262,7 +261,7 @@ class Trainer:
             prefetch_factor=2,
         )
 
-        data_fetcher = DataPrefetcher(data_loader, 'cuda')
+        data_fetcher = DataPrefetcher(data_loader)
         return data_fetcher
 
     def fill_replay(self, epsilon=1.0):
@@ -448,6 +447,7 @@ def make_program(cfg: Config):
 
 
 def main(cfg: Config):
+    set_random_seed(cfg.seed)
     if cfg.use_lp:
         program = make_program(cfg)
         lp.launch(program, launch_type="local_mp", terminal="tmux_session")
@@ -470,8 +470,8 @@ if __name__ == '__main__':
     timestr = time.strftime("%Y%m%d-%H%M%S")
     wordstr = "-".join(RandomWord().random_words(2))
     sha = git.Repo(search_parent_directories=True).head.object.hexsha[:7]
-    cfg.exp_name = f"{cfg.game}-{wordstr}"
-    cfg.logdir = f"{cfg.logdir}/{cfg.game}-{timestr}-{sha}-{wordstr}"
+    cfg.exp_name = f"dqn-{cfg.game}-{wordstr}"
+    cfg.logdir = f"{cfg.logdir}/dqn-{cfg.game}-{timestr}-{sha}-{wordstr}"
     os.makedirs(cfg.logdir, exist_ok=False)
 
     main(cfg)

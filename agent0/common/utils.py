@@ -1,35 +1,12 @@
-import argparse
 import json
 import random
-from enum import Enum
 
 import numpy as np
 import torch
-from prefetch_generator import BackgroundGenerator
-from torch.utils.data import DataLoader
-
-
-class LinearSchedule:
-    def __init__(self, start, end=None, steps=None):
-        if end is None:
-            end = start
-            steps = 1
-        self.inc = (end - start) / float(steps)
-        self.current = start
-        self.end = end
-        if end > start:
-            self.bound = min
-        else:
-            self.bound = max
-
-    def __call__(self, steps=1):
-        val = self.current
-        self.current = self.bound(self.current + self.inc * steps, self.end)
-        return val
-
+import torch.nn as nn
 
 class DataPrefetcher:
-    def __init__(self, data_loader, device):
+    def __init__(self, data_loader):
         self.data_loader = data_loader
         self.data_iter = iter(data_loader)
         self.stream = torch.cuda.Stream()
@@ -43,36 +20,22 @@ class DataPrefetcher:
             self.data_iter = iter(self.data_loader)
             self.preload()
 
-        # noinspection PyTypeChecker
         with torch.cuda.stream(self.stream):
             self.next_data = (
                 x.cuda(non_blocking=True) for x in self.next_data
             )
 
     def next(self):
-        # noinspection PyTypeChecker
         torch.cuda.current_stream().wait_stream(self.stream)
         data = self.next_data
         self.preload()
         return data
 
 
-class DataLoaderX(DataLoader):
-    def __iter__(self):
-        return BackgroundGenerator(super().__iter__(), max_prefetch=3)
-
-
-def parse_arguments(config):
-    parser = argparse.ArgumentParser()
-    for k, v in vars(config).items():
-        if type(v) == bool:
-            parser.add_argument(f"--{k}", dest=k, action="store_true")
-            parser.add_argument(f"--no_{k}", dest=k, action="store_false")
-            parser.set_defaults(**{k: v})
-        else:
-            parser.add_argument(f"--{k}", type=type(v), default=v)
-    args = parser.parse_args()
-    return args
+def init(m, gain=1.0):
+    if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
+        nn.init.orthogonal_(m.weight.data, gain)
+        nn.init.zeros_(m.bias.data)
 
 
 def set_random_seed(seed):
@@ -82,9 +45,3 @@ def set_random_seed(seed):
     torch.backends.cudnn.benchmark = False
     torch.manual_seed(np.random.randint(int(1e6)))
 
-
-class EnumEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, Enum):
-            return obj.name
-        return json.JSONEncoder.default(self, obj)
