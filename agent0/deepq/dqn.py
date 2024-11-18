@@ -6,12 +6,10 @@ from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import Dataset, DataLoader, RandomSampler
 from collections import deque
 from copy import deepcopy
-from collections.abc import Sequence
 
 from agent0.common.atari_wrappers import make_atari
 from agent0.common.utils import DataPrefetcher
 import lz4.block
-import random
 from dataclasses import dataclass, asdict
 import logging
 import wandb
@@ -19,6 +17,7 @@ import time
 from tqdm import tqdm
 import os
 import mediapy
+
 
 @dataclass
 class Config:
@@ -52,6 +51,7 @@ class Config:
     act_dim = None
     obs_shape = None
 
+
 def init(m, gain=1.0):
     if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
         nn.init.orthogonal_(m.weight.data, gain)
@@ -74,12 +74,12 @@ class NatureCNN(nn.Module):
 
         def conv2d_size_out(size, kernel_size, stride, padding):
             return (size + 2 * padding - (kernel_size - 1) - 1) // stride + 1
+
         height, width = cfg.obs_shape[1], cfg.obs_shape[2]
         for kernel_size, stride in [(8, 4), (4, 2), (3, 1)]:
             height = conv2d_size_out(height, kernel_size, stride, 0)
             width = conv2d_size_out(width, kernel_size, stride, 0)
         feature_dim = 64 * height * width
-
 
         self.fc1 = nn.Linear(feature_dim, 512)
         self.fc2 = nn.Linear(512, cfg.act_dim)
@@ -92,7 +92,6 @@ class NatureCNN(nn.Module):
         x = F.relu(self.fc1(x))
         x = self.fc2(x)
         return x
-    
 
 
 class Actor:
@@ -140,11 +139,8 @@ class Actor:
                 rs += info["episode"]['r'][info["_episode"]].tolist()
         return transitions, rs, qs
 
-    
     def sync(self, state_dict):
         self.model.load_state_dict(state_dict)
-
-
 
 
 class Learner:
@@ -212,34 +208,6 @@ class ReplayBuffer(Dataset):
         for frames, at, rt, dt in data:
             self.replay.append((lz4.block.compress(frames), at, rt, dt))
 
-class DataPrefetcher:
-    def __init__(self, data_loader, device):
-        self.data_loader = data_loader
-        self.data_iter = iter(data_loader)
-        self.stream = torch.cuda.Stream()
-        self.next_data = None
-        self.preload()
-
-    def preload(self):
-        try:
-            self.next_data = next(self.data_iter)
-        except Exception as e:
-            self.data_iter = iter(self.data_loader)
-            self.preload()
-
-        # noinspection PyTypeChecker
-        with torch.cuda.stream(self.stream):
-            self.next_data = (
-                x.cuda(non_blocking=True) for x in self.next_data
-            )
-
-    def next(self):
-        # noinspection PyTypeChecker
-        torch.cuda.current_stream().wait_stream(self.stream)
-        data = self.next_data
-        self.preload()
-        return data
-
 
 class Trainer:
     def __init__(self, cfg: Config):
@@ -267,7 +235,7 @@ class Trainer:
         ch.setFormatter(formatter)
         self.logger.addHandler(ch)
         
-        fh = logging.FileHandler(os.path.join(cfg.logdir, f'train.log'))
+        fh = logging.FileHandler(os.path.join(cfg.logdir, 'train.log'))
         fh.setLevel(logging.INFO)
         fh.setFormatter(formatter)
         self.logger.addHandler(fh)
@@ -277,7 +245,8 @@ class Trainer:
     def get_data_fetcher(self):
         sampler = RandomSampler(
             self.replay,
-            replacement=True)
+            replacement=True
+        )
         
         data_loader = DataLoader(
             self.replay,
@@ -287,7 +256,7 @@ class Trainer:
             pin_memory=True,
             prefetch_factor=2,
         )
-        
+
         data_fetcher = DataPrefetcher(data_loader, 'cuda')
         return data_fetcher
         
@@ -300,6 +269,7 @@ class Trainer:
             pbar.update(len(transitions))
         pbar.close()
         data_iter = self.get_data_fetcher()
+
         # Main training loop
         while self.steps < self.cfg.total_steps:
             if self.steps % (self.cfg.sample_steps * self.cfg.num_envs * self.cfg.test_freq) == 1:
@@ -355,7 +325,8 @@ class Trainer:
                 project="dqn-atari", 
                 config=asdict(self.cfg), 
                 dir=self.cfg.logdir,
-                name=self.cfg.exp_name)
+                name=self.cfg.exp_name
+            )
             self.writer = SummaryWriter(log_dir=self.cfg.logdir)
 
         data_stat = dict()
