@@ -17,7 +17,7 @@ import time
 from tqdm import tqdm
 import os
 import mediapy
-
+from typing import List
 
 @dataclass
 class Config:
@@ -29,7 +29,7 @@ class Config:
     record_video: bool = True
     exp_name = None
 
-    num_envs: int = 16
+    num_actors: int = 2
     sample_steps: int = 80
     min_epsilon: float = 0.01
     test_epsilon: float = 0.001
@@ -210,12 +210,14 @@ class ReplayBuffer(Dataset):
 
 
 class Trainer:
-    def __init__(self, cfg: Config):
+    def __init__(self, cfg: Config, actors: List[Actor]=None):
         self.cfg = cfg
-        self.model = NatureCNN(cfg).cuda()
-        self.learner = Learner(cfg, self.model)
-        self.actor = Actor(cfg, self.model)
-        self.replay = ReplayBuffer(cfg)
+        model = NatureCNN(cfg).cuda()
+        learner = Learner(cfg, model)
+        replay = ReplayBuffer(cfg)
+        self.actor = actors if actors is not None else Actor(cfg, model)
+        self.learner = learner
+        self.replay = replay
         self.dataloder = None
         self.steps = 1
         self.epsilon_fn = (
@@ -227,19 +229,19 @@ class Trainer:
         # Set up logging
         self.logger = logging.getLogger("dqn")
         self.logger.setLevel(logging.INFO)
-        
-        # Add console handler
-        ch = logging.StreamHandler() 
-        ch.setLevel(logging.INFO)
         formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        ch.setFormatter(formatter)
-        self.logger.addHandler(ch)
         
         fh = logging.FileHandler(os.path.join(cfg.logdir, 'train.log'))
         fh.setLevel(logging.INFO)
         fh.setFormatter(formatter)
         self.logger.addHandler(fh)
-
+        
+        if isinstance(self.actor, Actor):
+            # Add console handler
+            ch = logging.StreamHandler() 
+            ch.setLevel(logging.INFO)
+            ch.setFormatter(formatter)
+            self.logger.addHandler(ch)
         self.writer = None
 
     def get_data_fetcher(self):
@@ -270,8 +272,9 @@ class Trainer:
         pbar.close()
         data_iter = self.get_data_fetcher()
 
+        step_frames = self.cfg.num_envs * self.cfg.sample_steps
         # Main training loop
-        while self.steps < self.cfg.total_steps:
+        for _ in range(self.cfg.total_steps // step_frames + 1):
             if self.steps % (self.cfg.sample_steps * self.cfg.num_envs * self.cfg.test_freq) == 1:
                 self.test()
 
@@ -378,6 +381,7 @@ def main():
     os.makedirs(cfg.logdir, exist_ok=False)
 
     # Create and train agent
+
     trainer = Trainer(cfg)
     trainer.run()
 

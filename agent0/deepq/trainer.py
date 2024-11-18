@@ -6,6 +6,7 @@ from dataclasses import asdict
 import numpy as np
 from einops import repeat
 from torch.utils.tensorboard import SummaryWriter
+from torch.utils.data import DataLoader
 
 import agent0.deepq.agent as agents
 import wandb
@@ -61,12 +62,14 @@ class Trainer:
         self.frame_count = 0
 
     def get_data_fetcher(self):
-        data_loader = DataLoaderX(
+        data_loader = DataLoader(
             self.replay,
             batch_size=self.cfg.learner.batch_size,
             shuffle=True,
             num_workers=2,
             pin_memory=True,
+            drop_last=True,
+            prefetch_factor=2,
         )
         data_fetcher = DataPrefetcher(data_loader, self.cfg.device.value)
         return data_fetcher
