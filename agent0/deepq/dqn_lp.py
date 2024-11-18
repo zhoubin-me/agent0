@@ -1,94 +1,101 @@
 import launchpad as lp
-from agent0.deepq.dqn import Actor, Learner, ReplayBuffer, Config
+from agent0.deepq.dqn import Config, Actor, Learner, ReplayBuffer
+from typing import List
+import logging
+from concurrent import futures
 import time
-
-class Shared:
-    def __init__(self):
-        self.actor_ready = False
-        self.actor_should_sample = False
-
-        self.replay_ready = False
-        self.replay_should_sample = False
-        
-        self.leaner_ready = False
-        self.leaner_should_learn = False
+import torch
+from tqdm import tqdm
 
 class ActorNode:
-    def __init__(self, cfg: Config, actor: Actor, signal: Signal, Trainer: None):
-        self.cfg = cfg
-        self.actor = actor
-        self.signal = signal
-        self.transitions = None
+    def __init__(self, cfg: Config, rank: int):
+        self.actor = Actor(cfg)
+        self.rank = rank
 
-    def run(self):
-        while True:
-            if self.signal.actor_should_sample:
-                self.transitions, rs, qs = self.actor.sample()
-                self.signal.actor_ready = True
-                self.signal.actor_should_sample = False
-            else:
-                time.sleep(0.01)
+    def sample(self, epsilon):
+        return self.rank, self.actor.sample(epsilon)
 
 
 class ReplayNode:
-    def __init__(self, cfg: Config, replay: ReplayBuffer, signal: Signal, Trainer: None):
+    def __init__(self, cfg: Config):
         self.cfg = cfg
-        self.replay = replay
-        self.signal = signal
-        self.transitions = None
+        self.replay = ReplayBuffer(cfg.replay_size)
+        self.data = None
+        self.stream = torch.cuda.Stream()
 
-    def run(self):
-        while True:
-            if self.signal.replay_should_sample:
-                self.transitions = self.replay.sample()
-                self.signal.replay_ready = True
-                self.signal.replay_should_sample = False
-            else:
-                time.sleep(0.01)
+    def preload(self):
+        transitions = self.replay.sample()
+        self.data = list(torch.from_numpy(x).pin_memory() for x in transitions)
+        with torch.cuda.stream(self.stream):
+            self.data = list(
+                x.cuda(non_blocking=True) for x in self.data
+            )
+        
+    def sample(self):
+        torch.cuda.current_stream().wait_stream(self.stream)
+        data = self.data
+        return data
 
-
-class LearnerNode:
-    def __init__(self, cfg: Config, learner: Learner, signal: Signal, Trainer: None):
-        self.cfg = cfg
-        self.learner = learner
-        self.signal = signal
-        self.transitions = None
-
-    def run(self):
-        while True:
-            if self.signal.leaner_should_learn:
-                loss = self.learner.step(self.transitions)
-                self.signal.replay_ready = True
-                self.signal.replay_should_sample = False
-            else:
-                time.sleep(0.01)
-
+    def extend(self, data):
+        self.replay.extend(data)
 
 class TrainerNode:
-    def __init__(self, cfg: Config, signal: Signal, actor, learner, replay):
+    def __init__(self, cfg: Config, actors: List[ActorNode], replay: ReplayNode):
         self.cfg = cfg
-        self.signal = signal
-        self.actor = actor
-        self.learner = learner
-        self.replay = replay
+        self.actors = actors
+        self.learner = Learner(cfg)
+        self.replay = ReplayNode(cfg)
+        self.epsilon_fn = (
+            lambda step: cfg.min_eps
+            if step > cfg.exploration_steps
+            else (1.0 - step / cfg.exploration_steps) + cfg.min_eps
+        )
+        self.steps = 1
+
+    def run(self):
+        sample_tasks = [x.futures.sample(1.0) for x in self.actors]
+        pbar = tqdm(total=self.cfg.training_start_steps, desc="Filling replay buffer")
+        while pbar.n < pbar.total:
+            dones, not_dones = futures.wait(sample_tasks, return_when=futures.FIRST_COMPLETED)
+            sample_tasks = list(dones) + list(not_dones)
+            rank, (transitions, qs, rs) = sample_tasks.pop(0).result()
+            sample_tasks.append(self.actors[rank].futures.sample(1.0))
+            self.replay.extend(transitions)
+            pbar.update(len(transitions))
+
+        step_frames = self.cfg.num_envs * self.cfg.sample_steps
+        self.replay.preload()
+        for step in range(self.cfg.total_steps // step_frames + 1):
+            epsilon = self.epsilon_fn(self.steps)
+            dones, not_dones = futures.wait(sample_tasks, return_when=futures.FIRST_COMPLETED)
+            sample_tasks = list(dones) + list(not_dones)
+            rank, (transitions, qs, rs) = sample_tasks.pop(0).result()
+            sample_tasks.append(self.actors[rank].futures.sample(epsilon))
+            self.replay.extend(transitions)
+            
 
 
-def make_program(cfg: Config):
+def make_program():
+    cfg = Config()
+    cfg.obs_shape = (4, 84, 84)
+    cfg.act_dim = 4
+    cfg.num_actors = 2
+
     program = lp.Program("dqn")
-    signal = Signal()
-
-    actor = lp.CourierNode(ActorNode, signal)
-    program.add_node(actor, label="actor")
-
-    learner = lp.CourierNode(LearnerNode, signal)
-    program.add_node(learner, label="leaner")
-
-    replay = lp.CourierNode(ReplayNode, signal)
-    program.add_node(replay, label="replay")
-
-    trainer = lp.CourierNode(TrainerNode, cfg=cfg, actors=actors)
-    program.add_node(trainer, label="trainer")
+    with program.group("actors"):
+        actors = [
+            program.add_node(lp.CourierNode(ActorNode, cfg, rank))
+            for rank in range(cfg.num_actors)
+        ]
+    # with program.group("replay"):
+    #     replay = program.add_node(lp.CourierNode(ReplayNode, cfg))
+    node = lp.CourierNode(TrainerNode, cfg=cfg, actors=actors, replay=None)
+    program.add_node(node, label="trainer")
     return program
-        
 
+
+
+if __name__ == '__main__':
+    program = make_program()
+    lp.launch(program, launch_type="local_mp", terminal="tmux_session")
 
