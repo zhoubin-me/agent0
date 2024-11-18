@@ -3,12 +3,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
-
+from torch.utils.data import Dataset, DataLoader, RandomSampler
 from collections import deque
 from copy import deepcopy
 from collections.abc import Sequence
 
 from agent0.common.atari_wrappers import make_atari
+from agent0.common.utils import DataPrefetcher
 import lz4.block
 import random
 from dataclasses import dataclass, asdict
@@ -31,8 +32,8 @@ class Config:
 
     num_envs: int = 16
     sample_steps: int = 80
-    min_eps: float = 0.01
-    test_eps: float = 0.001
+    min_epsilon: float = 0.01
+    test_epsilon: float = 0.001
     test_max_steps: int = 450
     test_rs_len: int = 32
     test_freq: int = 320
@@ -95,11 +96,11 @@ class NatureCNN(nn.Module):
 
 
 class Actor:
-    def __init__(self, cfg: Config, model):
+    def __init__(self, cfg: Config, model=None):
         self.cfg = cfg
         self.envs = make_atari(cfg.game, cfg.num_envs)
         self.obs, _ = self.envs.reset()
-        self.model = model
+        self.model = NatureCNN(cfg).cuda() if model is None else model
 
     @torch.no_grad()
     def act(self, epsilon):
@@ -147,9 +148,9 @@ class Actor:
 
 
 class Learner:
-    def __init__(self, cfg: Config, model):
+    def __init__(self, cfg: Config, model=None):
         self.cfg = cfg
-        self.model = model
+        self.model = NatureCNN(cfg).cuda() if model is None else model
         self.model_target = deepcopy(self.model)
         
         self.optimizer = torch.optim.AdamW(
@@ -174,7 +175,7 @@ class Learner:
         frames, actions, rewards, terminals = map(
             lambda x: x.cuda().float(), data
         )
-        frames = frames.view(self.cfg.batch_size, -1, *self.cfg.obs_shape[1:])
+        frames = frames.view(-1, self.cfg.obs_shape[0] * 2, *self.cfg.obs_shape[1:])
         frames = frames.div(255.0)
         obs, obs_next = torch.split(frames, self.cfg.obs_shape[0], dim=1)
 
@@ -192,41 +193,67 @@ class Learner:
         return loss.item()
 
 
-class ReplayBuffer(Sequence):
+class ReplayBuffer(Dataset):
     def __init__(self, cfg: Config):
         self.cfg = cfg
-        self.data = deque(maxlen=cfg.replay_size)
-
+        self.replay = deque(maxlen=cfg.replay_size)
+        self.batch = None
+        self.stream = torch.cuda.Stream()
 
     def __len__(self):
-        return len(self.data)
+        return len(self.replay)
 
     def __getitem__(self, idx):
-        frames, at, rt, dt = self.data[idx]
+        frames, at, rt, dt = self.replay[idx]
         frames = np.frombuffer(lz4.block.decompress(frames), dtype=np.uint8)
         return np.array(frames), at, rt, dt
 
-    def extend(self, transitions):
-        for frames, at, rt, dt in transitions:
-            self.data.append((lz4.block.compress(frames), at, rt, dt))
-    
-    def sample(self):
-        transitions = random.sample(self, self.cfg.batch_size)
-        return map(lambda x: torch.from_numpy(np.array(x)),
-                   zip(*transitions))
-    
+    def extend(self, data):
+        for frames, at, rt, dt in data:
+            self.replay.append((lz4.block.compress(frames), at, rt, dt))
+
+class DataPrefetcher:
+    def __init__(self, data_loader, device):
+        self.data_loader = data_loader
+        self.data_iter = iter(data_loader)
+        self.stream = torch.cuda.Stream()
+        self.next_data = None
+        self.preload()
+
+    def preload(self):
+        try:
+            self.next_data = next(self.data_iter)
+        except Exception as e:
+            self.data_iter = iter(self.data_loader)
+            self.preload()
+
+        # noinspection PyTypeChecker
+        with torch.cuda.stream(self.stream):
+            self.next_data = (
+                x.cuda(non_blocking=True) for x in self.next_data
+            )
+
+    def next(self):
+        # noinspection PyTypeChecker
+        torch.cuda.current_stream().wait_stream(self.stream)
+        data = self.next_data
+        self.preload()
+        return data
+
+
 class Trainer:
-    def __init__(self, cfg: Config, model):
+    def __init__(self, cfg: Config):
         self.cfg = cfg
-        self.model = model
-        self.learner = Learner(cfg, model)
-        self.actor = Actor(cfg, model)
-        self.buffer = ReplayBuffer(cfg)
+        self.model = NatureCNN(cfg).cuda()
+        self.learner = Learner(cfg, self.model)
+        self.actor = Actor(cfg, self.model)
+        self.replay = ReplayBuffer(cfg)
+        self.dataloder = None
         self.steps = 1
         self.epsilon_fn = (
-            lambda step: cfg.min_eps
+            lambda step: cfg.min_epsilon
             if step > cfg.exploration_steps
-            else (1.0 - step / cfg.exploration_steps) + cfg.min_eps
+            else (1.0 - step / cfg.exploration_steps) + cfg.min_epsilon
         )
 
         # Set up logging
@@ -247,16 +274,32 @@ class Trainer:
 
         self.writer = None
 
+    def get_data_fetcher(self):
+        sampler = RandomSampler(
+            self.replay,
+            replacement=True)
         
-    def train(self):
+        data_loader = DataLoader(
+            self.replay,
+            sampler=sampler,
+            batch_size=self.cfg.batch_size,
+            num_workers=2,
+            pin_memory=True,
+            prefetch_factor=2,
+        )
+        
+        data_fetcher = DataPrefetcher(data_loader, 'cuda')
+        return data_fetcher
+        
+    def run(self):
         # Initial exploration
         pbar = tqdm(total=self.cfg.training_start_steps, desc="Filling replay buffer")
-        while len(self.buffer) < self.cfg.training_start_steps:
+        while pbar.n < pbar.total:
             transitions, _, _ = self.actor.sample(epsilon=1.0)
-            self.buffer.extend(transitions)
+            self.replay.extend(transitions)
             pbar.update(len(transitions))
         pbar.close()
-
+        data_iter = self.get_data_fetcher()
         # Main training loop
         while self.steps < self.cfg.total_steps:
             if self.steps % (self.cfg.sample_steps * self.cfg.num_envs * self.cfg.test_freq) == 1:
@@ -264,14 +307,14 @@ class Trainer:
 
             epsilon = self.epsilon_fn(self.steps)
             transitions, rs, qs = self.actor.sample(epsilon)
-            self.buffer.extend(transitions)
+            self.replay.extend(transitions)
             self.steps += self.cfg.sample_steps * self.cfg.num_envs
             
             # Train
             losses = []
             for _ in range(self.cfg.learner_steps):
-                batch = self.buffer.sample()
-                loss = self.learner.step(batch)
+                data = data_iter.next()
+                loss = self.learner.step(data)
                 losses.append(loss)
             
             logdata = dict(
@@ -291,7 +334,7 @@ class Trainer:
         video = []
         pbar = tqdm(total=self.cfg.test_max_steps, desc="Testing")
         for _ in range(self.cfg.test_max_steps):
-            frames, rs, qs = self.actor.sample(epsilon=self.cfg.test_eps, test=True)
+            frames, rs, qs = self.actor.sample(epsilon=self.cfg.test_epsilon, test=True)
             rss.extend(rs)
             qss.extend(qs)
             video.extend(frames)
@@ -364,9 +407,8 @@ def main():
     os.makedirs(cfg.logdir, exist_ok=False)
 
     # Create and train agent
-    model = NatureCNN(cfg).cuda()
-    trainer = Trainer(cfg, model)
-    trainer.train()
+    trainer = Trainer(cfg)
+    trainer.run()
 
 
 if __name__ == "__main__":

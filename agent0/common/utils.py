@@ -30,22 +30,23 @@ class LinearSchedule:
 
 class DataPrefetcher:
     def __init__(self, data_loader, device):
-        self.data_loader = iter(data_loader)
+        self.data_loader = data_loader
+        self.data_iter = iter(data_loader)
         self.stream = torch.cuda.Stream()
-        self.device = device
         self.next_data = None
         self.preload()
 
     def preload(self):
         try:
-            self.next_data = next(self.data_loader)
+            self.next_data = next(self.data_iter)
         except Exception as e:
-            raise StopIteration
+            self.data_iter = iter(self.data_loader)
+            self.preload()
 
         # noinspection PyTypeChecker
         with torch.cuda.stream(self.stream):
             self.next_data = (
-                x.to(self.device, non_blocking=True) for x in self.next_data
+                x.cuda(non_blocking=True) for x in self.next_data
             )
 
     def next(self):

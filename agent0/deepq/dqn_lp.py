@@ -34,6 +34,7 @@ class ReplayNode:
     def sample(self):
         torch.cuda.current_stream().wait_stream(self.stream)
         data = self.data
+        self.preload()
         return data
 
     def extend(self, data):
@@ -72,7 +73,7 @@ class TrainerNode:
             rank, (transitions, qs, rs) = sample_tasks.pop(0).result()
             sample_tasks.append(self.actors[rank].futures.sample(epsilon))
             self.replay.extend(transitions)
-            
+
 
 
 def make_program():
