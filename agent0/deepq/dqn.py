@@ -361,15 +361,12 @@ class Trainer:
             for k, v in logdata.items():
                 if len(v) > 0:
                     self.writer.add_histogram(k, np.array(v), self.steps)
-        
-
-
+                    
         if self.cfg.record_video and len(video) > 0:
             frames = [np.frombuffer(lz4.block.decompress(x), dtype=np.uint8) for x in video]
             frames = [x.reshape(-1, *self.cfg.obs_shape[1:])[0] for x in frames]
             video_path = f"{self.cfg.logdir}/{self.steps:09d}.mp4"
             mediapy.write_video(video_path, frames, fps=15)
-            data_stat.update(video=wandb.Video(video_path))
         
         if self.cfg.use_wandb:
             wandb.log(data_stat)
