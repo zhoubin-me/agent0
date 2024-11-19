@@ -213,7 +213,7 @@ class Trainer:
         self.learner = learner
         self.replay = replay
         self.dataloder = None
-        self.steps = 1
+        self.steps = 0
         self.epsilon_fn = (
             lambda step: cfg.min_epsilon
             if step > cfg.exploration_steps
@@ -274,7 +274,7 @@ class Trainer:
 
         # Main training loop
         for _ in range(self.cfg.total_steps // step_frames + 1):
-            if self.steps % (step_frames * self.cfg.test_freq) == 1:
+            if self.steps % (step_frames * self.cfg.test_freq) == 0:
                 self.test()
 
             epsilon = self.epsilon_fn(self.steps)
@@ -337,7 +337,7 @@ class Trainer:
 
         data_stat = dict()
         prefix = 'train' if not test else 'test '
-        logstr = f"{prefix} - Frames: {self.steps-1:8d}"
+        logstr = f"{prefix} - Frames: {self.steps:8d}"
         for k, v in logdata.items():
             if len(v) > 0:
                 data_stat[f"{k}/{prefix}_mean"] = np.mean(v)
@@ -353,25 +353,27 @@ class Trainer:
         if test:
             self.logger.info("=" * 100)
         
-        data_stat.update(frames=self.steps-1)
+        data_stat.update(frames=self.steps)
 
         if self.cfg.use_tb:
             for k, v in data_stat.items():
                 self.writer.add_scalar(k, v, self.steps)
             for k, v in logdata.items():
                 if len(v) > 0:
-                    self.writer.add_histogram(k, np.array(v), self.steps-1)
+                    self.writer.add_histogram(k, np.array(v), self.steps)
         
-        if self.cfg.use_wandb:
-            wandb.log(data_stat)
+
 
         if self.cfg.record_video and len(video) > 0:
             frames = [np.frombuffer(lz4.block.decompress(x), dtype=np.uint8) for x in video]
             frames = [x.reshape(-1, *self.cfg.obs_shape[1:])[0] for x in frames]
             video_path = f"{self.cfg.logdir}/{self.steps:09d}.mp4"
             mediapy.write_video(video_path, frames, fps=15)
-            if self.cfg.use_wandb:
-                wandb.log({"video": wandb.Video(video_path)}, step=self.steps-1)
+            data_stat.update(video=wandb.Video(video_path))
+        
+        if self.cfg.use_wandb:
+            wandb.log(data_stat)
+
         
 
             
