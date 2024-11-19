@@ -137,6 +137,9 @@ class Actor:
             if "episode" in info:
                 rs += info["episode"]['r'][info["_episode"]].tolist()
         return transitions, rs, qs
+    
+    def reset(self):
+        self.obs, _ = self.envs.reset()
 
 
 class Learner:
@@ -276,7 +279,7 @@ class Trainer:
         # Main training loop
         for _ in range(self.cfg.total_steps // step_frames + 1):
             if self.steps % (step_frames * self.cfg.test_freq) == 0:
-                self.test()
+                self.evaluate()
 
             epsilon = self.epsilon_fn(self.steps)
             rs, qs = self.fill_replay(epsilon)
@@ -298,16 +301,13 @@ class Trainer:
         
         self.final()
     
-    def final(self):
-        self.test()
-        self.actor.envs.close()
-        wandb.finish()
-    
-    def test(self):
+    def evaluate(self):
         rss = []
         qss = []
         video = []
+
         pbar = tqdm(total=self.cfg.test_max_steps, desc="Testing")
+        self.actor.reset()
         while pbar.n < pbar.total:
             transitions, rs, qs = self.actor.sample(epsilon=self.cfg.test_epsilon)
             rss.extend(rs)
@@ -324,6 +324,11 @@ class Trainer:
             returns=rss
         )
         self.log(logdata, video=video, test=True)
+
+    def final(self):
+        self.evaluate()
+        self.actor.envs.close()
+        wandb.finish()
 
     def log(self, logdata, video=[], test=False):
         if self.cfg.use_wandb and wandb.run is None:
@@ -384,6 +389,9 @@ class ActorNode:
 
     def close(self):
         self.actor.envs.close()
+    
+    def reset(self):
+        self.actor.envs.reset()
 
 class TrainerNode(Trainer):
     def __init__(self, cfg: Config, actors: List[ActorNode]):
@@ -402,12 +410,15 @@ class TrainerNode(Trainer):
         self.replay.extend(transitions)
         return rs, qs
 
-    def test(self):
+    def evaluate(self):
         rss = []
         qss = []
         video = []
 
         futures.wait(self.tasks, return_when=futures.ALL_COMPLETED)
+        futures.wait([x.futures.reset() for x in self.actor], return_when=futures.ALL_COMPLETED)
+        state_dict = self.learner.model.state_dict()
+        self.tasks = [x.futures.sample(self.cfg.test_epsilon, state_dict) for x in self.actor]
         pbar = tqdm(total=self.cfg.test_max_steps, desc="Testing")
         while pbar.n < pbar.total:
             dones, not_dones = futures.wait(self.tasks, return_when=futures.FIRST_COMPLETED)
@@ -426,7 +437,6 @@ class TrainerNode(Trainer):
         futures.wait(self.tasks, return_when=futures.ALL_COMPLETED)
         epsilon = self.epsilon_fn(self.steps)
         self.tasks = [x.futures.sample(epsilon) for x in self.actor]
-
         logdata = dict(
             qvals=qss,
             loss=[],
