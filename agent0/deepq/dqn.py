@@ -7,6 +7,7 @@ from dataclasses import dataclass, asdict
 from typing import List
 
 # Third party imports
+from absl.testing.absltest import Tuple
 import lz4.block
 import mediapy
 import numpy as np
@@ -29,19 +30,19 @@ from agent0.common.utils import DataPrefetcher, set_random_seed, init
 class Config:
     game: str = 'Breakout'
     logdir: str = 'logdir'
+    expname: str = ''
     seed: int = 42
 
     use_wandb: bool = False
     use_tb: bool = False
     use_lp: bool = False
     record_video: bool = False
-    exp_name = None
 
     num_envs: int = 16
     num_actors: int = 2
     sample_steps: int = 80
-    min_epsilon: float = 0.01
-    test_epsilon: float = 0.001
+    min_epsilon: float = 0.1
+    test_epsilon: float = 0.05
     test_max_steps: int = 450
     test_rs_len: int = 32
     test_freq: int = 640
@@ -57,8 +58,8 @@ class Config:
     exploration_steps: int = int(1e6)
     replay_size: int = int(1e6)
 
-    act_dim = None
-    obs_shape = None
+    act_dim: int = 0
+    obs_shape: Tuple[int, int, int] = (0, 0, 0)
 
 class NatureCNN(nn.Module):
     def __init__(self, cfg: Config):
@@ -108,7 +109,7 @@ class Actor:
         action_random = np.random.randint(0, self.cfg.act_dim, self.cfg.num_envs)
         if epsilon >= 1.0:
             return action_random, 0
-        
+
         obs = torch.from_numpy(self.obs).cuda().float().div(255.0)
         qvals = self.model(obs)
         qvals, action_greedy = qvals.max(dim=-1)
@@ -137,7 +138,7 @@ class Actor:
             if "episode" in info:
                 rs += info["episode"]['r'][info["_episode"]].tolist()
         return transitions, rs, qs
-    
+
     def reset(self):
         self.obs, _ = self.envs.reset()
 
@@ -147,7 +148,7 @@ class Learner:
         self.cfg = cfg
         self.model = NatureCNN(cfg).cuda() if model is None else model
         self.model_target = deepcopy(self.model)
-        
+
         self.optimizer = torch.optim.AdamW(
             self.model.parameters(),
             cfg.learning_rate,
@@ -155,7 +156,7 @@ class Learner:
         )
         self.loss_fn = nn.SmoothL1Loss()
         self.update_steps = 0
-    
+
     def train_step(self, batch):
         obs, actions, rewards, terminals, obs_next = batch
         with torch.no_grad():
@@ -166,7 +167,7 @@ class Learner:
         curr_q = curr_q.gather(1, actions.long().unsqueeze(-1)).squeeze(-1)
         loss = self.loss_fn(curr_q, target_q)
         return loss
-    
+
     def step(self, data):
         frames, actions, rewards, terminals = map(
             lambda x: x.cuda().float(), data
@@ -177,15 +178,15 @@ class Learner:
 
         batch = obs, actions, rewards, terminals, obs_next
         loss = self.train_step(batch)
-        
+
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
-        
+
         self.update_steps += 1
         if self.update_steps % self.cfg.target_update_freq == 0:
             self.model_target.load_state_dict(self.model.state_dict())
-            
+
         return loss.item()
 
 
@@ -228,26 +229,26 @@ class Trainer:
         self.logger = logging.getLogger("dqn")
         self.logger.setLevel(logging.INFO)
         formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        
+
         fh = logging.FileHandler(f"{cfg.logdir}/train.log")
         fh.setLevel(logging.INFO)
         fh.setFormatter(formatter)
         self.logger.addHandler(fh)
-        
+
         # Not using launchpad need to add console handler
         if not cfg.use_lp:
-            ch = logging.StreamHandler() 
+            ch = logging.StreamHandler()
             ch.setLevel(logging.INFO)
             ch.setFormatter(formatter)
             self.logger.addHandler(ch)
-        
+
 
     def get_data_fetcher(self):
         sampler = RandomSampler(
             self.replay,
             replacement=True
         )
-        
+
         data_loader = DataLoader(
             self.replay,
             sampler=sampler,
@@ -265,7 +266,7 @@ class Trainer:
         transitions, rs, qs = self.actor.sample(epsilon)
         self.replay.extend(transitions)
         return rs, qs
-    
+
     def run(self):
         # Initial exploration
         pbar = tqdm(total=self.cfg.training_start_steps, desc="Filling replay buffer")
@@ -284,23 +285,23 @@ class Trainer:
             epsilon = self.epsilon_fn(self.steps)
             rs, qs = self.fill_replay(epsilon)
             self.steps += step_frames
-            
+
             # Train
             losses = []
             for _ in range(self.cfg.learner_steps):
                 data = data_iter.next()
                 loss = self.learner.step(data)
                 losses.append(loss)
-            
+
             logdata = dict(
                 loss=losses,
                 qvals=qs,
                 returns=rs,
             )
             self.log(logdata, test=False)
-        
+
         self.final()
-    
+
     def evaluate(self):
         rss = []
         qss = []
@@ -333,10 +334,10 @@ class Trainer:
     def log(self, logdata, video=[], test=False):
         if self.cfg.use_wandb and wandb.run is None:
             wandb.init(
-                project="dqn-atari", 
-                config=asdict(self.cfg), 
+                project="dqn-atari",
+                config=asdict(self.cfg),
                 dir=self.cfg.logdir,
-                name=self.cfg.exp_name
+                name=self.cfg.expname
             )
         if self.cfg.use_tb and not hasattr(self, 'writer'):
             self.writer = SummaryWriter(log_dir=self.cfg.logdir)
@@ -358,7 +359,7 @@ class Trainer:
         self.logger.info(logstr)
         if test:
             self.logger.info("=" * 100)
-        
+
         data_stat.update(frames=self.steps)
 
         if self.cfg.use_tb:
@@ -367,13 +368,13 @@ class Trainer:
             for k, v in logdata.items():
                 if len(v) > 0:
                     self.writer.add_histogram(k, np.array(v), self.steps)
-                    
+
         if self.cfg.record_video and len(video) > 0:
             frames = [np.frombuffer(lz4.block.decompress(x), dtype=np.uint8) for x in video]
             frames = [x.reshape(-1, *self.cfg.obs_shape[1:])[0] for x in frames]
             video_path = f"{self.cfg.logdir}/{self.steps:09d}.mp4"
             mediapy.write_video(video_path, frames, fps=15)
-        
+
         if self.cfg.use_wandb:
             wandb.log(data_stat)
 
@@ -389,7 +390,7 @@ class ActorNode:
 
     def close(self):
         self.actor.envs.close()
-    
+
     def reset(self):
         self.actor.envs.reset()
 
@@ -437,7 +438,7 @@ class TrainerNode(Trainer):
             qvals=qss,
             loss=[],
             returns=rss
-        )        
+        )
         self.log(logdata, video=video, test=True)
 
 
@@ -487,7 +488,7 @@ if __name__ == '__main__':
     timestr = time.strftime("%Y%m%d-%H%M%S")
     wordstr = "-".join(RandomWord().random_words(2))
     sha = git.Repo(search_parent_directories=True).head.object.hexsha[:7]
-    cfg.exp_name = f"dqn-{cfg.game}-{wordstr}"
+    cfg.expname = f"dqn-{cfg.game}-{wordstr}"
     cfg.logdir = f"{cfg.logdir}/dqn-{cfg.game}-{timestr}-{sha}-{wordstr}"
     os.makedirs(cfg.logdir, exist_ok=False)
 

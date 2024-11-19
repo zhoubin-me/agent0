@@ -38,10 +38,9 @@ def init(m, gain=1.0):
         nn.init.zeros_(m.bias.data)
 
 
-def set_random_seed(seed):
+def set_random_seed(seed: int) -> None:
     random.seed(seed)
     np.random.seed(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
     torch.manual_seed(np.random.randint(int(1e6)))
-

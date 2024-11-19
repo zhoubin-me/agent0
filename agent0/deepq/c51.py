@@ -36,6 +36,7 @@ class C51NN(NatureCNN):
         x = self.fc2(x)
         x = F.softmax(x, dim=-1)
         return x
+
 class C51Learner(Learner):
     def train_step(self, batch):
         obs, actions, rewards, terminals, obs_next = batch
@@ -94,7 +95,7 @@ if __name__ == '__main__':
     timestr = time.strftime("%Y%m%d-%H%M%S")
     wordstr = "-".join(RandomWord().random_words(2))
     sha = git.Repo(search_parent_directories=True).head.object.hexsha[:7]
-    cfg.exp_name = f"c51-{cfg.game}-{wordstr}"
+    cfg.expname = f"c51-{cfg.game}-{wordstr}"
     cfg.logdir = f"{cfg.logdir}/c51-{cfg.game}-{timestr}-{sha}-{wordstr}"
     os.makedirs(cfg.logdir, exist_ok=False)
 

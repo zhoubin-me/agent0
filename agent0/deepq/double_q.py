@@ -10,6 +10,9 @@ from agent0.deepq.dqn import Learner, Trainer, Config, ActorNode, TrainerNode
 from agent0.common.utils import set_random_seed
 from agent0.common.atari_wrappers import make_atari
 
+class DoubleConfig(Config):
+    test_epsilon = 0.001
+
 class DoubleLearner(Learner):
     def train_step(self, batch):
         obs, actions, rewards, terminals, obs_next = batch
@@ -24,7 +27,7 @@ class DoubleLearner(Learner):
         return loss
 
 class DoubleTrainer(Trainer):
-    def __init__(self, cfg: Config):
+    def __init__(self, cfg: DoubleConfig):
         super(DoubleTrainer, self).__init__(cfg)
         self.learner = DoubleLearner(cfg, self.learner.model)
 
@@ -34,7 +37,7 @@ class DoubleTrainerNode(TrainerNode):
         super(DoubleTrainerNode, self).__init__(cfg, actors)
         self.learner = DoubleLearner(cfg, self.learner.model)
 
-def make_program(cfg: Config):
+def make_program(cfg: DoubleConfig):
     program = lp.Program("dqn")
     with program.group("actors"):
         actors = [
@@ -47,7 +50,7 @@ def make_program(cfg: Config):
     return program
 
 
-def main(cfg: Config):
+def main(cfg: DoubleConfig):
     set_random_seed(cfg.seed)
     if cfg.use_lp:
         program = make_program(cfg)
@@ -62,7 +65,7 @@ if __name__ == '__main__':
     import tyro
     import git
 
-    cfg = tyro.cli(Config)
+    cfg = tyro.cli(DoubleConfig)
     env = make_atari(cfg.game, 1)
     cfg.obs_shape = env.observation_space.shape[1:]
     cfg.act_dim = env.action_space[0].n
@@ -71,7 +74,7 @@ if __name__ == '__main__':
     timestr = time.strftime("%Y%m%d-%H%M%S")
     wordstr = "-".join(RandomWord().random_words(2))
     sha = git.Repo(search_parent_directories=True).head.object.hexsha[:7]
-    cfg.exp_name = f"double-dqn-{cfg.game}-{wordstr}"
+    cfg.expname = f"double-dqn-{cfg.game}-{wordstr}"
     cfg.logdir = f"{cfg.logdir}/double-dqn-{cfg.game}-{timestr}-{sha}-{wordstr}"
     os.makedirs(cfg.logdir, exist_ok=False)
 
