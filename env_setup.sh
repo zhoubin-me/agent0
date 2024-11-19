@@ -3,5 +3,5 @@ pip3 install uv
 echo "set-option -g default-shell /usr/bin/fish" >> $HOME/.tmux.conf
 mkdir -p "$HOME/.config/fish"
 echo "fish_add_path $HOME/.local/bin" >> $HOME/.config/fish/config.fish
-fish -c "cd agent0; uv python install 3.12; uv venv --python 3.12; uv sync"
+fish -c "uv python install 3.12; uv venv --python 3.12; uv sync"
 tmux

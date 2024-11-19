@@ -433,10 +433,6 @@ class TrainerNode(Trainer):
             if len(rss) > self.cfg.test_rs_len:
                 break
         pbar.close()
-
-        futures.wait(self.tasks, return_when=futures.ALL_COMPLETED)
-        epsilon = self.epsilon_fn(self.steps)
-        self.tasks = [x.futures.sample(epsilon) for x in self.actor]
         logdata = dict(
             qvals=qss,
             loss=[],
