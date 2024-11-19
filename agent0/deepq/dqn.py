@@ -44,7 +44,7 @@ class Config:
     test_epsilon: float = 0.001
     test_max_steps: int = 450
     test_rs_len: int = 32
-    test_freq: int = 320
+    test_freq: int = 640
 
     discount: float = 0.99
     batch_size: int = 512
@@ -432,6 +432,10 @@ class TrainerNode(Trainer):
             pbar.update(1)
             if len(rss) > self.cfg.test_rs_len:
                 break
+        futures.wait(self.tasks, return_when=futures.ALL_COMPLETED)
+        futures.wait([x.futures.reset() for x in self.actor], return_when=futures.ALL_COMPLETED)
+        epsilon = self.epsilon_fn(self.steps)
+        self.tasks = [x.futures.sample(epsilon) for x in self.actor]
         pbar.close()
         logdata = dict(
             qvals=qss,
