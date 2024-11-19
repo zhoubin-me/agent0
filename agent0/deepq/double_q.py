@@ -20,7 +20,7 @@ class DoubleLearner(Learner):
             target_q = rewards + self.cfg.discount * (1 - terminals) * next_q
         curr_q = self.model(obs)
         curr_q = curr_q.gather(1, actions.long().unsqueeze(-1)).squeeze(-1)
-        loss = F.smooth_l1_loss(curr_q, target_q, reduction='sum')
+        loss = self.loss_fn(curr_q, target_q)
         return loss
 
 class DoubleTrainer(Trainer):
