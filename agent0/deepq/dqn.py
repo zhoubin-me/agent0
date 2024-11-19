@@ -4,10 +4,9 @@ from collections import deque
 from concurrent import futures
 from copy import deepcopy
 from dataclasses import dataclass, asdict
-from typing import List
+from typing import List, Tuple
 
 # Third party imports
-from absl.testing.absltest import Tuple
 import lz4.block
 import mediapy
 import numpy as np
@@ -209,7 +208,7 @@ class ReplayBuffer(Dataset):
         self.replay.extend(data)
 
 class Trainer:
-    def __init__(self, cfg: Config, actors=None):
+    def __init__(self, cfg: Config, actors: None | Actor=None):
         self.cfg = cfg
         model = NatureCNN(cfg).cuda()
         learner = Learner(cfg, model)
@@ -219,11 +218,7 @@ class Trainer:
         self.replay = replay
         self.dataloder = None
         self.steps = 0
-        self.epsilon_fn = (
-            lambda step: cfg.min_epsilon
-            if step > cfg.exploration_steps
-            else (1.0 - step / cfg.exploration_steps) + cfg.min_epsilon
-        )
+
 
         # Set up logging
         self.logger = logging.getLogger("dqn")
@@ -242,6 +237,11 @@ class Trainer:
             ch.setFormatter(formatter)
             self.logger.addHandler(ch)
 
+    def epsilon(self):
+        if self.steps > self.cfg.exploration_steps:
+            return self.cfg.min_epsilon
+        else:
+            return (1.0 - self.steps / cfg.exploration_steps) + cfg.min_epsilon
 
     def get_data_fetcher(self):
         sampler = RandomSampler(
@@ -282,8 +282,7 @@ class Trainer:
             if self.steps % (step_frames * self.cfg.test_freq) == 0:
                 self.evaluate()
 
-            epsilon = self.epsilon_fn(self.steps)
-            rs, qs = self.fill_replay(epsilon)
+            rs, qs = self.fill_replay(self.epsilon())
             self.steps += step_frames
 
             # Train
@@ -396,8 +395,8 @@ class ActorNode:
 
 class TrainerNode(Trainer):
     def __init__(self, cfg: Config, actors: List[ActorNode]):
-        super(TrainerNode, self).__init__(cfg, actors)
-        self.tasks = [x.futures.sample(1.0) for x in actors]
+        super(TrainerNode, self).__init__(cfg, actors) # pyright: ignore
+        self.tasks = [x.futures.sample(1.0) for x in actors] # pyright: ignore
 
     def fill_replay(self, epsilon=1.0):
         dones, not_dones = futures.wait(self.tasks, return_when=futures.FIRST_COMPLETED)
@@ -407,7 +406,7 @@ class TrainerNode(Trainer):
             state_dict = self.learner.model.state_dict()
         else:
             state_dict = None
-        self.tasks.append(self.actor[rank].futures.sample(epsilon, state_dict))
+        self.tasks.append(self.actor[rank].futures.sample(epsilon, state_dict)) # pyright: ignore
         self.replay.extend(transitions)
         return rs, qs
 
@@ -417,9 +416,9 @@ class TrainerNode(Trainer):
         video = []
 
         futures.wait(self.tasks, return_when=futures.ALL_COMPLETED)
-        futures.wait([x.futures.reset() for x in self.actor], return_when=futures.ALL_COMPLETED)
+        futures.wait([x.futures.reset() for x in self.actor], return_when=futures.ALL_COMPLETED) # pyright: ignore
         state_dict = self.learner.model.state_dict()
-        self.tasks = [x.futures.sample(self.cfg.test_epsilon, state_dict) for x in self.actor]
+        self.tasks = [x.futures.sample(self.cfg.test_epsilon, state_dict) for x in self.actor] # pyright: ignore
         pbar = tqdm(total=self.cfg.test_max_steps, desc="Testing")
         while pbar.n < pbar.total:
             dones, not_dones = futures.wait(self.tasks, return_when=futures.FIRST_COMPLETED)
@@ -429,7 +428,7 @@ class TrainerNode(Trainer):
             qss.extend(qs)
             if self.cfg.record_video and rank == 0:
                 video.extend([x[0] for x in transitions])
-            self.tasks.append(self.actor[rank].futures.sample(self.cfg.test_epsilon, None))
+            self.tasks.append(self.actor[rank].futures.sample(self.cfg.test_epsilon, None)) # pyright: ignore
             pbar.update(1)
             if len(rss) > self.cfg.test_rs_len:
                 break
@@ -445,7 +444,7 @@ class TrainerNode(Trainer):
     def final(self):
         self.evaluate()
         futures.wait(self.tasks, return_when=futures.ALL_COMPLETED)
-        futures.wait([x.futures.close() for x in self.actor], return_when=futures.ALL_COMPLETED)
+        futures.wait([x.futures.close() for x in self.actor], return_when=futures.ALL_COMPLETED) # pyright: ignore
         wandb.finish()
         lp.stop()
 
@@ -481,8 +480,8 @@ if __name__ == '__main__':
 
     cfg = tyro.cli(Config)
     env = make_atari(cfg.game, 1)
-    cfg.obs_shape = env.observation_space.shape[1:]
-    cfg.act_dim = env.action_space[0].n
+    cfg.obs_shape = env.observation_space.shape[1:] # pyright: ignore
+    cfg.act_dim = env.action_space[0].n # pyright: ignore
     env.close()
 
     timestr = time.strftime("%Y%m%d-%H%M%S")

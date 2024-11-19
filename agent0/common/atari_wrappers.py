@@ -5,7 +5,7 @@ import ale_py
 import numpy as np
 
 from gymnasium.wrappers import (
-    AtariPreprocessing, 
+    AtariPreprocessing,
     FrameStackObservation,
     TransformReward,
     RecordEpisodeStatistics)
@@ -49,7 +49,7 @@ class EpisodicLifeEnv(gym.Wrapper):
         return obs, reward, done, trunc, info
 
 
-def make_atari(game: str, num_envs: int):
+def make_atari(game: str, num_envs: int) -> gym.vector.VectorEnv:
     def trunk():
         x = gym.make(f'{game}NoFrameskip-v4')
         x = AtariPreprocessing(x, terminal_on_life_loss=False)
