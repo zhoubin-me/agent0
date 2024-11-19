@@ -1,7 +1,5 @@
 # Standard library imports
 import logging
-import os
-import time
 from collections import deque
 from concurrent import futures
 from copy import deepcopy
@@ -122,29 +120,23 @@ class Actor:
         )
         return action, qvals.mean().item()
 
-    def sample(self, epsilon, test=False):
+    def sample(self, epsilon):
         rs, qs, transitions = [], [], []
         for _ in range(self.cfg.sample_steps):
             action, qt_max = self.act(epsilon)
             obs_next, reward, terminal, truncated, info = self.envs.step(action)
-            if not test:
-                done = np.logical_or(terminal, truncated)
-                done = np.logical_or(done, info["lifeloss"])
+            done = np.logical_or(terminal, truncated)
+            done = np.logical_or(done, info["lifeloss"])
 
-                for st, at, rt, dt, st_next in zip(self.obs, action, reward, done, obs_next):
-                    frames = lz4.block.compress(np.concat([st, st_next], axis=0))
-                    transitions.append((frames, at, rt, dt))
-            else:
-                transitions.append(obs_next[0][-1])
+            for st, at, rt, dt, st_next in zip(self.obs, action, reward, done, obs_next):
+                frames = lz4.block.compress(np.concat([st, st_next], axis=0))
+                transitions.append((frames, at, rt, dt))
 
             self.obs = obs_next
             qs.append(qt_max)
             if "episode" in info:
                 rs += info["episode"]['r'][info["_episode"]].tolist()
         return transitions, rs, qs
-
-    def sync(self, state_dict):
-        self.model.load_state_dict(state_dict)
 
 
 class Learner:
@@ -233,7 +225,7 @@ class Trainer:
         self.logger.setLevel(logging.INFO)
         formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         
-        fh = logging.FileHandler(os.path.join(cfg.logdir, 'train.log'))
+        fh = logging.FileHandler(f"{cfg.logdir}/train.log")
         fh.setLevel(logging.INFO)
         fh.setFormatter(formatter)
         self.logger.addHandler(fh)
@@ -303,6 +295,9 @@ class Trainer:
             )
             self.log(logdata, test=False)
         
+        self.final()
+    
+    def final(self):
         self.test()
         self.actor.envs.close()
         wandb.finish()
@@ -313,10 +308,11 @@ class Trainer:
         video = []
         pbar = tqdm(total=self.cfg.test_max_steps, desc="Testing")
         while pbar.n < pbar.total:
-            frames, rs, qs = self.actor.sample(epsilon=self.cfg.test_epsilon, test=True)
+            transitions, rs, qs = self.actor.sample(epsilon=self.cfg.test_epsilon)
             rss.extend(rs)
             qss.extend(qs)
-            video.extend(frames)
+            if self.cfg.record_video:
+                video.extend([x[0] for x in transitions])
             pbar.update(1)
             if len(rss) > self.cfg.test_rs_len:
                 break
@@ -328,7 +324,7 @@ class Trainer:
         )
         self.log(logdata, video=video, test=True)
 
-    def log(self, logdata, video=None, test=False):
+    def log(self, logdata, video=[], test=False):
         if self.cfg.use_wandb and wandb.run is None:
             wandb.init(
                 project="dqn-atari", 
@@ -341,7 +337,7 @@ class Trainer:
 
         data_stat = dict()
         prefix = 'train' if not test else 'test '
-        logstr = f"{prefix} - Frames: {self.steps:8d}"
+        logstr = f"{prefix} - Frames: {self.steps-1:8d}"
         for k, v in logdata.items():
             if len(v) > 0:
                 data_stat[f"{k}/{prefix}_mean"] = np.mean(v)
@@ -357,19 +353,28 @@ class Trainer:
         if test:
             self.logger.info("=" * 100)
         
-        data_stat.update(frames=self.steps)
-        if self.cfg.use_wandb:
-            wandb.log(data_stat)
-            if self.cfg.record_video and video is not None:
-                timestr = time.strftime("%Y%m%d-%H%M%S")
-                video_path = f"/tmp/{self.cfg.exp_name}-{timestr}.mp4"
-                mediapy.write_video(video_path, video, fps=15)
-                wandb.log({"video": wandb.Video(video_path)}, step=self.steps)
-            
+        data_stat.update(frames=self.steps-1)
+
         if self.cfg.use_tb:
+            for k, v in data_stat.items():
+                self.writer.add_scalar(k, v, self.steps)
             for k, v in logdata.items():
                 if len(v) > 0:
-                    self.writer.add_histogram(k, np.array(v), self.steps)
+                    self.writer.add_histogram(k, np.array(v), self.steps-1)
+        
+        if self.cfg.use_wandb:
+            wandb.log(data_stat)
+
+        if self.cfg.record_video and len(video) > 0:
+            frames = [np.frombuffer(lz4.block.decompress(x), dtype=np.uint8) for x in video]
+            frames = [x.reshape(-1, *self.cfg.obs_shape[1:])[0] for x in frames]
+            video_path = f"{self.cfg.logdir}/{self.steps:09d}.mp4"
+            mediapy.write_video(video_path, frames, fps=15)
+            if self.cfg.use_wandb:
+                wandb.log({"video": wandb.Video(video_path)}, step=self.steps-1)
+        
+
+            
 
 
 
@@ -378,10 +383,13 @@ class ActorNode:
         self.actor = Actor(cfg)
         self.rank = rank
 
-    def sample(self, epsilon, state_dict=None, test=False):
+    def sample(self, epsilon, state_dict=None):
         if state_dict is not None:
             self.actor.model.load_state_dict(state_dict)
-        return self.rank, self.actor.sample(epsilon, test=test)
+        return self.rank, self.actor.sample(epsilon)
+
+    def close(self):
+        self.actor.envs.close()
 
 class TrainerNode(Trainer):
     def __init__(self, cfg: Config, actors: List[ActorNode]):
@@ -391,47 +399,47 @@ class TrainerNode(Trainer):
     def fill_replay(self, epsilon=1.0):
         dones, not_dones = futures.wait(self.tasks, return_when=futures.FIRST_COMPLETED)
         self.tasks = list(dones) + list(not_dones)
-        rank, (transitions, qs, rs) = self.tasks.pop(0).result()
+        rank, (transitions, rs, qs) = self.tasks.pop(0).result()
         if epsilon < 1.0:
             state_dict = self.learner.model.state_dict()
         else:
             state_dict = None
         self.tasks.append(self.actor[rank].futures.sample(epsilon, state_dict))
         self.replay.extend(transitions)
-        return qs, rs
+        return rs, qs
 
     def test(self):
         rss = []
         qss = []
         video = []
 
-        self.tasks, _ = futures.wait(self.tasks, return_when=futures.ALL_COMPLETED)
-        self.tasks = list(self.tasks)
-
-        state_dict = self.learner.model.state_dict()
-        tasks = [x.futures.sample(self.cfg.test_epsilon, state_dict, test=True) for x in self.actor]
         pbar = tqdm(total=self.cfg.test_max_steps, desc="Testing")
         while pbar.n < pbar.total:
-            dones, not_dones = futures.wait(tasks, return_when=futures.FIRST_COMPLETED)
-            tasks = list(dones) + list(not_dones)
-            rank, (frames, qs, rs) = tasks.pop(0).result()
+            dones, not_dones = futures.wait(self.tasks, return_when=futures.FIRST_COMPLETED)
+            self.tasks = list(dones) + list(not_dones)
+            rank, (transitions, rs, qs) = self.tasks.pop(0).result()
             rss.extend(rs)
             qss.extend(qs)
-            video.extend(frames)
-            tasks.append(self.actor[rank].futures.sample(self.cfg.test_epsilon, None, True))
+            if self.cfg.record_video and rank == 0:
+                video.extend([x[0] for x in transitions])
+            self.tasks.append(self.actor[rank].futures.sample(self.cfg.test_epsilon, None))
             pbar.update(1)
             if len(rss) > self.cfg.test_rs_len:
                 break
         pbar.close()
-        for task in tasks:
-            task.cancel()
-        
         logdata = dict(
             qvals=qss,
             loss=[],
             returns=rss
         )
         self.log(logdata, video=video, test=True)
+
+
+    def final(self):
+        self.test()
+        futures.wait([x.futures.close() for x in self.actor], return_when=futures.ALL_COMPLETED)
+        wandb.finish()
+        lp.stop()
 
 def make_program(cfg: Config):
     program = lp.Program("dqn")
@@ -460,6 +468,8 @@ if __name__ == '__main__':
     from wonderwords import RandomWord
     import tyro
     import git
+    import time
+    import os
 
     cfg = tyro.cli(Config)
     env = make_atari(cfg.game, 1)

@@ -39,7 +39,6 @@ class C51NN(NatureCNN):
 class C51Learner(Learner):
     def train_step(self, batch):
         obs, actions, rewards, terminals, obs_next = batch
-
         with torch.no_grad():
             prob_next = self.model_target(obs_next)
             a_next = prob_next.mul(self.model.atoms).sum(-1).argmax(-1)
