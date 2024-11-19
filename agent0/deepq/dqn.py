@@ -374,12 +374,6 @@ class Trainer:
         if self.cfg.use_wandb:
             wandb.log(data_stat)
 
-        
-
-            
-
-
-
 class ActorNode:
     def __init__(self, cfg: Config, rank: int):
         self.actor = Actor(cfg)
@@ -415,6 +409,7 @@ class TrainerNode(Trainer):
         qss = []
         video = []
 
+        futures.wait(self.tasks, return_when=futures.ALL_COMPLETED)
         pbar = tqdm(total=self.cfg.test_max_steps, desc="Testing")
         while pbar.n < pbar.total:
             dones, not_dones = futures.wait(self.tasks, return_when=futures.FIRST_COMPLETED)
@@ -429,16 +424,22 @@ class TrainerNode(Trainer):
             if len(rss) > self.cfg.test_rs_len:
                 break
         pbar.close()
+
+        futures.wait(self.tasks, return_when=futures.ALL_COMPLETED)
+        epsilon = self.epsilon_fn(self.steps)
+        self.tasks = [x.futures.sample(epsilon) for x in self.actor]
+
         logdata = dict(
             qvals=qss,
             loss=[],
             returns=rss
-        )
+        )        
         self.log(logdata, video=video, test=True)
 
 
     def final(self):
         self.test()
+        futures.wait(self.tasks, return_when=futures.ALL_COMPLETED)
         futures.wait([x.futures.close() for x in self.actor], return_when=futures.ALL_COMPLETED)
         wandb.finish()
         lp.stop()
