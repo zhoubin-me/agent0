@@ -48,7 +48,7 @@ class Config:
 
     discount: float = 0.99
     batch_size: int = 512
-    learning_rate: float = 1e-3
+    learning_rate: float = 5e-4
     target_update_freq: int = 100
     learner_steps: int = 20
 
